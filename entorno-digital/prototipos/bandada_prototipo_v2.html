@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bandada v2 · Boids + Acelerómetro (MAEDI)</title>
+<style>
+  :root {
+    --panel-bg: rgba(255,255,255,0.92);
+    --ink: #111;
+    --line: #ccc;
+  }
+  html, body {
+    margin: 0; padding: 0; overflow: hidden;
+    background: #fff;
+    font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+    color: var(--ink);
+  }
+  canvas { display: block; background: #fff; }
+
+  #panel {
+    position: fixed;
+    top: 16px; left: 16px;
+    width: 280px;
+    background: var(--panel-bg);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 14px 16px 10px;
+    font-size: 12px;
+    backdrop-filter: blur(4px);
+    box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+  }
+  #panel h1 {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin: 0 0 2px;
+    font-weight: 600;
+    color: #555;
+  }
+  #panel .subtitle {
+    font-size: 10.5px;
+    color: #999;
+    margin: 0 0 10px;
+  }
+  .row { margin-bottom: 10px; }
+  .row label {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 3px;
+    font-size: 11.5px;
+  }
+  .row label span.val {
+    font-variant-numeric: tabular-nums;
+    color: #666;
+  }
+  input[type=range] { width: 100%; }
+  .divider { border: none; border-top: 1px solid var(--line); margin: 10px 0; }
+  .checkline {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 11.5px; margin-bottom: 8px;
+  }
+  button {
+    width: 100%;
+    padding: 6px 8px;
+    font-size: 11.5px;
+    border: 1px solid #999;
+    background: #fff;
+    border-radius: 6px;
+    cursor: pointer;
+  }
+  button:hover { background: #f2f2f2; }
+  #hint {
+    margin-top: 8px;
+    font-size: 10.5px;
+    color: #888;
+    line-height: 1.4;
+  }
+  #stats {
+    position: fixed;
+    bottom: 12px; left: 16px;
+    font-size: 10.5px;
+    color: #999;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.5;
+  }
+</style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+
+<div id="panel">
+  <h1>Acelerómetro simulado</h1>
+  <p class="subtitle">v2 · boids con vecinos locales + viento + estela</p>
+
+  <div class="row">
+    <label>Eje X (viento horizontal) <span class="val" id="valX">0.00</span></label>
+    <input type="range" id="sliderX" min="-2" max="2" step="0.01" value="0">
+  </div>
+  <div class="row">
+    <label>Eje Y (viento vertical) <span class="val" id="valY">0.00</span></label>
+    <input type="range" id="sliderY" min="-2" max="2" step="0.01" value="0">
+  </div>
+  <div class="row">
+    <label>Eje Z (peso de cohesión) <span class="val" id="valZ">0.00</span></label>
+    <input type="range" id="sliderZ" min="-2" max="2" step="0.01" value="0">
+  </div>
+
+  <div class="checkline">
+    <input type="checkbox" id="autoMode">
+    <label for="autoMode">Modo demo automático (simula una mano moviéndose)</label>
+  </div>
+
+  <hr class="divider">
+
+  <div class="row">
+    <label>Cantidad de pájaros <span class="val" id="valN">1500</span></label>
+    <input type="range" id="sliderN" min="100" max="16000" step="100" value="1500">
+  </div>
+
+  <div class="row">
+    <label>Tamaño de los puntos <span class="val" id="valSize">100%</span></label>
+    <input type="range" id="sliderSize" min="100" max="200" step="5" value="100">
+  </div>
+
+  <div class="row">
+    <label>Estela (persistencia) <span class="val" id="valTrail">0.18</span></label>
+    <input type="range" id="sliderTrail" min="0" max="0.4" step="0.01" value="0.18">
+  </div>
+
+  <button id="resetBtn">Reiniciar bandada</button>
+
+  <div id="hint">
+    Cada pájaro reacciona solo a sus vecinos cercanos (separación, alineación,
+    cohesión) — la forma de la nube emerge del comportamiento local, no de una
+    fórmula geométrica global. X/Y actúan como viento que empuja a la bandada;
+    Z regula cuánta cohesión hay (más compacta o más difusa). Un movimiento
+    brusco del vector dispara un "depredador" simulado que abre un vacío
+    temporal en la nube. Esta interfaz reemplaza temporalmente al textil con
+    acelerómetro (Arduino/Lilypad); <code>window.updateAccel(x,y,z)</code>
+    queda disponible para cuando exista el dispositivo real.
+  </div>
+</div>
+
+<div id="stats"></div>
+
+<script>
+(function () {
+  "use strict";
+
+  const canvas = document.getElementById("canvas");
+  const ctx = canvas.getContext("2d");
+
+  function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+  window.addEventListener("resize", resize);
+  resize();
+
+  // ---------------------------------------------------------------
+  // Estado del "acelerómetro". Igual que en la v1: los sliders lo
+  // alimentan hoy; cuando exista el dispositivo real, basta con
+  // llamar a window.updateAccel(x, y, z) desde el código que lea el
+  // puerto serie / BLE del Arduino-Lilypad, sin tocar el resto de la
+  // simulación (Tarea "próximos pasos" del documento de propuesta).
+  // ---------------------------------------------------------------
+  const accel = { x: 0, y: 0, z: 0 };
+
+  window.updateAccel = function (x, y, z) {
+    accel.x = clamp(x, -2, 2);
+    accel.y = clamp(y, -2, 2);
+    accel.z = clamp(z, -2, 2);
+  };
+
+  function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+  function lerp(a, b, t) { return a + (b - a) * t; }
+  function rand(a, b) { return a + Math.random() * (b - a); }
+
+  // Mezcla dependiente de dt normalizada a 60fps, para que factores de
+  // "blend por frame" (alineación, cohesión) se comporten igual aunque
+  // el framerate real varíe con la densidad de puntos.
+  function rateBlend(factor, dt) {
+    return 1 - Math.pow(1 - factor, dt * 60);
+  }
+
+  // ---------------------------------------------------------------
+  // UI
+  // ---------------------------------------------------------------
+  const sliderX = document.getElementById("sliderX");
+  const sliderY = document.getElementById("sliderY");
+  const sliderZ = document.getElementById("sliderZ");
+  const sliderN = document.getElementById("sliderN");
+  const sliderSize = document.getElementById("sliderSize");
+  const sliderTrail = document.getElementById("sliderTrail");
+  const valX = document.getElementById("valX");
+  const valY = document.getElementById("valY");
+  const valZ = document.getElementById("valZ");
+  const valN = document.getElementById("valN");
+  const valSize = document.getElementById("valSize");
+  const valTrail = document.getElementById("valTrail");
+  const autoModeBox = document.getElementById("autoMode");
+  const resetBtn = document.getElementById("resetBtn");
+  const stats = document.getElementById("stats");
+
+  let manualControl = true;
+
+  function syncSlidersToAccel() {
+    sliderX.value = accel.x.toFixed(2);
+    sliderY.value = accel.y.toFixed(2);
+    sliderZ.value = accel.z.toFixed(2);
+  }
+
+  [sliderX, sliderY, sliderZ].forEach((s) => {
+    s.addEventListener("input", () => {
+      manualControl = true;
+      autoModeBox.checked = false;
+      window.updateAccel(
+        parseFloat(sliderX.value),
+        parseFloat(sliderY.value),
+        parseFloat(sliderZ.value)
+      );
+    });
+  });
+
+  autoModeBox.addEventListener("change", () => {
+    manualControl = !autoModeBox.checked;
+  });
+
+  sliderN.addEventListener("input", () => {
+    valN.textContent = sliderN.value;
+    setBirdCount(parseInt(sliderN.value, 10));
+  });
+
+  const BASE_POINT_SIZE = 1.76; // px, mismo tamaño de referencia que v1 (100%)
+  let pointSize = BASE_POINT_SIZE;
+
+  sliderSize.addEventListener("input", () => {
+    const pct = parseInt(sliderSize.value, 10);
+    valSize.textContent = pct + "%";
+    pointSize = BASE_POINT_SIZE * (pct / 100);
+  });
+
+  let trailAlpha = parseFloat(sliderTrail.value);
+  sliderTrail.addEventListener("input", () => {
+    trailAlpha = parseFloat(sliderTrail.value);
+    valTrail.textContent = trailAlpha.toFixed(2);
+  });
+
+  resetBtn.addEventListener("click", () => {
+    initBirds(birds.length);
+  });
+
+  // ---------------------------------------------------------------
+  // Sistema de partículas ("bandada") — v2: boids con grilla espacial
+  //
+  // Cada pájaro es {x, y, vx, vy}. En cada frame se arma una grilla
+  // (Map) que ubica a cada pájaro en su celda; para calcular las tres
+  // reglas clásicas (separación, alineación, cohesión) solo se miran
+  // los vecinos en la propia celda y las 8 adyacentes, nunca contra
+  // toda la bandada -> costo ~O(n) en vez de O(n²), viable a 16000
+  // puntos en Canvas 2D.
+  //
+  // - Separación: alejarse de vecinos muy cercanos (< SEP_R).
+  // - Alineación: mezclar la propia velocidad hacia el promedio de
+  //   los vecinos (factor bajo, para que un giro se propague como
+  //   onda por la nube en vez de sincronizarse de golpe).
+  // - Cohesión: atracción suave hacia el centro de masa de los
+  //   vecinos; el peso lo controla el eje Z (más cohesión = bandada
+  //   más compacta).
+  // - X/Y del acelerómetro ya no mueven un centro maestro: se suman
+  //   como un vector de "viento" a la velocidad de cada pájaro, así
+  //   que la nube se estira/inclina en esa dirección en vez de
+  //   trasladarse en bloque.
+  // - Los bordes de pantalla frenan con un rebote suave (fuerza de
+  //   retorno) en vez de un clamp duro de posición.
+  // ---------------------------------------------------------------
+
+  const CELL = 50;           // tamaño de celda de la grilla espacial (px)
+  const CELL_OFFSET = 4000;  // desplaza índices de celda para evitar claves negativas
+  const NEIGHBOR_R = 55;     // radio de percepción para alineación/cohesión (px)
+  const NEIGHBOR_R2 = NEIGHBOR_R * NEIGHBOR_R;
+  const SEP_R = 11;          // radio de separación (px) — dentro del rango 8-14 sugerido
+  const SEP_R2 = SEP_R * SEP_R;
+  const MAX_NEIGHBORS = 26;  // tope de vecinos evaluados por pájaro (acota el peor caso)
+
+  const SEP_WEIGHT = 620;      // "fuerza" de separación (px/s² aprox.)
+  const ALIGN_FACTOR = 0.11;   // mezcla de velocidad hacia el promedio vecino, por "frame" a 60fps
+  const COHESION_MIN = 0.010;  // peso de cohesión con Z al mínimo
+  const COHESION_MAX = 0.075;  // peso de cohesión con Z al máximo
+
+  const WIND_K = 70;           // fuerza del viento por unidad de acelerómetro (px/s²)
+  const BOUND_MARGIN = 70;     // margen de pantalla donde arranca el rebote suave
+  const BOUND_K = 5.5;         // fuerza del rebote suave
+
+  let birds = [];
+  const grid = new Map();
+
+  function initBirds(n) {
+    const w = canvas.width, h = canvas.height;
+    const cx = w / 2, cy = h / 2;
+    const spread = Math.min(w, h) * 0.22;
+    birds = new Array(n);
+    for (let i = 0; i < n; i++) {
+      birds[i] = makeBird(cx, cy, spread);
+    }
+  }
+
+  function makeBird(cx, cy, spread) {
+    const angle = rand(0, Math.PI * 2);
+    const r = Math.sqrt(Math.random()) * spread;
+    const dir = rand(0, Math.PI * 2);
+    const speed = rand(40, 90);
+    return {
+      x: cx + Math.cos(angle) * r,
+      y: cy + Math.sin(angle) * r,
+      vx: Math.cos(dir) * speed,
+      vy: Math.sin(dir) * speed,
+    };
+  }
+
+  function flockCentroid() {
+    if (birds.length === 0) return { x: canvas.width / 2, y: canvas.height / 2 };
+    let sx = 0, sy = 0;
+    const n = Math.min(birds.length, 400); // muestra acotada, alcanza para estimar el centro
+    const step = Math.max(1, Math.floor(birds.length / n));
+    let count = 0;
+    for (let i = 0; i < birds.length; i += step) {
+      sx += birds[i].x; sy += birds[i].y; count++;
+    }
+    return { x: sx / count, y: sy / count };
+  }
+
+  function setBirdCount(n) {
+    if (n === birds.length) return;
+    if (n < birds.length) {
+      birds.length = n;
+    } else {
+      const c = flockCentroid();
+      const spread = Math.min(canvas.width, canvas.height) * 0.15;
+      const add = n - birds.length;
+      for (let i = 0; i < add; i++) birds.push(makeBird(c.x, c.y, spread));
+    }
+  }
+
+  initBirds(parseInt(sliderN.value, 10));
+
+  // ---------------------------------------------------------------
+  // Evento de "depredador" simulado (Tarea 4)
+  // Un pico repentino en la magnitud del vector del acelerómetro
+  // (comparado contra el frame anterior, no un valor sostenido) crea
+  // un punto de repulsión temporal dentro de la nube: empuja a los
+  // vecinos cercanos y se disuelve en 1-2s, replicando el "agujero
+  // negro" que se ve cuando un halcón cruza una murmuración real.
+  // ---------------------------------------------------------------
+  const SPIKE_THRESHOLD = 0.55;
+  const PREDATOR_LIFE = 1.6;     // segundos
+  const PREDATOR_RADIUS = 160;   // px
+  const MAX_PREDATORS = 3;
+  let predators = [];
+  let prevMag = 0;
+
+  function maybeSpawnPredator(mag) {
+    const delta = mag - prevMag;
+    if (delta > SPIKE_THRESHOLD && predators.length < MAX_PREDATORS) {
+      const b = birds[Math.floor(Math.random() * birds.length)];
+      if (b) {
+        predators.push({ x: b.x, y: b.y, life: PREDATOR_LIFE, maxLife: PREDATOR_LIFE });
+      }
+    }
+    prevMag = mag;
+  }
+
+  function updatePredators(dt) {
+    for (let i = predators.length - 1; i >= 0; i--) {
+      predators[i].life -= dt;
+      if (predators[i].life <= 0) predators.splice(i, 1);
+    }
+  }
+
+  // ---------------------------------------------------------------
+  // Grilla espacial: se reconstruye cada frame (O(n)).
+  // ---------------------------------------------------------------
+  function cellIndex(v) { return Math.floor(v / CELL) + CELL_OFFSET; }
+  function cellKey(cx, cy) { return cx * 100000 + cy; }
+
+  function buildGrid() {
+    grid.clear();
+    for (let i = 0; i < birds.length; i++) {
+      const b = birds[i];
+      const cx = cellIndex(b.x);
+      const cy = cellIndex(b.y);
+      b._cx = cx; b._cy = cy;
+      const key = cellKey(cx, cy);
+      let arr = grid.get(key);
+      if (!arr) { arr = []; grid.set(key, arr); }
+      arr.push(i);
+    }
+  }
+
+  // ---------------------------------------------------------------
+  // Loop de animación
+  // ---------------------------------------------------------------
+  let autoT = 0;
+  let lastTime = performance.now();
+  let fps = 60;
+  let fpsSmoothed = 60;
+
+  function frame(now) {
+    const dt = Math.min(0.05, (now - lastTime) / 1000);
+    const instFps = dt > 0 ? 1 / dt : 60;
+    fpsSmoothed = lerp(fpsSmoothed, instFps, 0.08);
+    lastTime = now;
+
+    if (!manualControl) {
+      autoT += dt;
+      const ax = Math.sin(autoT * 0.35) * 1.4 + Math.sin(autoT * 0.9) * 0.3;
+      const ay = Math.cos(autoT * 0.27) * 1.2 + Math.sin(autoT * 1.3) * 0.25;
+      const az = Math.sin(autoT * 0.18) * 1.6;
+      window.updateAccel(ax, ay, az);
+      syncSlidersToAccel();
+    }
+
+    updateSliderLabels();
+    step(dt);
+    draw();
+
+    requestAnimationFrame(frame);
+  }
+
+  function updateSliderLabels() {
+    valX.textContent = accel.x.toFixed(2);
+    valY.textContent = accel.y.toFixed(2);
+    valZ.textContent = accel.z.toFixed(2);
+  }
+
+  function step(dt) {
+    const w = canvas.width, h = canvas.height;
+
+    // Turbulencia general a partir de la magnitud del vector (x,y,z)
+    const mag = Math.sqrt(accel.x * accel.x + accel.y * accel.y + accel.z * accel.z);
+    const turbulence = clamp(mag / 2.5, 0, 1);
+    maybeSpawnPredator(mag);
+    updatePredators(dt);
+
+    // Z: peso de cohesión (más cohesión = bandada más compacta)
+    const zNorm = (accel.z + 2) / 4; // 0..1
+    const cohesionWeight = lerp(COHESION_MIN, COHESION_MAX, zNorm);
+
+    // X/Y: viento, no desplazamiento rígido de un centro maestro
+    const windX = accel.x * WIND_K;
+    const windY = -accel.y * WIND_K;
+
+    const maxSpeed = lerp(95, 260, turbulence);
+    const minSpeed = maxSpeed * 0.22;
+
+    const alignBlend = rateBlend(ALIGN_FACTOR, dt);
+
+    buildGrid();
+
+    for (let i = 0; i < birds.length; i++) {
+      const b = birds[i];
+      let vx = b.vx, vy = b.vy;
+
+      // --- vecinos locales (grilla 3x3) ---
+      let sepX = 0, sepY = 0, sepCount = 0;
+      let avgVX = 0, avgVY = 0, alignCount = 0;
+      let cohX = 0, cohY = 0, cohCount = 0;
+      let scanned = 0;
+
+      const cx = b._cx, cy = b._cy;
+      scanLoop:
+      for (let dx = -1; dx <= 1; dx++) {
+        for (let dy = -1; dy <= 1; dy++) {
+          const arr = grid.get(cellKey(cx + dx, cy + dy));
+          if (!arr) continue;
+          for (let k = 0; k < arr.length; k++) {
+            const j = arr[k];
+            if (j === i) continue;
+            const ob = birds[j];
+            const ddx = b.x - ob.x, ddy = b.y - ob.y;
+            const d2 = ddx * ddx + ddy * ddy;
+            if (d2 < NEIGHBOR_R2) {
+              cohX += ob.x; cohY += ob.y; cohCount++;
+              avgVX += ob.vx; avgVY += ob.vy; alignCount++;
+              if (d2 < SEP_R2 && d2 > 0.0001) {
+                const d = Math.sqrt(d2);
+                const f = (SEP_R - d) / SEP_R;
+                sepX += (ddx / d) * f;
+                sepY += (ddy / d) * f;
+                sepCount++;
+              }
+            }
+            scanned++;
+            if (scanned >= MAX_NEIGHBORS) break scanLoop;
+          }
+        }
+      }
+
+      // Separación
+      if (sepCount > 0) {
+        vx += (sepX / sepCount) * SEP_WEIGHT * dt;
+        vy += (sepY / sepCount) * SEP_WEIGHT * dt;
+      }
+      // Alineación (se mezcla gradualmente -> onda de giro, no sincronización instantánea)
+      if (alignCount > 0) {
+        const avx = avgVX / alignCount, avy = avgVY / alignCount;
+        vx += (avx - vx) * alignBlend;
+        vy += (avy - vy) * alignBlend;
+      }
+      // Cohesión (peso según Z)
+      if (cohCount > 0) {
+        const ccx = cohX / cohCount, ccy = cohY / cohCount;
+        vx += (ccx - b.x) * cohesionWeight;
+        vy += (ccy - b.y) * cohesionWeight;
+      }
+
+      // Viento (X/Y): se suma a la velocidad, no reemplaza el rumbo local
+      vx += windX * dt;
+      vy += windY * dt;
+
+      // Depredador: repulsión temporal que se disuelve sola
+      for (let p = 0; p < predators.length; p++) {
+        const pr = predators[p];
+        const ddx = b.x - pr.x, ddy = b.y - pr.y;
+        const d2 = ddx * ddx + ddy * ddy;
+        if (d2 < PREDATOR_RADIUS * PREDATOR_RADIUS && d2 > 1) {
+          const d = Math.sqrt(d2);
+          const falloff = (pr.life / pr.maxLife);
+          const strength = (1 - d / PREDATOR_RADIUS) * 900 * falloff;
+          vx += (ddx / d) * strength * dt;
+          vy += (ddy / d) * strength * dt;
+        }
+      }
+
+      // Bordes de pantalla: rebote suave (fuerza de retorno), no clamp duro
+      if (b.x < BOUND_MARGIN) vx += (BOUND_MARGIN - b.x) * BOUND_K * dt;
+      else if (b.x > w - BOUND_MARGIN) vx -= (b.x - (w - BOUND_MARGIN)) * BOUND_K * dt;
+      if (b.y < BOUND_MARGIN) vy += (BOUND_MARGIN - b.y) * BOUND_K * dt;
+      else if (b.y > h - BOUND_MARGIN) vy -= (b.y - (h - BOUND_MARGIN)) * BOUND_K * dt;
+
+      // Límite de velocidad (con mínimo, para que nunca queden estáticos)
+      const speed = Math.hypot(vx, vy);
+      if (speed > maxSpeed) {
+        vx *= maxSpeed / speed; vy *= maxSpeed / speed;
+      } else if (speed < minSpeed && speed > 0.0001) {
+        vx *= minSpeed / speed; vy *= minSpeed / speed;
+      } else if (speed <= 0.0001) {
+        const a = rand(0, Math.PI * 2);
+        vx = Math.cos(a) * minSpeed; vy = Math.sin(a) * minSpeed;
+      }
+
+      b.vx = vx; b.vy = vy;
+      b.x += vx * dt;
+      b.y += vy * dt;
+
+      // Contención dura de emergencia (por si el rebote suave no alcanza
+      // con ráfagas de viento extremas) para que nunca se pierdan fuera
+      // del lienzo de forma permanente.
+      if (b.x < -40) b.x = -40;
+      else if (b.x > w + 40) b.x = w + 40;
+      if (b.y < -40) b.y = -40;
+      else if (b.y > h + 40) b.y = h + 40;
+    }
+  }
+
+  function draw() {
+    const w = canvas.width, h = canvas.height;
+
+    // Tarea 1: estela por opacidad en vez de limpiar en blanco sólido
+    ctx.fillStyle = `rgba(255,255,255,${trailAlpha})`;
+    ctx.fillRect(0, 0, w, h);
+
+    ctx.fillStyle = "#0a0a0a";
+    for (let i = 0; i < birds.length; i++) {
+      const b = birds[i];
+      ctx.fillRect(b.x, b.y, pointSize, pointSize);
+    }
+
+    fps = Math.round(fpsSmoothed);
+    stats.textContent = birds.length + " puntos renderizados · " + fps + " fps" +
+      (predators.length ? " · depredador activo (" + predators.length + ")" : "");
+  }
+
+  requestAnimationFrame((now) => {
+    lastTime = now;
+    requestAnimationFrame(frame);
+  });
+
+})();
+</script>
+</body>
+</html>

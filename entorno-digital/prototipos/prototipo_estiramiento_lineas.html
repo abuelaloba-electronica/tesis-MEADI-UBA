@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Líneas · Estiramiento (MAEDI)</title>
+<style>
+  :root {
+    --panel-bg: rgba(255,255,255,0.94);
+    --ink: #222;
+    --line: #ddd;
+    --accent: #2f5fb0;
+  }
+  html, body {
+    margin: 0; padding: 0; overflow: hidden;
+    background: #faf8f3;
+    font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+    color: var(--ink);
+  }
+  canvas { display: block; }
+
+  #panel {
+    position: fixed;
+    top: 16px; left: 16px;
+    width: 300px;
+    background: var(--panel-bg);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 16px 18px 12px;
+    font-size: 12px;
+    backdrop-filter: blur(4px);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.10);
+    max-height: calc(100vh - 32px);
+    overflow-y: auto;
+  }
+  #panel h1 {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin: 0 0 2px;
+    font-weight: 600;
+    color: #555;
+  }
+  #panel .subtitle {
+    font-size: 10.5px;
+    color: #999;
+    margin: 0 0 12px;
+  }
+  .section-title {
+    font-size: 11px;
+    font-weight: 600;
+    color: #666;
+    margin: 14px 0 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .section-title:first-of-type { margin-top: 0; }
+
+  #stretchPad {
+    position: relative;
+    width: 100%;
+    height: 92px;
+    border: 1.5px dashed #c9c2b8;
+    border-radius: 10px;
+    background: linear-gradient(90deg, rgba(47,95,176,0.07), rgba(26,26,26,0.05));
+    cursor: pointer;
+    user-select: none;
+    touch-action: none;
+    overflow: hidden;
+  }
+  #stretchPad.active {
+    border-style: solid;
+    border-color: var(--accent);
+  }
+  #stretchAnchor {
+    position: absolute;
+    left: 10px; top: 50%;
+    width: 10px; height: 10px;
+    margin-top: -5px;
+    border-radius: 50%;
+    background: #999;
+  }
+  #stretchBand {
+    position: absolute;
+    left: 15px; top: 50%;
+    height: 5px;
+    width: 0%;
+    margin-top: -2.5px;
+    border-radius: 3px;
+    background-image: repeating-linear-gradient(90deg,
+      var(--accent) 0, var(--accent) 3px, transparent 3px, transparent 9px);
+    background-size: 12px 100%;
+    transition: none;
+  }
+  #stretchHandle {
+    position: absolute;
+    top: 50%;
+    width: 14px; height: 14px;
+    margin-top: -7px; margin-left: -7px;
+    border-radius: 50%;
+    background: var(--accent);
+    border: 2px solid #fff;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.25);
+    left: 15px;
+    display: none;
+  }
+  #stretchPad.active #stretchHandle { display: block; }
+  #stretchLabel {
+    position: absolute;
+    left: 0; right: 0; bottom: 8px;
+    text-align: center;
+    pointer-events: none;
+    padding: 0 10px;
+    color: #888;
+    font-size: 11px;
+    line-height: 1.4;
+  }
+
+  .bar-row { margin: 8px 0; }
+  .bar-row label {
+    display: flex; justify-content: space-between;
+    font-size: 10.5px; color: #777; margin-bottom: 3px;
+  }
+  .bar-track {
+    width: 100%; height: 6px;
+    background: #ececec; border-radius: 3px;
+    overflow: hidden;
+  }
+  .bar-fill {
+    height: 100%; width: 0%;
+    border-radius: 3px;
+    background: #999;
+  }
+  #stretchFillBar { background: linear-gradient(90deg, #9db6de, var(--accent)); }
+  #speedFillBar { background: #c96a3a; }
+
+  .checkline {
+    display: flex; align-items: center; gap: 6px;
+    margin: 10px 0 2px;
+    font-size: 11px;
+    color: #666;
+  }
+
+  .color-row { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+  #colorSelect {
+    flex: 1;
+    padding: 6px 8px;
+    font-size: 11.5px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    background: #fff;
+    color: var(--ink);
+  }
+  #colorPreview {
+    width: 22px; height: 14px;
+    border-radius: 3px;
+    border: 1px solid rgba(0,0,0,0.15);
+    flex-shrink: 0;
+  }
+  .note { font-size: 10.5px; color: #999; line-height: 1.4; margin-top: 6px; }
+
+  .row { margin-bottom: 10px; }
+  .row label {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 3px;
+    font-size: 11.5px;
+  }
+  .row label span.val {
+    font-variant-numeric: tabular-nums;
+    color: #666;
+  }
+  input[type=range] { width: 100%; }
+  .divider { border: none; border-top: 1px solid var(--line); margin: 12px 0; }
+
+  button {
+    width: 100%;
+    padding: 7px 8px;
+    font-size: 11.5px;
+    border: 1px solid #999;
+    background: #fff;
+    border-radius: 6px;
+    cursor: pointer;
+    margin-top: 4px;
+  }
+  button:hover { background: #f2f2f2; }
+
+  #stats {
+    position: fixed;
+    bottom: 16px; left: 16px;
+    background: var(--panel-bg);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 10px 14px;
+    font-size: 11px;
+    color: #666;
+    line-height: 1.6;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+  }
+  #stats b { color: #333; }
+  #swatch {
+    display: inline-block;
+    width: 14px; height: 4px;
+    border-radius: 2px;
+    vertical-align: middle;
+    margin-right: 4px;
+    border: 1px solid rgba(0,0,0,0.15);
+  }
+  #hint {
+    margin-top: 10px;
+    font-size: 10.5px;
+    color: #999;
+    line-height: 1.4;
+  }
+</style>
+</head>
+<body>
+
+<canvas id="canvas"></canvas>
+
+<div id="panel">
+  <h1>Líneas · Estiramiento</h1>
+  <p class="subtitle">MAEDI — prototipo con sensor simulado</p>
+
+  <div class="section-title">Sensor de estiramiento (simulado)</div>
+  <div id="stretchPad">
+    <div id="stretchAnchor"></div>
+    <div id="stretchBand"></div>
+    <div id="stretchHandle"></div>
+    <div id="stretchLabel">Mantené presionado y arrastrá<br>hacia la derecha para estirar.</div>
+  </div>
+  <div class="bar-row">
+    <label><span>Estiramiento</span><span id="stretchVal">0%</span></label>
+    <div class="bar-track"><div class="bar-fill" id="stretchFillBar"></div></div>
+  </div>
+  <div class="bar-row">
+    <label><span>Velocidad del gesto</span><span id="speedVal">0%</span></label>
+    <div class="bar-track"><div class="bar-fill" id="speedFillBar"></div></div>
+  </div>
+  <label class="checkline">
+    <input type="checkbox" id="simpleModeCheck">
+    Modo pulsador simple (on/off)
+  </label>
+
+  <div class="row">
+    <label><span>Estiramiento mínimo para contar</span><span class="val" id="minStretchVal">10%</span></label>
+    <input type="range" id="minStretch" min="0" max="0.4" step="0.01" value="0.10">
+  </div>
+
+  <hr class="divider">
+
+  <div class="section-title">Color de tinta</div>
+  <div class="color-row">
+    <select id="colorSelect">
+      <option value="#1a1a1a" selected>Tinta negra</option>
+      <option value="#3d6fbd">Azul lápiz</option>
+      <option value="#1f5fd1">Azul eléctrico</option>
+      <option value="#4d4d4d">Grafito</option>
+    </select>
+    <div id="colorPreview"></div>
+  </div>
+  <div class="note">El estiramiento sigue controlando largo y opacidad; esto solo cambia el matiz base de los próximos trazos.</div>
+
+  <hr class="divider">
+  <button id="resetBtn">Limpiar lienzo</button>
+  <div id="hint">Cada estiramiento suma un trazo recto más. El largo depende del pico alcanzado, la opacidad del promedio, y el grosor combina la fuerza del estiramiento con qué tan rápido fue el gesto.</div>
+</div>
+
+<div id="stats">
+  Trazos dibujados: <b id="countVal">0</b><br>
+  Último: <span id="swatch"></span><b id="lastVal">—</b>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  // ---------------------------------------------------------------
+  // Canvas setup
+  // ---------------------------------------------------------------
+  const canvas = document.getElementById("canvas");
+  const ctx = canvas.getContext("2d");
+  let W = 0, H = 0, DPR = Math.max(1, window.devicePixelRatio || 1);
+
+  function resize() {
+    W = window.innerWidth;
+    H = window.innerHeight;
+    canvas.width = W * DPR;
+    canvas.height = H * DPR;
+    canvas.style.width = W + "px";
+    canvas.style.height = H + "px";
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  }
+  window.addEventListener("resize", resize);
+  resize();
+
+  const BG_COLOR = "#faf8f3";
+
+  // ---------------------------------------------------------------
+  // Config
+  // ---------------------------------------------------------------
+  let minStretchToCount = 0.10; // pico mínimo del gesto para no descartarlo como roce accidental
+  const STRETCH_PRESS_THRESHOLD = 0.04; // a partir de acá se considera que el gesto empezó
+
+  const MIN_LENGTH_FRAC = 0.06; // relativo a min(W,H)
+  const MAX_LENGTH_FRAC = 0.55;
+
+  const STRETCH_MIN_ALPHA = 0.35; // piso: un trazo nunca queda casi invisible
+  const SPEED_REF = 2.6; // "unidades de estiramiento por segundo" que se consideran gesto rápido
+  const FLASH_MS = 550; // duración del destello de "tinta recién puesta"
+
+  // El grosor calculado a partir de fuerza+velocidad se toma como 100%; cada
+  // trazo nuevo sortea un factor aleatorio dentro de este rango para variar
+  // su ancho final, igual que la posición de cada línea también es al azar.
+  const WIDTH_RANDOM_MIN = 0.5; // 50%
+  const WIDTH_RANDOM_MAX = 2.0; // 200%
+
+  function hexToRgb(hex) {
+    const clean = hex.replace("#", "");
+    const bigint = parseInt(clean, 16);
+    return [(bigint >> 16) & 255, (bigint >> 8) & 255, bigint & 255];
+  }
+  let currentInkColor = hexToRgb("#1a1a1a"); // por defecto: tinta negra
+
+  function stretchToAlpha(t) {
+    t = Math.min(1, Math.max(0, t));
+    return STRETCH_MIN_ALPHA + t * (1 - STRETCH_MIN_ALPHA);
+  }
+
+  // ---------------------------------------------------------------
+  // State
+  // ---------------------------------------------------------------
+  const strokes = []; // {points:[{x,y}], widths:[...], rgb, alpha, length, createdAt}
+
+  let pressing = false;
+  let peakStretch = 0;
+  let sumStretch = 0;
+  let sampleCount = 0;
+  let liveStretch = 0;
+  let maxSpeedInGesture = 0;
+  let liveSpeed = 0;
+  let lastValue = 0;
+  let lastTime = 0;
+
+  const nowSec = () => performance.now() / 1000;
+
+  // ---------------------------------------------------------------
+  // Public integration point (future hardware hooks up here)
+  // ---------------------------------------------------------------
+
+  // Llamar continuamente con una lectura de estiramiento normalizada (0-1),
+  // p. ej. (rawADC - min) / (max - min) ya recortado a ese rango.
+  // Maneja internamente detección de inicio/fin de gesto, pico, promedio y velocidad.
+  window.feedStretch = function (value01) {
+    const v = Math.min(1, Math.max(0, value01));
+    const t = nowSec();
+    liveStretch = v;
+
+    if (lastTime > 0) {
+      const dt = Math.max(0.001, t - lastTime);
+      const inst = Math.abs(v - lastValue) / dt;
+      liveSpeed = inst;
+      if (pressing) maxSpeedInGesture = Math.max(maxSpeedInGesture, inst);
+    }
+    lastValue = v;
+    lastTime = t;
+
+    if (!pressing && v > STRETCH_PRESS_THRESHOLD) {
+      pressing = true;
+      peakStretch = 0;
+      sumStretch = 0;
+      sampleCount = 0;
+      maxSpeedInGesture = 0;
+    }
+
+    if (pressing) {
+      peakStretch = Math.max(peakStretch, v);
+      sumStretch += v;
+      sampleCount += 1;
+
+      if (v <= STRETCH_PRESS_THRESHOLD) {
+        pressing = false;
+        finalizeStretch();
+      }
+    }
+  };
+
+  function finalizeStretch() {
+    if (peakStretch < minStretchToCount) {
+      flashTooShort();
+      return;
+    }
+    const avgStretch = sampleCount > 0 ? sumStretch / sampleCount : 0;
+    const speedNorm = Math.min(1, maxSpeedInGesture / SPEED_REF);
+
+    const minL = Math.min(W, H) * MIN_LENGTH_FRAC;
+    const maxL = Math.min(W, H) * MAX_LENGTH_FRAC;
+    const length = minL + peakStretch * (maxL - minL);
+
+    const alpha = stretchToAlpha(avgStretch);
+
+    // Ancla y ángulo aleatorios, con un margen chico para permitir que algunos
+    // trazos salgan parcialmente del lienzo (como en las imágenes de referencia).
+    const margin = length * 0.15;
+    const cx = margin + Math.random() * Math.max(1, W - margin * 2);
+    const cy = margin + Math.random() * Math.max(1, H - margin * 2);
+    const angle = Math.random() * Math.PI * 2;
+    const dx = Math.cos(angle), dy = Math.sin(angle);
+    const x0 = cx - dx * length / 2, y0 = cy - dy * length / 2;
+    const x1 = cx + dx * length / 2, y1 = cy + dy * length / 2;
+
+    // Trazo recto y de grosor uniforme: un único segmento entre las dos puntas
+    // calculadas arriba, sin temblor ni variación de ancho por tramo — la
+    // velocidad del gesto ya no deforma la línea, solo la engrosa un poco.
+    const points = [{ x: x0, y: y0 }, { x: x1, y: y1 }];
+    const baseWidth = 1.1 + avgStretch * 2.2 + speedNorm * 1.0;
+    // Factor aleatorio de grosor (50%–200% del ancho calculado), independiente
+    // por cada trazo — misma lógica que la posición aleatoria de cada línea.
+    const widthRandomFactor = WIDTH_RANDOM_MIN + Math.random() * (WIDTH_RANDOM_MAX - WIDTH_RANDOM_MIN);
+    const widths = [baseWidth * widthRandomFactor];
+
+    // Variación leve de brillo por trazo, para que no todas las líneas del
+    // mismo color se vean idénticas (textura de tinta, no de vector).
+    const jitteredRgb = currentInkColor.map((c) => {
+      const shift = (Math.random() * 2 - 1) * 14;
+      return Math.min(255, Math.max(0, Math.round(c + shift)));
+    });
+
+    strokes.push({
+      points, widths,
+      rgb: jitteredRgb,
+      alpha,
+      length,
+      createdAt: nowSec()
+    });
+
+    updateLastStats(length, alpha, jitteredRgb);
+  }
+
+  function flashTooShort() {
+    const el = document.getElementById("stretchLabel");
+    const original = el.innerHTML;
+    el.innerHTML = "Estiramiento muy leve — descartado<br>(mínimo " + Math.round(minStretchToCount * 100) + "%)";
+    setTimeout(() => { el.innerHTML = original; }, 900);
+  }
+
+  // ---------------------------------------------------------------
+  // Simulated stretch sensor: draggable pad (Pointer Events -> mouse + touch)
+  // ---------------------------------------------------------------
+  const pad = document.getElementById("stretchPad");
+  const band = document.getElementById("stretchBand");
+  const handle = document.getElementById("stretchHandle");
+  const simpleModeCheck = document.getElementById("simpleModeCheck");
+
+  function stretchFromPointer(e) {
+    const rect = pad.getBoundingClientRect();
+    const anchorX = 15; // debe coincidir con el "left" de #stretchAnchor/#stretchBand
+    const usableWidth = Math.max(1, rect.width - anchorX - 10);
+    const relX = (e.clientX - rect.left - anchorX) / usableWidth;
+    return Math.min(1, Math.max(0, relX));
+  }
+
+  function paintBand(v) {
+    const pct = (v * 100).toFixed(1) + "%";
+    band.style.width = pct;
+    handle.style.left = pct;
+    // El "paso" del punteado se abre a medida que se estira, como si el
+    // elástico pasara de un enrollado tenso a hilos más separados.
+    band.style.backgroundSize = (10 + v * 46) + "px 100%";
+  }
+
+  let pointerDown = false;
+
+  pad.addEventListener("pointerdown", (e) => {
+    pointerDown = true;
+    pad.classList.add("active");
+    pad.setPointerCapture(e.pointerId);
+    const v = simpleModeCheck.checked ? 1 : stretchFromPointer(e);
+    paintBand(v);
+    window.feedStretch(v);
+  });
+  pad.addEventListener("pointermove", (e) => {
+    if (!pointerDown) return;
+    if (simpleModeCheck.checked) return; // en modo pulsador se mantiene fijo en el máximo
+    const v = stretchFromPointer(e);
+    paintBand(v);
+    window.feedStretch(v);
+  });
+  function endPointer() {
+    if (!pointerDown) return;
+    pointerDown = false;
+    pad.classList.remove("active");
+    paintBand(0);
+    window.feedStretch(0);
+  }
+  pad.addEventListener("pointerup", endPointer);
+  pad.addEventListener("pointercancel", endPointer);
+  pad.addEventListener("pointerleave", () => {
+    if (pointerDown) endPointer();
+  });
+
+  // ---------------------------------------------------------------
+  // Fill color selector
+  // ---------------------------------------------------------------
+  const colorSelect = document.getElementById("colorSelect");
+  const colorPreview = document.getElementById("colorPreview");
+  function applyColorSelection(hex) {
+    currentInkColor = hexToRgb(hex);
+    colorPreview.style.background = hex;
+  }
+  colorSelect.addEventListener("change", () => applyColorSelection(colorSelect.value));
+  applyColorSelection(colorSelect.value);
+
+  // ---------------------------------------------------------------
+  // Min-stretch-to-count config
+  // ---------------------------------------------------------------
+  const minStretchSlider = document.getElementById("minStretch");
+  const minStretchValEl = document.getElementById("minStretchVal");
+  minStretchSlider.addEventListener("input", () => {
+    minStretchToCount = parseFloat(minStretchSlider.value);
+    minStretchValEl.textContent = Math.round(minStretchToCount * 100) + "%";
+  });
+
+  document.getElementById("resetBtn").addEventListener("click", () => {
+    strokes.length = 0;
+    updateCount();
+  });
+
+  // ---------------------------------------------------------------
+  // Live readouts
+  // ---------------------------------------------------------------
+  const stretchValEl = document.getElementById("stretchVal");
+  const stretchFillEl = document.getElementById("stretchFillBar");
+  const speedValEl = document.getElementById("speedVal");
+  const speedFillEl = document.getElementById("speedFillBar");
+  const countValEl = document.getElementById("countVal");
+  const lastValEl = document.getElementById("lastVal");
+  const swatchEl = document.getElementById("swatch");
+
+  function updateLiveReadouts() {
+    const pct = Math.round(liveStretch * 100);
+    stretchValEl.textContent = pct + "%";
+    stretchFillEl.style.width = pct + "%";
+
+    const speedPct = Math.min(100, Math.round((liveSpeed / SPEED_REF) * 100));
+    speedValEl.textContent = speedPct + "%";
+    speedFillEl.style.width = speedPct + "%";
+  }
+
+  function updateCount() {
+    countValEl.textContent = String(strokes.length);
+  }
+
+  function updateLastStats(length, alpha, rgb) {
+    updateCount();
+    swatchEl.style.background = `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${alpha.toFixed(2)})`;
+    lastValEl.textContent = Math.round(length) + "px · " + Math.round(alpha * 100) + "%";
+  }
+
+  // ---------------------------------------------------------------
+  // Main draw loop
+  // ---------------------------------------------------------------
+  function draw() {
+    const t = nowSec();
+
+    ctx.globalCompositeOperation = "source-over";
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = BG_COLOR;
+    ctx.fillRect(0, 0, W, H);
+
+    ctx.globalCompositeOperation = "multiply";
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+
+    for (let i = 0; i < strokes.length; i++) {
+      const s = strokes[i];
+      const age = t - s.createdAt;
+      const flashProgress = Math.min(1, Math.max(0, age / (FLASH_MS / 1000)));
+      const flashBoost = (1 - flashProgress) * 0.4; // "tinta recién puesta" que se asienta
+      const drawAlpha = Math.min(1, s.alpha + flashBoost);
+
+      ctx.globalAlpha = drawAlpha;
+      ctx.strokeStyle = `rgb(${s.rgb[0]},${s.rgb[1]},${s.rgb[2]})`;
+
+      for (let j = 0; j < s.points.length - 1; j++) {
+        ctx.lineWidth = s.widths[j];
+        ctx.beginPath();
+        ctx.moveTo(s.points[j].x, s.points[j].y);
+        ctx.lineTo(s.points[j + 1].x, s.points[j + 1].y);
+        ctx.stroke();
+      }
+    }
+
+    ctx.setLineDash([]);
+    ctx.globalCompositeOperation = "source-over";
+    ctx.globalAlpha = 1;
+
+    updateLiveReadouts();
+    requestAnimationFrame(draw);
+  }
+
+  requestAnimationFrame(draw);
+})();
+</script>
+</body>
+</html>

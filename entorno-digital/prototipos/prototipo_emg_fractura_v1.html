@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EMG · Fractura + Temblor (V1) — MAEDI</title>
+<style>
+  :root {
+    --panel-bg: rgba(255,255,255,0.94);
+    --ink: #222;
+    --line: #ddd;
+    --accent: #c22a44;
+  }
+  html, body {
+    margin: 0; padding: 0; overflow: hidden;
+    background: #fdf7f5;
+    font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+    color: var(--ink);
+  }
+  canvas { display: block; }
+
+  #panel {
+    position: fixed;
+    top: 16px; left: 16px;
+    width: 300px;
+    background: var(--panel-bg);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 16px 18px 12px;
+    font-size: 12px;
+    backdrop-filter: blur(4px);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.10);
+  }
+  #panel h1 {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin: 0 0 2px;
+    font-weight: 600;
+    color: #555;
+  }
+  #panel .subtitle {
+    font-size: 10.5px;
+    color: #999;
+    margin: 0 0 12px;
+  }
+  .section-title {
+    font-size: 11px;
+    font-weight: 600;
+    color: #666;
+    margin: 14px 0 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .section-title:first-of-type { margin-top: 0; }
+
+  #emgPad {
+    position: relative;
+    width: 100%;
+    height: 110px;
+    border: 1.5px dashed #d9b9bd;
+    border-radius: 10px;
+    background: linear-gradient(180deg, rgba(194,42,68,0.10), rgba(255,255,255,0.10));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    color: #888;
+    font-size: 11px;
+    line-height: 1.4;
+    cursor: pointer;
+    user-select: none;
+    touch-action: none;
+    overflow: hidden;
+    transition: opacity 0.2s;
+  }
+  #emgPad.active { border-style: solid; border-color: var(--accent); }
+  #emgPad.disabled { opacity: 0.45; pointer-events: none; }
+  #emgFill {
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    height: 0%;
+    background: linear-gradient(180deg, rgba(194,42,68,0.32), rgba(194,42,68,0.08));
+    pointer-events: none;
+  }
+  #emgLabel { position: relative; z-index: 1; pointer-events: none; padding: 0 10px; }
+
+  .row { margin-bottom: 10px; }
+  .row label { display: flex; justify-content: space-between; margin-bottom: 3px; font-size: 11.5px; }
+  .row label span.val { font-variant-numeric: tabular-nums; color: #666; }
+  input[type=range] { width: 100%; }
+  .divider { border: none; border-top: 1px solid var(--line); margin: 12px 0; }
+
+  .bar-row { margin: 8px 0; }
+  .bar-row label { display: flex; justify-content: space-between; font-size: 10.5px; color: #777; margin-bottom: 3px; }
+  .bar-track { width: 100%; height: 6px; background: #ececec; border-radius: 3px; overflow: hidden; }
+  .bar-fill { height: 100%; width: 0%; border-radius: 3px; background: #999; }
+  #envFill { background: linear-gradient(90deg, #f2b4c0, #c22a44); }
+  #jitterFill { background: #7a7ad9; }
+
+  .check-row { display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: #555; margin: 10px 0 4px; }
+
+  button {
+    width: 100%;
+    padding: 7px 8px;
+    font-size: 11.5px;
+    border: 1px solid #999;
+    background: #fff;
+    border-radius: 6px;
+    cursor: pointer;
+    margin-top: 4px;
+  }
+  button:hover { background: #f2f2f2; }
+
+  .note { font-size: 10.5px; color: #999; line-height: 1.4; margin-top: 6px; }
+
+  #stats {
+    position: fixed;
+    bottom: 16px; left: 16px;
+    background: var(--panel-bg);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 10px 14px;
+    font-size: 11px;
+    color: #666;
+    line-height: 1.6;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+  }
+  #stats b { color: #333; }
+</style>
+</head>
+<body>
+
+<canvas id="canvas"></canvas>
+
+<div id="panel">
+  <h1>EMG · Fractura + Temblor</h1>
+  <p class="subtitle">MAEDI — V1 · prototipo con sensor simulado</p>
+
+  <div class="section-title">Sensor EMG (simulado) — pierna</div>
+  <div id="emgPad">
+    <div id="emgFill"></div>
+    <div id="emgLabel">Mantené presionado y moví el puntero arriba/abajo para simular la contracción.</div>
+  </div>
+
+  <div class="bar-row">
+    <label><span>Contracción (envolvente)</span><span id="envVal">0%</span></label>
+    <div class="bar-track"><div class="bar-fill" id="envFill"></div></div>
+  </div>
+  <div class="bar-row">
+    <label><span>Temblor (ruido EMG)</span><span id="jitterVal">0%</span></label>
+    <div class="bar-track"><div class="bar-fill" id="jitterFill"></div></div>
+  </div>
+
+  <div class="check-row">
+    <input type="checkbox" id="autoMode">
+    <label for="autoMode">Modo automático (demo sin manos)</label>
+  </div>
+
+  <hr class="divider">
+
+  <div class="row">
+    <label><span>Detalle máximo de fractura</span><span class="val" id="depthVal">5</span></label>
+    <input type="range" id="depthSlider" min="3" max="7" step="1" value="5">
+  </div>
+  <div class="row">
+    <label><span>Sensibilidad al temblor</span><span class="val" id="jitterSensVal">1.0×</span></label>
+    <input type="range" id="jitterSens" min="0.3" max="2.5" step="0.1" value="1.0">
+  </div>
+
+  <hr class="divider">
+  <button id="relaxBtn">Relajar ahora</button>
+  <div class="note">Más contracción → más facetas y temblor más marcado. El triángulo nunca vuelve a una figura lisa: siempre queda levemente fracturado, igual que un músculo en reposo nunca está en tensión cero.</div>
+</div>
+
+<div id="stats">
+  Facetas visibles: <b id="facetCountVal">0</b><br>
+  Envolvente: <b id="envStatVal">0%</b> · Temblor: <b id="jitterStatVal">0%</b>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  // ---------------------------------------------------------------
+  // Canvas setup
+  // ---------------------------------------------------------------
+  const canvas = document.getElementById("canvas");
+  const ctx = canvas.getContext("2d");
+  let W = 0, H = 0, DPR = Math.max(1, window.devicePixelRatio || 1);
+
+  function resize() {
+    W = window.innerWidth;
+    H = window.innerHeight;
+    canvas.width = W * DPR;
+    canvas.height = H * DPR;
+    canvas.style.width = W + "px";
+    canvas.style.height = H + "px";
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  }
+  window.addEventListener("resize", resize);
+  resize();
+
+  const BG_COLOR = "#fdf7f5";
+  const clamp01 = (v) => Math.min(1, Math.max(0, v));
+
+  // ---------------------------------------------------------------
+  // Triángulo escaleno base (espacio normalizado; se escala en toScreen)
+  // ---------------------------------------------------------------
+  const VERT_A = [-0.40, 0.34];
+  const VERT_B = [0.46, 0.10];
+  const VERT_C = [-0.10, -0.44];
+
+  function toScreen(p) {
+    const S = Math.min(W, H) * 0.72;
+    const cx = W / 2, cy = H / 2 + H * 0.02;
+    return [cx + p[0] * S, cy + p[1] * S];
+  }
+
+  // ---------------------------------------------------------------
+  // Árbol de subdivisión (fractura low-poly).
+  // Cada nodo no-hoja se parte en 3 triángulos que comparten un punto
+  // interior, sin superposición ni huecos entre ellos. "threshold" es
+  // el nivel de envolvente (0-1) a partir del cual ese nodo se
+  // reemplaza por sus 3 hijos al renderizar: a más contracción, más
+  // nodos superan su umbral y el triángulo se ve más fracturado.
+  // ---------------------------------------------------------------
+  let maxDepth = 5;
+  let triTree = null;
+
+  function randomInteriorPoint(tri) {
+    let r1 = Math.random(), r2 = Math.random();
+    let a = 1 - Math.sqrt(r1), b = Math.sqrt(r1) * (1 - r2), c = Math.sqrt(r1) * r2;
+    const minB = 0.14; // evita esquirlas degeneradas muy finas
+    a = Math.max(a, minB); b = Math.max(b, minB); c = Math.max(c, minB);
+    const sum = a + b + c; a /= sum; b /= sum; c /= sum;
+    return [
+      tri[0][0] * a + tri[1][0] * b + tri[2][0] * c,
+      tri[0][1] * a + tri[1][1] * b + tri[2][1] * c
+    ];
+  }
+
+  function makeNode(tri, depth, parentShade) {
+    return {
+      v: tri,
+      depth,
+      children: null,
+      threshold: depth <= 1 ? Math.random() * 0.03 : Math.min(0.97, depth / maxDepth + (Math.random() - 0.5) * 0.14),
+      shade: Math.max(-1, Math.min(1, parentShade * 0.5 + (Math.random() * 2 - 1) * 0.7)),
+      jseeds: [0, 1, 2].map(() => ({
+        fx: 2 + Math.random() * 5, fy: 2 + Math.random() * 5,
+        phx: Math.random() * Math.PI * 2, phy: Math.random() * Math.PI * 2
+      })),
+      revealedAt: null
+    };
+  }
+
+  function splitNode(node, force) {
+    if (node.depth >= maxDepth) return;
+    const chance = Math.max(0.12, 0.88 - node.depth * 0.14);
+    if (!force && Math.random() > chance) return;
+    const p = randomInteriorPoint(node.v);
+    const [A, B, C] = node.v;
+    const kids = [[A, B, p], [B, C, p], [C, A, p]].map((tri) => makeNode(tri, node.depth + 1, node.shade));
+    node.children = kids;
+    kids.forEach((k) => splitNode(k, false));
+  }
+
+  function buildTriTree() {
+    const root = {
+      v: [VERT_A, VERT_B, VERT_C], depth: 0, children: null, threshold: 0,
+      shade: Math.random() * 2 - 1
+    };
+    splitNode(root, true); // el triángulo raíz siempre se fractura al menos una vez
+    return root;
+  }
+
+  function collectVisible(node, envelope, out) {
+    if (!node.children || envelope < node.threshold) {
+      out.push(node);
+      return;
+    }
+    for (const c of node.children) collectVisible(c, envelope, out);
+  }
+
+  // ---------------------------------------------------------------
+  // Señal EMG: envolvente (contracción suavizada) + temblor (residuo
+  // de alta frecuencia respecto a la envolvente). Es el mismo
+  // procesamiento que se le haría a una lectura cruda real de
+  // electrodos de superficie: rectificar + promediar da la
+  // envolvente; lo que queda fuera de ese promedio es el temblor.
+  // ---------------------------------------------------------------
+  const ENV_ALPHA = 0.10;
+  const RESID_ALPHA = 0.18;
+  const MAX_JITTER_PX = 10;
+
+  let envelope = 0, jitterMagnitude = 0;
+  let jitterSensitivity = 1.0;
+
+  // Punto de enganche público: alimentar con una lectura EMG cruda
+  // normalizada 0-1 (por ejemplo, rectificada, sin promediar) a la
+  // frecuencia que entregue el hardware. La envolvente y el temblor
+  // se calculan acá adentro; no hace falta tocar el resto del archivo.
+  window.feedEMG = function (raw01) {
+    const v = clamp01(raw01);
+    envelope += (v - envelope) * ENV_ALPHA;
+    const instResidual = Math.abs(v - envelope);
+    jitterMagnitude += (instResidual - jitterMagnitude) * RESID_ALPHA;
+  };
+
+  // ---------------------------------------------------------------
+  // Simulación del sensor: pad vertical (Pointer Events) + generador
+  // de ruido fisiológico (la amplitud del ruido crece con la
+  // contracción, como en una señal EMG real).
+  // ---------------------------------------------------------------
+  let pressing = false, target = 0, autoMode = false, autoT = 0;
+
+  function simRawSample(dt) {
+    if (autoMode) {
+      autoT += dt;
+      target = Math.sin(autoT * 0.6) * 0.5 + 0.5;
+    }
+    const base = (pressing || autoMode) ? target : 0;
+    const noiseAmp = 0.03 + base * 0.22;
+    const now = performance.now();
+    const n = (Math.sin(now * 0.011 + 1.7) + Math.sin(now * 0.023 + 0.4) + (Math.random() * 2 - 1)) / 3;
+    return clamp01(base + n * noiseAmp);
+  }
+
+  const pad = document.getElementById("emgPad");
+  const emgFill = document.getElementById("emgFill");
+
+  function targetFromPointer(e) {
+    const rect = pad.getBoundingClientRect();
+    const relY = (e.clientY - rect.top) / rect.height;
+    return clamp01(1 - relY);
+  }
+
+  let pointerDown = false;
+  pad.addEventListener("pointerdown", (e) => {
+    if (autoMode) return;
+    pointerDown = true; pressing = true;
+    pad.classList.add("active");
+    pad.setPointerCapture(e.pointerId);
+    target = targetFromPointer(e);
+  });
+  pad.addEventListener("pointermove", (e) => {
+    if (!pointerDown) return;
+    target = targetFromPointer(e);
+  });
+  function endPointer() {
+    if (!pointerDown) return;
+    pointerDown = false; pressing = false;
+    pad.classList.remove("active");
+  }
+  pad.addEventListener("pointerup", endPointer);
+  pad.addEventListener("pointercancel", endPointer);
+  pad.addEventListener("pointerleave", () => { if (pointerDown) endPointer(); });
+
+  document.getElementById("autoMode").addEventListener("change", (e) => {
+    autoMode = e.target.checked;
+    pad.classList.toggle("disabled", autoMode);
+    if (!autoMode) { pressing = false; target = 0; }
+  });
+
+  document.getElementById("relaxBtn").addEventListener("click", () => {
+    pressing = false; target = 0;
+    document.getElementById("autoMode").checked = false;
+    autoMode = false;
+    pad.classList.remove("disabled");
+  });
+
+  // ---------------------------------------------------------------
+  // Controles de detalle y sensibilidad
+  // ---------------------------------------------------------------
+  const depthSlider = document.getElementById("depthSlider");
+  const depthVal = document.getElementById("depthVal");
+  depthSlider.addEventListener("input", () => {
+    maxDepth = parseInt(depthSlider.value, 10);
+    depthVal.textContent = String(maxDepth);
+    triTree = buildTriTree();
+    prevVisibleSet = new Set();
+  });
+
+  const jitterSensSlider = document.getElementById("jitterSens");
+  const jitterSensVal = document.getElementById("jitterSensVal");
+  jitterSensSlider.addEventListener("input", () => {
+    jitterSensitivity = parseFloat(jitterSensSlider.value);
+    jitterSensVal.textContent = jitterSensitivity.toFixed(1) + "×";
+  });
+
+  // ---------------------------------------------------------------
+  // Render
+  // ---------------------------------------------------------------
+  triTree = buildTriTree();
+  let prevVisibleSet = new Set();
+  const POP_MS = 220;
+
+  function jitterOffset(node, idx, timeSec, magPx) {
+    const s = node.jseeds[idx];
+    const ox = Math.sin(timeSec * s.fx + s.phx) * magPx;
+    const oy = Math.cos(timeSec * s.fy + s.phy) * magPx;
+    return [ox, oy];
+  }
+
+  function facetHSL(e, shade) {
+    const sat = Math.min(90, Math.max(20, 50 + e * 30 + shade * 4));
+    const light = Math.min(96, Math.max(22, 90 - e * 60 + shade * 8));
+    const hue = 352 + shade * 6;
+    return [hue, sat, light];
+  }
+
+  function drawFacet(node, e, magPx, timeSec) {
+    const rawPts = node.v.map((p, i) => {
+      const s = toScreen(p);
+      const [jx, jy] = jitterOffset(node, i, timeSec, magPx);
+      return [s[0] + jx, s[1] + jy];
+    });
+
+    let scale = 1, alpha = 1;
+    if (node.revealedAt != null) {
+      const t = Math.min(1, (timeSec - node.revealedAt) / (POP_MS / 1000));
+      const eased = 1 - Math.pow(1 - t, 3);
+      scale = 0.82 + 0.18 * eased;
+      alpha = eased;
+    }
+    const cx = (rawPts[0][0] + rawPts[1][0] + rawPts[2][0]) / 3;
+    const cy = (rawPts[0][1] + rawPts[1][1] + rawPts[2][1]) / 3;
+    const pts = rawPts.map(([x, y]) => [cx + (x - cx) * scale, cy + (y - cy) * scale]);
+
+    const [h, s, l] = facetHSL(e, node.shade);
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = `hsl(${h.toFixed(1)}, ${s.toFixed(1)}%, ${l.toFixed(1)}%)`;
+    ctx.beginPath();
+    ctx.moveTo(pts[0][0], pts[0][1]);
+    ctx.lineTo(pts[1][0], pts[1][1]);
+    ctx.lineTo(pts[2][0], pts[2][1]);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = `hsla(${h.toFixed(1)}, ${Math.max(0, s - 15).toFixed(1)}%, ${Math.max(0, l - 18).toFixed(1)}%, 0.55)`;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+
+  let facetCount = 0;
+
+  function renderFrame(timeSec) {
+    ctx.fillStyle = BG_COLOR;
+    ctx.fillRect(0, 0, W, H);
+
+    const visible = [];
+    collectVisible(triTree, envelope, visible);
+    const curSet = new Set(visible);
+    for (const n of visible) if (!prevVisibleSet.has(n)) n.revealedAt = timeSec;
+    prevVisibleSet.forEach((n) => { if (!curSet.has(n)) n.revealedAt = null; });
+    prevVisibleSet = curSet;
+
+    const magPx = Math.min(MAX_JITTER_PX, jitterMagnitude * 45 * jitterSensitivity);
+    for (const n of visible) drawFacet(n, envelope, magPx, timeSec);
+    facetCount = visible.length;
+  }
+
+  // ---------------------------------------------------------------
+  // Lecturas en vivo
+  // ---------------------------------------------------------------
+  const envValEl = document.getElementById("envVal");
+  const envFillEl = document.getElementById("envFill");
+  const jitterValEl = document.getElementById("jitterVal");
+  const jitterFillEl = document.getElementById("jitterFill");
+  const facetCountValEl = document.getElementById("facetCountVal");
+  const envStatValEl = document.getElementById("envStatVal");
+  const jitterStatValEl = document.getElementById("jitterStatVal");
+
+  function updateReadouts() {
+    const envPct = Math.round(envelope * 100);
+    envValEl.textContent = envPct + "%";
+    envFillEl.style.width = envPct + "%";
+    emgFill.style.height = Math.round(clamp01((pressing || autoMode) ? target : envelope) * 100) + "%";
+
+    const jitterPct = Math.round(Math.min(1, jitterMagnitude * 4) * 100);
+    jitterValEl.textContent = jitterPct + "%";
+    jitterFillEl.style.width = jitterPct + "%";
+
+    facetCountValEl.textContent = String(facetCount);
+    envStatValEl.textContent = envPct + "%";
+    jitterStatValEl.textContent = jitterPct + "%";
+  }
+
+  // ---------------------------------------------------------------
+  // Loop principal
+  // ---------------------------------------------------------------
+  let lastT = performance.now();
+  function loop(now) {
+    const dt = Math.min(0.05, (now - lastT) / 1000);
+    lastT = now;
+    window.feedEMG(simRawSample(dt));
+    renderFrame(now / 1000);
+    updateReadouts();
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

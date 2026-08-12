@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Círculos · Fuerza + Pulso (MAEDI)</title>
+<style>
+  :root {
+    --panel-bg: rgba(255,255,255,0.94);
+    --ink: #222;
+    --line: #ddd;
+    --accent: #e63986;
+  }
+  html, body {
+    margin: 0; padding: 0; overflow: hidden;
+    background: #faf6f0;
+    font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+    color: var(--ink);
+  }
+  canvas { display: block; }
+
+  #panel {
+    position: fixed;
+    top: 16px; left: 16px;
+    width: 300px;
+    background: var(--panel-bg);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 16px 18px 12px;
+    font-size: 12px;
+    backdrop-filter: blur(4px);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.10);
+  }
+  #panel h1 {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin: 0 0 2px;
+    font-weight: 600;
+    color: #555;
+  }
+  #panel .subtitle {
+    font-size: 10.5px;
+    color: #999;
+    margin: 0 0 12px;
+  }
+  .section-title {
+    font-size: 11px;
+    font-weight: 600;
+    color: #666;
+    margin: 14px 0 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .section-title:first-of-type { margin-top: 0; }
+
+  #forcePad {
+    position: relative;
+    width: 100%;
+    height: 96px;
+    border: 1.5px dashed #c9c2b8;
+    border-radius: 10px;
+    background: linear-gradient(180deg, rgba(230,57,134,0.10), rgba(247,224,90,0.10));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    color: #888;
+    font-size: 11px;
+    line-height: 1.4;
+    cursor: pointer;
+    user-select: none;
+    touch-action: none;
+    overflow: hidden;
+  }
+  #forcePad.active {
+    border-style: solid;
+    border-color: var(--accent);
+  }
+  #forceFill {
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    height: 0%;
+    background: linear-gradient(180deg, rgba(230,57,134,0.35), rgba(247,224,90,0.35));
+    pointer-events: none;
+    transition: none;
+  }
+  #forceLabel {
+    position: relative;
+    z-index: 1;
+    pointer-events: none;
+    padding: 0 10px;
+  }
+
+  .bar-row { margin: 8px 0; }
+  .bar-row label {
+    display: flex; justify-content: space-between;
+    font-size: 10.5px; color: #777; margin-bottom: 3px;
+  }
+  .bar-track {
+    width: 100%; height: 6px;
+    background: #ececec; border-radius: 3px;
+    overflow: hidden;
+  }
+  .bar-fill {
+    height: 100%; width: 0%;
+    border-radius: 3px;
+    background: #999;
+  }
+  #intensityFill { background: linear-gradient(90deg, #f7e05a, #e63986); }
+  #durationFill { background: #4a90d9; }
+
+  .color-row { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+  #colorSelect {
+    flex: 1;
+    padding: 6px 8px;
+    font-size: 11.5px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    background: #fff;
+    color: var(--ink);
+  }
+  #colorPreview {
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    border: 1px solid rgba(0,0,0,0.15);
+    flex-shrink: 0;
+  }
+  .note { font-size: 10.5px; color: #999; line-height: 1.4; margin-top: 6px; }
+
+  .row { margin-bottom: 10px; }
+  .row label {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 3px;
+    font-size: 11.5px;
+  }
+  .row label span.val {
+    font-variant-numeric: tabular-nums;
+    color: #666;
+  }
+  input[type=range] { width: 100%; }
+  .divider { border: none; border-top: 1px solid var(--line); margin: 12px 0; }
+
+  .pulse-live {
+    display: flex; align-items: center; gap: 8px;
+    margin-top: 4px;
+  }
+  #pulseDot {
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: var(--accent);
+    flex-shrink: 0;
+  }
+  #pulseDot.beat { }
+  .pulse-live span {
+    font-size: 10.5px; color: #888;
+  }
+
+  button {
+    width: 100%;
+    padding: 7px 8px;
+    font-size: 11.5px;
+    border: 1px solid #999;
+    background: #fff;
+    border-radius: 6px;
+    cursor: pointer;
+    margin-top: 4px;
+  }
+  button:hover { background: #f2f2f2; }
+
+  #stats {
+    position: fixed;
+    bottom: 16px; left: 16px;
+    background: var(--panel-bg);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 10px 14px;
+    font-size: 11px;
+    color: #666;
+    line-height: 1.6;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+  }
+  #stats b { color: #333; }
+  #swatch {
+    display: inline-block;
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    vertical-align: middle;
+    margin-right: 4px;
+    border: 1px solid rgba(0,0,0,0.15);
+  }
+  #hint {
+    margin-top: 10px;
+    font-size: 10.5px;
+    color: #999;
+    line-height: 1.4;
+  }
+</style>
+</head>
+<body>
+
+<canvas id="canvas"></canvas>
+
+<div id="panel">
+  <h1>Círculos · Fuerza + Pulso</h1>
+  <p class="subtitle">MAEDI — prototipo con sensores simulados</p>
+
+  <div class="section-title">Sensor de fuerza (simulado)</div>
+  <div id="forcePad">
+    <div id="forceFill"></div>
+    <div id="forceLabel">Mantené presionado.<br>Mové el puntero arriba/abajo para variar la fuerza.</div>
+  </div>
+  <div class="bar-row">
+    <label><span>Intensidad</span><span id="intensityVal">0%</span></label>
+    <div class="bar-track"><div class="bar-fill" id="intensityFill"></div></div>
+  </div>
+  <div class="bar-row">
+    <label><span>Duración</span><span id="durationVal">0.0s</span></label>
+    <div class="bar-track"><div class="bar-fill" id="durationFill"></div></div>
+  </div>
+
+  <div class="row">
+    <label><span>Mínimo permitido</span><span class="val" id="minHoldVal">0.4s</span></label>
+    <input type="range" id="minHold" min="0.1" max="2" step="0.1" value="0.4">
+  </div>
+  <div class="row">
+    <label><span>Máximo permitido</span><span class="val" id="maxHoldVal">4.0s</span></label>
+    <input type="range" id="maxHold" min="1" max="8" step="0.5" value="4.0">
+  </div>
+
+  <hr class="divider">
+
+  <div class="section-title">Color de relleno</div>
+  <div class="color-row">
+    <select id="colorSelect">
+      <option value="#0000FF" selected>Azul puro</option>
+      <option value="#FF2C2C">Rojo puro</option>
+      <option value="#FFDE21">Amarillo</option>
+      <option value="#008000">Verde</option>
+      <option value="#ECFD18">Amarillo fluo</option>
+      <option value="#ECF50B">Amarillo chillón</option>
+    </select>
+    <div id="colorPreview"></div>
+  </div>
+  <div class="note">La fuerza sigue controlando la opacidad; esto solo cambia el matiz base de los próximos círculos.</div>
+
+  <hr class="divider">
+
+  <div class="section-title">Sensor de pulso (simulado)</div>
+  <div class="row">
+    <label><span>Pulso actual</span><span class="val" id="bpmVal">72 bpm</span></label>
+    <input type="range" id="bpmSlider" min="40" max="180" step="1" value="72">
+  </div>
+  <div class="pulse-live">
+    <div id="pulseDot"></div>
+    <span>Así va a parpadear el próximo círculo que se cree.</span>
+  </div>
+
+  <hr class="divider">
+  <button id="resetBtn">Limpiar lienzo</button>
+  <div id="hint">Cada círculo guarda el pulso vigente al crearse y parpadea a ese ritmo de forma indefinida.</div>
+</div>
+
+<div id="stats">
+  Círculos dibujados: <b id="countVal">0</b><br>
+  Último: <span id="swatch"></span><b id="lastVal">—</b>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  // ---------------------------------------------------------------
+  // Canvas setup
+  // ---------------------------------------------------------------
+  const canvas = document.getElementById("canvas");
+  const ctx = canvas.getContext("2d");
+  let W = 0, H = 0, DPR = Math.max(1, window.devicePixelRatio || 1);
+
+  function resize() {
+    W = window.innerWidth;
+    H = window.innerHeight;
+    canvas.width = W * DPR;
+    canvas.height = H * DPR;
+    canvas.style.width = W + "px";
+    canvas.style.height = H + "px";
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  }
+  window.addEventListener("resize", resize);
+  resize();
+
+  const BG_COLOR = "#faf6f0";
+
+  // ---------------------------------------------------------------
+  // Config (adjustable min/max hold duration)
+  // ---------------------------------------------------------------
+  let minHoldSec = 0.4;
+  let maxHoldSec = 4.0;
+
+  const PRESS_THRESHOLD = 0.06; // fraction (0-1) above which the force sensor counts as "pressed"
+  const MIN_DIAMETER_FRAC = 0.035; // relative to min(W,H)
+  const MAX_DIAMETER_FRAC = 0.30;
+
+  // Color de relleno: seleccionable entre una paleta fija de colores primarios.
+  // La fuerza modula únicamente la opacidad sobre el matiz elegido (ver forceToAlpha).
+  function hexToRgb(hex) {
+    const clean = hex.replace("#", "");
+    const bigint = parseInt(clean, 16);
+    return [(bigint >> 16) & 255, (bigint >> 8) & 255, bigint & 255];
+  }
+  let currentFillColor = hexToRgb("#0000FF"); // por defecto: Azul puro
+
+  const FORCE_MIN_ALPHA = 0.08; // piso: la opacidad nunca llega a 0, aunque la fuerza sea mínima
+
+  function forceToAlpha(t) {
+    t = Math.min(1, Math.max(0, t));
+    // t=0 -> FORCE_MIN_ALPHA (nunca 0) · t=1 -> 1 (color pleno)
+    return FORCE_MIN_ALPHA + t * (1 - FORCE_MIN_ALPHA);
+  }
+
+  // ---------------------------------------------------------------
+  // State
+  // ---------------------------------------------------------------
+  const circles = []; // {x, y, diameter, rgb, baseAlpha, bpm, birthTime}
+  let currentBpm = 72;
+
+  let pressing = false;
+  let pressStart = 0;
+  let sumIntensity = 0;
+  let sampleCount = 0;
+  let peakIntensity = 0;
+  let liveIntensity = 0;
+
+  const nowSec = () => performance.now() / 1000;
+
+  // ---------------------------------------------------------------
+  // Public integration points (future hardware hooks up here)
+  // ---------------------------------------------------------------
+
+  // Call continuously with a normalized force reading (0-1), e.g. rawADC/1023.
+  // Handles press-start / press-end detection and circle creation internally.
+  window.feedForce = function (value01) {
+    const v = Math.min(1, Math.max(0, value01));
+    liveIntensity = v;
+
+    if (!pressing && v > PRESS_THRESHOLD) {
+      pressing = true;
+      pressStart = nowSec();
+      sumIntensity = 0;
+      sampleCount = 0;
+      peakIntensity = 0;
+    }
+
+    if (pressing) {
+      sumIntensity += v;
+      sampleCount += 1;
+      peakIntensity = Math.max(peakIntensity, v);
+
+      if (v <= PRESS_THRESHOLD) {
+        const elapsed = nowSec() - pressStart;
+        pressing = false;
+        finalizePress(elapsed);
+      }
+    }
+  };
+
+  // Call whenever a new pulse (BPM) reading is available.
+  window.feedPulseBpm = function (bpm) {
+    currentBpm = Math.min(220, Math.max(30, bpm));
+  };
+
+  function finalizePress(elapsedSec) {
+    if (elapsedSec < minHoldSec) {
+      flashTooShort();
+      return;
+    }
+    const clamped = Math.min(elapsedSec, maxHoldSec);
+    const durNorm = (clamped - minHoldSec) / Math.max(0.0001, maxHoldSec - minHoldSec);
+    const avgIntensity = sampleCount > 0 ? sumIntensity / sampleCount : 0;
+
+    const minD = Math.min(W, H) * MIN_DIAMETER_FRAC;
+    const maxD = Math.min(W, H) * MAX_DIAMETER_FRAC;
+    const diameter = minD + durNorm * (maxD - minD);
+
+    const baseAlpha = forceToAlpha(avgIntensity);
+    const margin = diameter / 2 + 10;
+    const x = margin + Math.random() * Math.max(1, (W - margin * 2));
+    const y = margin + Math.random() * Math.max(1, (H - margin * 2));
+
+    circles.push({
+      x, y, diameter, rgb: currentFillColor.slice(), baseAlpha,
+      bpm: currentBpm,
+      birthTime: nowSec()
+    });
+
+    updateLastStats(diameter, avgIntensity, currentBpm, currentFillColor);
+  }
+
+  function flashTooShort() {
+    const el = document.getElementById("forceLabel");
+    const original = el.innerHTML;
+    el.innerHTML = "Muy breve — descartado<br>(mínimo " + minHoldSec.toFixed(1) + "s)";
+    setTimeout(() => { el.innerHTML = original; }, 900);
+  }
+
+  // ---------------------------------------------------------------
+  // Simulated force sensor: draggable pad (Pointer Events -> mouse + touch)
+  // ---------------------------------------------------------------
+  const pad = document.getElementById("forcePad");
+  const forceFill = document.getElementById("forceFill");
+
+  function intensityFromPointer(e) {
+    const rect = pad.getBoundingClientRect();
+    const relY = (e.clientY - rect.top) / rect.height; // 0 top .. 1 bottom
+    return Math.min(1, Math.max(0, 1 - relY));
+  }
+
+  let pointerDown = false;
+
+  pad.addEventListener("pointerdown", (e) => {
+    pointerDown = true;
+    pad.classList.add("active");
+    pad.setPointerCapture(e.pointerId);
+    window.feedForce(intensityFromPointer(e));
+  });
+  pad.addEventListener("pointermove", (e) => {
+    if (!pointerDown) return;
+    window.feedForce(intensityFromPointer(e));
+  });
+  function endPointer(e) {
+    if (!pointerDown) return;
+    pointerDown = false;
+    pad.classList.remove("active");
+    window.feedForce(0);
+  }
+  pad.addEventListener("pointerup", endPointer);
+  pad.addEventListener("pointercancel", endPointer);
+  pad.addEventListener("pointerleave", (e) => {
+    // Leaving the pad while held counts as releasing the sensor.
+    if (pointerDown) endPointer(e);
+  });
+
+  // ---------------------------------------------------------------
+  // Fill color selector
+  // ---------------------------------------------------------------
+  const colorSelect = document.getElementById("colorSelect");
+  const colorPreview = document.getElementById("colorPreview");
+  function applyColorSelection(hex) {
+    currentFillColor = hexToRgb(hex);
+    colorPreview.style.background = hex;
+  }
+  colorSelect.addEventListener("change", () => applyColorSelection(colorSelect.value));
+  applyColorSelection(colorSelect.value);
+
+  // ---------------------------------------------------------------
+  // Simulated pulse sensor: BPM slider
+  // ---------------------------------------------------------------
+  const bpmSlider = document.getElementById("bpmSlider");
+  const bpmVal = document.getElementById("bpmVal");
+  bpmSlider.addEventListener("input", () => {
+    window.feedPulseBpm(parseFloat(bpmSlider.value));
+    bpmVal.textContent = bpmSlider.value + " bpm";
+  });
+
+  // Min/max hold config
+  const minHoldSlider = document.getElementById("minHold");
+  const maxHoldSlider = document.getElementById("maxHold");
+  const minHoldValEl = document.getElementById("minHoldVal");
+  const maxHoldValEl = document.getElementById("maxHoldVal");
+  minHoldSlider.addEventListener("input", () => {
+    minHoldSec = parseFloat(minHoldSlider.value);
+    minHoldValEl.textContent = minHoldSec.toFixed(1) + "s";
+  });
+  maxHoldSlider.addEventListener("input", () => {
+    maxHoldSec = parseFloat(maxHoldSlider.value);
+    maxHoldValEl.textContent = maxHoldSec.toFixed(1) + "s";
+  });
+
+  document.getElementById("resetBtn").addEventListener("click", () => {
+    circles.length = 0;
+    updateCount();
+  });
+
+  // ---------------------------------------------------------------
+  // Live readouts
+  // ---------------------------------------------------------------
+  const intensityValEl = document.getElementById("intensityVal");
+  const intensityFillEl = document.getElementById("intensityFill");
+  const durationValEl = document.getElementById("durationVal");
+  const durationFillEl = document.getElementById("durationFill");
+  const countValEl = document.getElementById("countVal");
+  const lastValEl = document.getElementById("lastVal");
+  const swatchEl = document.getElementById("swatch");
+  const pulseDotEl = document.getElementById("pulseDot");
+
+  function updateLiveReadouts() {
+    const pct = Math.round(liveIntensity * 100);
+    intensityValEl.textContent = pct + "%";
+    intensityFillEl.style.width = pct + "%";
+    forceFill.style.height = pct + "%";
+
+    let elapsed = 0;
+    if (pressing) elapsed = nowSec() - pressStart;
+    durationValEl.textContent = elapsed.toFixed(1) + "s";
+    const durPct = Math.min(100, (elapsed / maxHoldSec) * 100);
+    durationFillEl.style.width = durPct + "%";
+  }
+
+  function updateCount() {
+    countValEl.textContent = String(circles.length);
+  }
+
+  function updateLastStats(diameter, avgIntensity, bpm, rgb) {
+    updateCount();
+    const alpha = forceToAlpha(avgIntensity);
+    swatchEl.style.background = `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${alpha.toFixed(2)})`;
+    lastValEl.textContent =
+      Math.round(diameter) + "px · " + Math.round(avgIntensity * 100) + "% · " + Math.round(bpm) + " bpm";
+  }
+
+  // ---------------------------------------------------------------
+  // Heartbeat phase: 0 = instante del latido, 1 = justo antes del próximo.
+  // ---------------------------------------------------------------
+  function beatPhase(tNow, birthTime, bpm) {
+    const period = 60 / Math.max(1, bpm);
+    const age = Math.max(0, tNow - birthTime);
+    return (age % period) / period; // 0..1
+  }
+
+  // ---------------------------------------------------------------
+  // Main draw loop
+  // ---------------------------------------------------------------
+  // En cada pulsación el círculo aparece por completo y luego desaparece por
+  // completo (en vez de agrandarse/achicarse): se dibuja únicamente durante la
+  // fracción inicial BEAT_VISIBLE_FRACTION del período del latido, con su
+  // opacidad base intacta (sin atenuar), y se omite el resto del ciclo.
+  // A fuerza máxima (baseAlpha = 1) el círculo, cuando está visible, se ve
+  // siempre en color pleno, sin transparencia.
+  const BEAT_VISIBLE_FRACTION = 0.35;
+
+  function draw() {
+    const t = nowSec();
+
+    ctx.globalCompositeOperation = "source-over";
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = BG_COLOR;
+    ctx.fillRect(0, 0, W, H);
+
+    ctx.globalCompositeOperation = "multiply";
+    for (let i = 0; i < circles.length; i++) {
+      const c = circles[i];
+      const phase = beatPhase(t, c.birthTime, c.bpm);
+      if (phase >= BEAT_VISIBLE_FRACTION) continue; // "desaparece" durante el resto del latido
+
+      ctx.globalAlpha = c.baseAlpha;
+      ctx.fillStyle = `rgb(${c.rgb[0]},${c.rgb[1]},${c.rgb[2]})`;
+      ctx.beginPath();
+      ctx.arc(c.x, c.y, c.diameter / 2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalCompositeOperation = "source-over";
+    ctx.globalAlpha = 1;
+
+    // Live preview dot for the pulse control: mismo criterio aparece/desaparece.
+    const phasePreview = beatPhase(t, previewBirth, currentBpm);
+    pulseDotEl.style.opacity = phasePreview < BEAT_VISIBLE_FRACTION ? "1" : "0";
+
+    updateLiveReadouts();
+    requestAnimationFrame(draw);
+  }
+
+  const previewBirth = nowSec();
+  requestAnimationFrame(draw);
+})();
+</script>
+</body>
+</html>

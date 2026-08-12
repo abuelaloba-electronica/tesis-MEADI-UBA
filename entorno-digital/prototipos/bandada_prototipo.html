@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bandada · Prototipo Acelerómetro (MAEDI)</title>
+<style>
+  :root {
+    --panel-bg: rgba(255,255,255,0.92);
+    --ink: #111;
+    --line: #ccc;
+  }
+  html, body {
+    margin: 0; padding: 0; overflow: hidden;
+    background: #fff;
+    font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+    color: var(--ink);
+  }
+  canvas { display: block; background: #fff; }
+
+  #panel {
+    position: fixed;
+    top: 16px; left: 16px;
+    width: 280px;
+    background: var(--panel-bg);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 14px 16px 10px;
+    font-size: 12px;
+    backdrop-filter: blur(4px);
+    box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+  }
+  #panel h1 {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin: 0 0 10px;
+    font-weight: 600;
+    color: #555;
+  }
+  .row { margin-bottom: 10px; }
+  .row label {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 3px;
+    font-size: 11.5px;
+  }
+  .row label span.val {
+    font-variant-numeric: tabular-nums;
+    color: #666;
+  }
+  input[type=range] { width: 100%; }
+  .axis-x::-webkit-slider-thumb { background: #111; }
+  .divider { border: none; border-top: 1px solid var(--line); margin: 10px 0; }
+  .checkline {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 11.5px; margin-bottom: 8px;
+  }
+  button {
+    width: 100%;
+    padding: 6px 8px;
+    font-size: 11.5px;
+    border: 1px solid #999;
+    background: #fff;
+    border-radius: 6px;
+    cursor: pointer;
+  }
+  button:hover { background: #f2f2f2; }
+  #hint {
+    margin-top: 8px;
+    font-size: 10.5px;
+    color: #888;
+    line-height: 1.4;
+  }
+  #stats {
+    position: fixed;
+    bottom: 12px; left: 16px;
+    font-size: 10.5px;
+    color: #999;
+    font-variant-numeric: tabular-nums;
+  }
+</style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+
+<div id="panel">
+  <h1>Acelerómetro simulado</h1>
+
+  <div class="row">
+    <label>Eje X <span class="val" id="valX">0.00</span></label>
+    <input type="range" id="sliderX" min="-2" max="2" step="0.01" value="0">
+  </div>
+  <div class="row">
+    <label>Eje Y <span class="val" id="valY">0.00</span></label>
+    <input type="range" id="sliderY" min="-2" max="2" step="0.01" value="0">
+  </div>
+  <div class="row">
+    <label>Eje Z (concentración) <span class="val" id="valZ">0.00</span></label>
+    <input type="range" id="sliderZ" min="-2" max="2" step="0.01" value="0">
+  </div>
+
+  <div class="checkline">
+    <input type="checkbox" id="autoMode">
+    <label for="autoMode">Modo demo automático (simula una mano moviéndose)</label>
+  </div>
+
+  <hr class="divider">
+
+  <div class="row">
+    <label>Cantidad de pájaros <span class="val" id="valN">1500</span></label>
+    <input type="range" id="sliderN" min="100" max="16000" step="100" value="1500">
+  </div>
+
+  <div class="row">
+    <label>Tamaño de los puntos <span class="val" id="valSize">100%</span></label>
+    <input type="range" id="sliderSize" min="100" max="200" step="5" value="100">
+  </div>
+
+  <button id="resetBtn">Reiniciar bandada</button>
+
+  <div id="hint">
+    Los puntos se mueven de forma aleatoria por defecto. Al mover X/Y cambia la
+    dirección de la bandada; Z controla si se concentra (bandada compacta) o
+    se dispersa. Esta interfaz reemplaza temporalmente al textil con
+    acelerómetro (Arduino/Lilypad).
+  </div>
+</div>
+
+<div id="stats"></div>
+
+<script>
+(function () {
+  "use strict";
+
+  const canvas = document.getElementById("canvas");
+  const ctx = canvas.getContext("2d");
+
+  function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+  window.addEventListener("resize", resize);
+  resize();
+
+  // ---------------------------------------------------------------
+  // Estado del "acelerómetro". En el prototipo final este objeto se
+  // actualiza desde los sliders; cuando exista el dispositivo real,
+  // basta con llamar a window.updateAccel(x, y, z) desde el código
+  // que lea el puerto serie / BLE del Arduino-Lilypad, sin tocar el
+  // resto de la simulación.
+  // ---------------------------------------------------------------
+  const accel = { x: 0, y: 0, z: 0 };
+
+  window.updateAccel = function (x, y, z) {
+    accel.x = clamp(x, -2, 2);
+    accel.y = clamp(y, -2, 2);
+    accel.z = clamp(z, -2, 2);
+  };
+
+  function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+  function lerp(a, b, t) { return a + (b - a) * t; }
+  function rand(a, b) { return a + Math.random() * (b - a); }
+
+  // ---------------------------------------------------------------
+  // UI
+  // ---------------------------------------------------------------
+  const sliderX = document.getElementById("sliderX");
+  const sliderY = document.getElementById("sliderY");
+  const sliderZ = document.getElementById("sliderZ");
+  const sliderN = document.getElementById("sliderN");
+  const sliderSize = document.getElementById("sliderSize");
+  const valX = document.getElementById("valX");
+  const valY = document.getElementById("valY");
+  const valZ = document.getElementById("valZ");
+  const valN = document.getElementById("valN");
+  const valSize = document.getElementById("valSize");
+  const autoModeBox = document.getElementById("autoMode");
+  const resetBtn = document.getElementById("resetBtn");
+  const stats = document.getElementById("stats");
+
+  let manualControl = true;
+
+  function syncSlidersToAccel() {
+    sliderX.value = accel.x.toFixed(2);
+    sliderY.value = accel.y.toFixed(2);
+    sliderZ.value = accel.z.toFixed(2);
+  }
+
+  [sliderX, sliderY, sliderZ].forEach((s) => {
+    s.addEventListener("input", () => {
+      manualControl = true;
+      autoModeBox.checked = false;
+      window.updateAccel(
+        parseFloat(sliderX.value),
+        parseFloat(sliderY.value),
+        parseFloat(sliderZ.value)
+      );
+    });
+  });
+
+  autoModeBox.addEventListener("change", () => {
+    manualControl = !autoModeBox.checked;
+  });
+
+  sliderN.addEventListener("input", () => {
+    valN.textContent = sliderN.value;
+    setBirdCount(parseInt(sliderN.value, 10));
+  });
+
+  const BASE_POINT_SIZE = 1.76; // px, tamaño actual de referencia (100%) — 10% más grande que antes
+  let pointSize = BASE_POINT_SIZE;
+
+  sliderSize.addEventListener("input", () => {
+    const pct = parseInt(sliderSize.value, 10);
+    valSize.textContent = pct + "%";
+    pointSize = BASE_POINT_SIZE * (pct / 100); // 100% -> tamaño actual, 200% -> el doble
+  });
+
+  resetBtn.addEventListener("click", () => {
+    initBirds(birds.length);
+  });
+
+  // ---------------------------------------------------------------
+  // Sistema de partículas ("bandada")
+  //
+  // Enfoque: no es un boids clásico (separación/alineación/cohesión
+  // por pares, O(n^2)), porque con miles de puntos eso no rinde bien
+  // en un canvas 2D. En su lugar hay N "centroides" (sub-núcleos de
+  // la bandada) que flotan alrededor de un centro maestro:
+  //   - X,Y del acelerómetro desplazan el centro maestro -> dirección.
+  //     Todos los centroides se mueven de forma uniforme junto con él.
+  //   - Cada centroide además vaga de forma independiente y aleatoria
+  //     alrededor del centro maestro, con una leve atracción mutua
+  //     entre centroides: a veces se acercan y se solapan (se "unen"
+  //     visualmente), otras veces se separan.
+  //   - Z del acelerómetro cambia el radio objetivo de cada núcleo
+  //     -> concentración (bandada compacta vs. dispersa).
+  //   - Cada pájaro pertenece a un centroide y su distancia al mismo
+  //     no es un círculo perfecto: se modula con "armónicos" (curvas
+  //     seno superpuestas con fase que evoluciona en el tiempo) que
+  //     le dan un contorno orgánico e irregular, como una nube viva.
+  // ---------------------------------------------------------------
+
+  const NUM_CLUSTERS = 3;
+  let birds = [];
+  let centroid = { x: 0, y: 0 }; // centro maestro (lo mueve X,Y)
+  let clusters = [];
+
+  function makeHarmonics() {
+    const arr = [];
+    const n = 4;
+    for (let i = 0; i < n; i++) {
+      arr.push({
+        freq: 2 + Math.floor(Math.random() * 4),  // 2..5 lóbulos
+        amp: rand(0.14, 0.34),
+        phase: rand(0, Math.PI * 2),
+        phaseSpeed: rand(-0.18, 0.18),
+      });
+    }
+    return arr;
+  }
+
+  // Radio "orgánico": el radio base se modula según el ángulo con
+  // varios senos superpuestos, dando un contorno de nube en vez de
+  // un círculo perfecto.
+  function organicRadius(harmonics, angle, baseRadius) {
+    let mod = 1;
+    for (let i = 0; i < harmonics.length; i++) {
+      const hh = harmonics[i];
+      mod += hh.amp * Math.sin(hh.freq * angle + hh.phase);
+    }
+    return baseRadius * Math.max(0.18, mod);
+  }
+
+  function initClusters() {
+    clusters = [];
+    for (let c = 0; c < NUM_CLUSTERS; c++) {
+      const angle = (c / NUM_CLUSTERS) * Math.PI * 2 + rand(-0.3, 0.3);
+      const dist = rand(15, 60);
+      clusters.push({
+        offset: { x: Math.cos(angle) * dist, y: Math.sin(angle) * dist },
+        vel: { x: 0, y: 0 },
+        harmonics: makeHarmonics(),
+      });
+    }
+  }
+
+  function initBirds(n) {
+    centroid.x = canvas.width / 2;
+    centroid.y = canvas.height / 2;
+    initClusters();
+    birds = new Array(n);
+    for (let i = 0; i < n; i++) {
+      birds[i] = makeBird();
+    }
+  }
+
+  function makeBird() {
+    // Sesgo leve hacia el centro (sqrt-ish) para que la nube llene
+    // bien el área en vez de dejar anillos vacíos, conservando algo
+    // más de densidad hacia el núcleo.
+    const skew = Math.pow(Math.random(), 0.6);
+    return {
+      clusterIndex: Math.floor(Math.random() * NUM_CLUSTERS),
+      baseFactor: skew,                       // 0..1, posición relativa dentro del radio
+      orbitAngle: rand(0, Math.PI * 2),
+      orbitDir: Math.random() < 0.82 ? 1 : -1, // casi todos giran igual, algunos al revés
+      orbitSpeed: rand(0.05, 0.18),
+      wobblePhase: rand(0, Math.PI * 2),
+      wobbleFreq: rand(0.3, 0.9),
+      wobbleAmp: rand(6, 26),
+      wanderAngle: rand(0, Math.PI * 2),
+      wanderSpeed: rand(0.4, 1.4),
+      x: 0, y: 0,
+    };
+  }
+
+  function setBirdCount(n) {
+    if (n === birds.length) return;
+    if (n < birds.length) {
+      birds.length = n;
+    } else {
+      const add = n - birds.length;
+      for (let i = 0; i < add; i++) birds.push(makeBird());
+    }
+  }
+
+  initBirds(parseInt(sliderN.value, 10));
+
+  // ---------------------------------------------------------------
+  // Loop de animación
+  // ---------------------------------------------------------------
+  let t = 0;
+  let autoT = 0;
+  let lastTime = performance.now();
+
+  function frame(now) {
+    const dt = Math.min(0.05, (now - lastTime) / 1000);
+    lastTime = now;
+    t += dt;
+
+    if (!manualControl) {
+      autoT += dt;
+      const ax = Math.sin(autoT * 0.35) * 1.4 + Math.sin(autoT * 0.9) * 0.3;
+      const ay = Math.cos(autoT * 0.27) * 1.2 + Math.sin(autoT * 1.3) * 0.25;
+      const az = Math.sin(autoT * 0.18) * 1.6;
+      window.updateAccel(ax, ay, az);
+      syncSlidersToAccel();
+    }
+
+    updateSliderLabels();
+    step(dt);
+    draw();
+
+    requestAnimationFrame(frame);
+  }
+
+  function updateSliderLabels() {
+    valX.textContent = accel.x.toFixed(2);
+    valY.textContent = accel.y.toFixed(2);
+    valZ.textContent = accel.z.toFixed(2);
+  }
+
+  function updateClusters(dt, maxSpread, turbulence) {
+    const roamLimit = maxSpread * 0.55;
+
+    // Vagabundeo aleatorio de cada centroide (más fuerte si hay turbulencia)
+    const jitterAccel = 45 * (0.3 + turbulence);
+    for (let i = 0; i < clusters.length; i++) {
+      const c = clusters[i];
+      c.vel.x += rand(-1, 1) * jitterAccel * dt;
+      c.vel.y += rand(-1, 1) * jitterAccel * dt;
+    }
+
+    // Atracción mutua leve y constante entre centroides: hace que a
+    // veces se acerquen y se solapen (se "unan") y otras se separen,
+    // combinado con el vagabundeo aleatorio de arriba.
+    for (let i = 0; i < clusters.length; i++) {
+      for (let j = i + 1; j < clusters.length; j++) {
+        const a = clusters[i], b = clusters[j];
+        const dx = b.offset.x - a.offset.x;
+        const dy = b.offset.y - a.offset.y;
+        const dist = Math.sqrt(dx * dx + dy * dy) + 0.001;
+        const force = 7;
+        const fx = (dx / dist) * force;
+        const fy = (dy / dist) * force;
+        a.vel.x += fx * dt; a.vel.y += fy * dt;
+        b.vel.x -= fx * dt; b.vel.y -= fy * dt;
+      }
+    }
+
+    for (let i = 0; i < clusters.length; i++) {
+      const c = clusters[i];
+
+      // resorte suave hacia el centro maestro + amortiguación
+      c.vel.x += -c.offset.x * 0.8 * dt;
+      c.vel.y += -c.offset.y * 0.8 * dt;
+      c.vel.x *= 0.96;
+      c.vel.y *= 0.96;
+
+      const maxSpeed = 65 * (0.5 + turbulence);
+      const speed = Math.hypot(c.vel.x, c.vel.y);
+      if (speed > maxSpeed) {
+        c.vel.x *= maxSpeed / speed;
+        c.vel.y *= maxSpeed / speed;
+      }
+
+      c.offset.x += c.vel.x * dt;
+      c.offset.y += c.vel.y * dt;
+
+      const od = Math.hypot(c.offset.x, c.offset.y);
+      if (od > roamLimit) {
+        c.offset.x *= roamLimit / od;
+        c.offset.y *= roamLimit / od;
+      }
+
+      for (let k = 0; k < c.harmonics.length; k++) {
+        c.harmonics[k].phase += c.harmonics[k].phaseSpeed * dt;
+      }
+    }
+  }
+
+  function step(dt) {
+    const w = canvas.width, h = canvas.height;
+    const diag = Math.sqrt(w * w + h * h);
+
+    // Concentración según Z: z alto -> radio chico (bandada compacta)
+    // z bajo/negativo -> radio grande (bandada casi ocupa toda la pantalla)
+    const zNorm = (accel.z + 2) / 4; // 0..1
+    const maxSpread = lerp(diag * 0.5, diag * 0.10, zNorm);
+
+    // Deriva del centro maestro según X, Y (dirección de la bandada).
+    // El margen escala con el tamaño de la nube para que no se salga
+    // de pantalla apenas se mueve.
+    const driftSpeed = 120; // px/s por unidad de "g"
+    const marginX = clamp(maxSpread * 0.45, 30, w * 0.45);
+    const marginY = clamp(maxSpread * 0.45, 30, h * 0.45);
+    centroid.x += accel.x * driftSpeed * dt;
+    centroid.y += -accel.y * driftSpeed * dt; // invertido: "arriba" en pantalla
+    centroid.x = clamp(centroid.x, marginX, w - marginX);
+    centroid.y = clamp(centroid.y, marginY, h - marginY);
+
+    // Turbulencia: cuanto más fuerte el movimiento total, más caótico
+    const mag = Math.sqrt(accel.x * accel.x + accel.y * accel.y + accel.z * accel.z);
+    const turbulence = clamp(mag / 2.5, 0, 1);
+
+    updateClusters(dt, maxSpread, turbulence);
+
+    const maxSpreadPerCluster = maxSpread * 0.62;
+    const FLATTEN = 0.82;
+
+    for (let i = 0; i < birds.length; i++) {
+      const b = birds[i];
+      const cl = clusters[b.clusterIndex];
+
+      b.orbitAngle += b.orbitDir * (b.orbitSpeed + turbulence * 0.6) * dt;
+      b.wanderAngle += (Math.random() - 0.5) * (0.8 + turbulence * 2.0) * dt;
+
+      const localCx = centroid.x + cl.offset.x;
+      const localCy = centroid.y + cl.offset.y;
+
+      const baseRadius = b.baseFactor * maxSpreadPerCluster;
+      const shapedRadius = organicRadius(cl.harmonics, b.orbitAngle, baseRadius) +
+        Math.sin(t * b.wobbleFreq + b.wobblePhase) * (b.wobbleAmp * (0.4 + turbulence));
+
+      const wanderOffset = (10 + turbulence * 30);
+
+      b.x = localCx + Math.cos(b.orbitAngle) * shapedRadius +
+        Math.cos(b.wanderAngle) * wanderOffset;
+      b.y = localCy + Math.sin(b.orbitAngle) * shapedRadius * FLATTEN +
+        Math.sin(b.wanderAngle) * wanderOffset;
+    }
+  }
+
+  function draw() {
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ctx.fillStyle = "#0a0a0a";
+    for (let i = 0; i < birds.length; i++) {
+      const b = birds[i];
+      ctx.fillRect(b.x, b.y, pointSize, pointSize);
+    }
+
+    stats.textContent = birds.length + " puntos renderizados";
+  }
+
+  requestAnimationFrame((now) => {
+    lastTime = now;
+    requestAnimationFrame(frame);
+  });
+
+})();
+</script>
+</body>
+</html>
