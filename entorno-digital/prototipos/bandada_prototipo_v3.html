@@ -139,9 +139,9 @@
   <button id="resetBtn">Reiniciar bandada</button>
 
   <div id="hint">
-    <b>Qué cambió respecto a v2:</b> cada pájaro ahora es un triángulo orientado
-    según su rumbo (heading), no un punto — con una leve inclinación de alas
-    (banking) que refleja qué tan cerrado es el giro. Inspirado en el modelo de
+    <b>Qué cambió respecto a v2:</b> el movimiento de cada pájaro se calcula
+    con un rumbo (heading) propio y una inclinación de giro (banking), aunque
+    en pantalla se lo dibuja como un punto de tamaño regulable. Inspirado en el modelo de
     orientación social de <b>flock2</b> (Rama Hoetzlein): en vez de sumar
     separación/alineación/cohesión/viento directamente sobre la velocidad, ese
     total se usa solo para calcular un <b>rumbo deseado</b>, y el pájaro gira
@@ -184,6 +184,12 @@
     viene de ninguna de las dos referencias, es una extensión propia).
     Ahora frena en proporción a cuánto le falta girar, como un auto en
     una curva cerrada.
+    <br><br>
+    <b>Forma:</b> a pedido, cada pájaro se dibuja como un punto circular en
+    vez de un triángulo orientado. El slider de tamaño sigue funcionando
+    igual: ahora escala el radio del punto (1,5 px al 100%, 3 px al 200%).
+    La física no cambió — el rumbo y el banking se siguen calculando, solo
+    dejaron de usarse para orientar la silueta.
   </div>
 </div>
 
@@ -217,6 +223,8 @@
     accel.y = clamp(y, -2, 2);
     accel.z = clamp(z, -2, 2);
   };
+
+  const TWO_PI = Math.PI * 2;
 
   function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
   function lerp(a, b, t) { return a + (b - a) * t; }
@@ -285,11 +293,10 @@
     setBirdCount(parseInt(sliderN.value, 10));
   });
 
-  // Geometría base del triángulo (px, a "tamaño 100%"), recalculada en
-  // draw() al multiplicarla por sizeMul.
-  const BASE_NOSE = 4.6;  // distancia del centro a la punta (nariz)
-  const BASE_REAR = 2.6;  // distancia del centro a la base de las alas
-  const BASE_WING = 2.3;  // semi-envergadura de cada ala
+  // Geometría base del punto (px, a "tamaño 100%"), multiplicada en draw()
+  // por sizeMul. El slider de tamaño sigue funcionando igual que antes:
+  // escala este radio en vez de las medidas del triángulo.
+  const BASE_RADIUS = 1.5; // radio del punto a tamaño 100%
   let sizeMul = 1;
 
   sliderSize.addEventListener("input", () => {
@@ -809,32 +816,22 @@
     ctx.fillStyle = `rgba(255,255,255,${trailAlpha})`;
     ctx.fillRect(0, 0, w, h);
 
-    // Cada pájaro es un triángulo orientado según su rumbo (heading), con
-    // las alas asimétricas según `bank` (cuánto de su giro máximo está
-    // usando en este frame) para sugerir una inclinación al virar. Se
-    // acumulan todos los triángulos en un único path y se pinta con un
-    // solo fill() -> mucho más barato que 16000 llamadas a fill/fillRect.
-    const noseDist = BASE_NOSE * sizeMul;
-    const rearDist = BASE_REAR * sizeMul;
-    const wing = BASE_WING * sizeMul;
+    // Cada pájaro se dibuja como un punto (círculo) de radio
+    // BASE_RADIUS * sizeMul. Se acumulan todos los círculos en un único
+    // path y se pinta con un solo fill() -> mucho más barato que 16000
+    // llamadas a fill(). El moveTo() antes de cada arc() es necesario:
+    // sin él, el path uniría con una recta el final de un círculo con el
+    // comienzo del siguiente. `heading` y `bank` se siguen calculando en
+    // la simulación (gobiernan el movimiento), simplemente ya no se usan
+    // para orientar la silueta.
+    const r = Math.max(0.35, BASE_RADIUS * sizeMul);
 
     ctx.fillStyle = "#0a0a0a";
     ctx.beginPath();
     for (let i = 0; i < birds.length; i++) {
       const b = birds[i];
-      const ch = Math.cos(b.heading), sh = Math.sin(b.heading);
-      const px = -sh, py = ch; // perpendicular al rumbo
-
-      const noseX = b.x + ch * noseDist, noseY = b.y + sh * noseDist;
-      const rearX = b.x - ch * rearDist, rearY = b.y - sh * rearDist;
-
-      const wL = wing * (1 + b.bank * 0.55);
-      const wR = wing * (1 - b.bank * 0.55);
-
-      ctx.moveTo(noseX, noseY);
-      ctx.lineTo(rearX + px * wL, rearY + py * wL);
-      ctx.lineTo(rearX - px * wR, rearY - py * wR);
-      ctx.closePath();
+      ctx.moveTo(b.x + r, b.y);
+      ctx.arc(b.x, b.y, r, 0, TWO_PI);
     }
     ctx.fill();
 

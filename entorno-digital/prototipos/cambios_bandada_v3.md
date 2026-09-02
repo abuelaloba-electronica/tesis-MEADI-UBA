@@ -130,6 +130,24 @@ v3 originalmente (no había Chrome/Firefox disponibles); las correcciones de
 esta segunda ronda sí se validaron con la física real vía Node, pero el
 resultado final en pantalla queda sujeto a confirmación visual del usuario.
 
+## v3 — tercera ronda: pájaros como puntos
+
+A pedido, el render vuelve a ser un **punto** (círculo), no el triángulo
+orientado de la primera ronda. Se reemplazaron las tres medidas del triángulo
+(`BASE_NOSE` / `BASE_REAR` / `BASE_WING`) por un único `BASE_RADIUS = 1.5` px
+a tamaño 100%; el slider de tamaño sigue existiendo y funcionando igual, solo
+que ahora escala ese radio (1,5 px al 100%, 3 px al 200%), con un piso de
+0,35 px para que nunca desaparezca. A diferencia del punto cuadrado de v2
+(`fillRect`), es un círculo: se acumulan todos en un único `path` y se pintan
+con un solo `fill()`, con un `moveTo()` antes de cada `arc()` — sin él, el
+path uniría con una recta el final de un círculo con el comienzo del
+siguiente.
+
+**La física no cambió.** `heading` y `bank` se siguen calculando y siguen
+gobernando el movimiento (rumbo objetivo, velocidad angular máxima, frenado en
+la curva); simplemente dejaron de usarse para orientar la silueta. Volver al
+triángulo es solo cambiar el cuerpo del bucle de `draw()`.
+
 ## Archivo
 
 - `bandada_prototipo_v3.html` — archivo único, autocontenido, sin
