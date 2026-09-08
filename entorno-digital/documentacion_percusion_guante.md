@@ -1,0 +1,378 @@
+# Documentación: `prototipo_percusion_guante_{a,b}[_dispositivo].html`
+
+## Qué es
+
+Un guante de percusión. La placa **LilyPad Arduino USB** va en el dorso de la
+mano; dos piezos cosidos en las puntas de dos dedos detectan golpes contra una
+superficie, y un FSR —el mismo que ya usaba `dispositivo2`— se toca con la mano
+opuesta.
+
+Cada golpe **suena** (una nota sintetizada en la propia página) y **deja una
+marca** en el lienzo. La presión del FSR **distorsiona el sonido** y aplica un
+efecto **global** sobre la imagen.
+
+Reemplaza al par fuerza + pulso: el Pulse Sensor Amped nunca llegó a dar
+lecturas estables y se descartó. Las páginas de círculos quedaron archivadas en
+`prototipos/` (siguen funcionando con el firmware nuevo, porque el formato `F:`
+no cambió).
+
+Inspiración: [Adafruit MIDI Drum Glove](https://learn.adafruit.com/midi-drum-glove).
+De ahí sale el gesto y el circuito base. Lo que **no** tomamos es su detección
+—un umbral binario que manda siempre velocity 127— porque acá la intensidad del
+golpe es justamente lo que da la expresión.
+
+## Los cuatro archivos
+
+| Archivo | Variante musical | Datos |
+|---|---|---|
+| `prototipo_percusion_guante_a.html` | (a) nota fija por dedo | pads y sliders manuales |
+| `prototipo_percusion_guante_a_dispositivo.html` | (a) | Web Serial |
+| `prototipo_percusion_guante_b.html` | (b) pentatónica por intensidad | pads y sliders manuales |
+| `prototipo_percusion_guante_b_dispositivo.html` | (b) | Web Serial |
+
+Las cuatro comparten la misma cadena de audio y el mismo motor de dibujo; lo
+único que cambia entre (a) y (b) es de dónde sale la nota y, en consecuencia,
+qué representa la imagen.
+
+## Requisitos para probarlo
+
+- **Navegador**: Chrome o Edge de escritorio para las versiones `_dispositivo`
+  (la Web Serial API no existe en Firefox ni Safari; ahí el botón queda
+  deshabilitado). Las versiones simuladas andan en cualquier navegador con Web
+  Audio.
+- **El sonido necesita un gesto del usuario.** El `AudioContext` se construye
+  perezosamente en `asegurarAudio()`, enganchada al clic de "Conectar
+  dispositivo" (versión real) o al de "Activar sonido" y al primer golpe en un
+  pad (versión simulada). Si la página está en silencio, mirar el estado del
+  audio en el panel.
+- **Firmware**: `dispositivo2/dispositivo2.ino` con la detección de piezos.
+- Se abren con doble clic (`file://`). No hay build step ni dependencias.
+
+## Circuito de los piezos
+
+Acá nos apartamos de Adafruit a propósito. Su montaje —piezo con un pulldown de
+1 MΩ y nada más— alcanza para decidir *si* hubo golpe, pero no para medir *cuán
+fuerte*, por dos razones:
+
+1. Un disco piezo golpeado no da un pulso: da un timbrado en su resonancia
+   mecánica, típicamente **3–6 kHz**. El loop del ATmega32U4 a 8 MHz alcanza
+   unas 2,7 kHz de muestreo (`analogRead()` tarda ~112 µs y hay tres canales),
+   o sea **por debajo de Nyquist de ese timbrado**: cada muestra cae en una fase
+   arbitraria y el pico varía ±20–40 % entre golpes idénticos.
+2. Con AREF = 3,3 V, un golpe fuerte satura en 1023 y se pierde toda la
+   dinámica.
+
+Por eso cada dedo lleva su propio front-end RC, montado **en la punta del dedo,
+junto al piezo**:
+
+```
+piezo ──┬── R_serie 10 kΩ ──┬── A2 (dedo 0) / A3 (dedo 1)
+        │                   │
+     R_pd 100 kΩ         C 100 nF
+        │                   │
+       GND                 GND
+```
+
+| Componente | Qué resuelve |
+|---|---|
+| `C 100 nF` | Divisor capacitivo con la capacidad del piezo (~20 nF): atenúa el transitorio ×6, así que 30–60 V quedan en 5–10 V. Junto con `R_serie` forma un pasabajos de ~160 Hz, que deja pasar entera la envolvente del golpe (10–30 ms) y elimina la resonancia. Con la señal limitada a ~150 Hz y muestreo a 2,7 kHz hay ×18 de sobremuestreo: el pico se vuelve repetible. |
+| `R_serie 10 kΩ` | Limita la corriente en los diodos de clamp internos del 32U4 (~0,7 mA con 10 V residuales). Sin protección, esa corriente la limita sólo la impedancia de la fuente piezoeléctrica, que en el transitorio es baja: es un riesgo real de degradar el pin. |
+| `R_pd 100 kΩ` | Descarga, τ = 100k × 120n = **12 ms**. **No poner 1 MΩ acá**: con el capacitor daría τ = 120 ms y bloquearía el retrigger unos 300 ms. El 1 MΩ de Adafruit es correcto sólo *sin* capacitor. |
+
+Montarlo en el dedo y llevar por hilo conductor sólo la salida de baja
+impedancia importa más de lo que parece: un nodo de alta impedancia atravesando
+el textil capta zumbido de red y artefactos triboeléctricos del propio
+movimiento de la tela. De yapa, el capacitor elimina el *crosstalk* entre
+canales del ADC (el sample-and-hold de 14 pF del 32U4 retiene carga del canal
+anterior).
+
+Opcional y barato: un Zener de 3,3 V o dos Schottky (a 3V3 y a GND) en el nodo
+del ADC.
+
+**Pines.** La LilyPad USB expone nueve sew tabs de I/O —`2, 3, 9, 10, 11, A2,
+A3, A4, A5`—, o sea exactamente cuatro entradas analógicas. Piezos en **A2/A3**,
+FSR en **A4** (sin cambios), A5 libre. Conviene verificarlo contra la serigrafía
+de la placa antes de coser.
+
+## Protocolo serie (Arduino → navegador)
+
+Una línea de texto por lectura, terminada en `\n`, a 9600 baudios nominales.
+
+| Línea | Frecuencia | Qué hace la web |
+|---|---|---|
+| `G:<dedo>,<pico>` | por golpe | `dedo` ∈ {0,1}, `pico` ∈ 0–1023 **crudo** (ya restado el reposo). Llama a `window.feedGolpe(dedo, pico)` |
+| `F:<0-1023>` | cada 20 ms | Normaliza a 0–1 y llama a `window.feedForce(v)`. **Sin cambios** respecto del sketch anterior |
+| `FSR reading = ... - ...` | cada 3 s | Se ignora (diagnóstico legible para el Monitor Serial) |
+
+El pico va **crudo, no normalizado**: es la convención del repo —la corrección
+vive del lado del navegador, igual que con la gravedad del acelerómetro— y
+permite recalibrar el rango con sliders mientras se toca.
+
+El parser (`handleLine()`) compara los **dos primeros caracteres**, no usa
+`startsWith("F")`: la línea de diagnóstico `FSR reading = ...` también empieza
+con `F` y no debe confundirse con una lectura. Y conserva el `trim()`, porque
+`Serial.println()` emite `\r\n`.
+
+`window.feedGolpe` y `window.feedForce` son la **única** frontera de entrada de
+datos: por ahí entran el lector de Web Serial, los pads, los sliders, el teclado
+y cualquier prueba desde la consola.
+
+## Detección del golpe (en el sketch)
+
+Máquina de tres estados por dedo:
+
+```
+REPOSO  : si (v - base) > UMBRAL_ON  → MIDIENDO_PICO, pico = v-base
+MIDIENDO: pico = max(pico, v-base)
+          al vencer VENTANA_PICO → arbitrar contra el otro dedo, emitir
+BLOQUEADO: tras BLOQUEO_MS y con la señal ya baja → REPOSO
+```
+
+| Constante | Valor | Criterio |
+|---|---|---|
+| `UMBRAL_ON` | 20 cuentas sobre el reposo | ≈65 mV, por encima del ruido del ADC (±3). El `threshold = 40` de Adafruit corresponde a otro front-end |
+| `UMBRAL_OFF` | `UMBRAL_ON / 2` | Histéresis: evita re-disparar en la cola del decaimiento |
+| `VENTANA_PICO` | 8 ms | ~23 muestras; cubre el ataque de la envolvente ya filtrada |
+| `BLOQUEO_MS` | 60 ms | Techo de 16 golpes/s por dedo (un dedo humano sostiene 6–8) |
+| `FACTOR_DIAFONIA` | 0,6 | Ver abajo |
+| `base` | promedio de 64 lecturas al arrancar | Mismo criterio que hubo que aplicarle al sensor de pulso |
+
+**Diafonía entre dedos.** Los dos piezos están acoplados mecánicamente por el
+guante y por el hueso: golpear un dedo excita el piezo del otro. Cuando los dos
+pican en la misma ventana se emite siempre el mayor, y el menor sólo si supera
+`0,6 × pico_mayor`. **Ese 0,6 hay que medirlo con el guante puesto** (golpear un
+solo dedo veinte veces y ver qué fracción aparece en el otro canal); si la
+diafonía real lo supera, hay que amortiguar con una capa de espuma entre piezo y
+guante. Es el ajuste que más va a costar.
+
+## El sonido: cadena de Web Audio
+
+Helm no entra acá: es un sintetizador nativo (VST/standalone) y no corre en el
+navegador. Meterlo hubiera exigido Web MIDI más un puerto virtual configurado a
+mano en cada arranque. La página sintetiza su propia voz percusiva, lo que la
+mantiene autocontenida y sin dependencias, como el resto del repo.
+
+```
+por golpe (efímeros):
+  oscPrincipal ─┐
+  oscCuerpo    ─┼→ ganVoz(envolvente) → filtroVoz ─┐
+  ruido → bpRuido → ganRuido ─────────────────────┴→ bus
+
+persistentes:
+  bus ├─────────────────────────────────────────→ ganDry ─┐
+      └→ preGain → shaper(curva FIJA) → postGain → lpPost → ganWet ─┤
+                                                                    ↓
+                                       limitador → master → destination
+```
+
+Decisiones que no son obvias y que conviene no revertir sin motivo:
+
+- **Todo se programa en `currentTime + 0.005`**, nunca en `currentTime` pelado:
+  si el envelope cae en el pasado, el ataque se convierte en un click.
+- **Ataque de 2 ms, no 0.** Un salto instantáneo clickea. Y el decay termina en
+  `0.0001`, porque `exponentialRampToValueAtTime(0)` lanza excepción.
+- **Pitch drop** (`f0*1.7 → f0` en 30 ms): es lo que hace que suene a membrana
+  golpeada y no a un beep. Es la línea con mayor retorno de toda la voz.
+- **El ruido sale de un único `AudioBuffer` generado en JS** y reusado por
+  `BufferSource` desechables. Nada de `fetch`: desde `file://` muere por CORS.
+- **Todo oscilador tiene su `stop()` programado.** Uno sin `stop()` corre para
+  siempre; es la fuga clásica, y se manifiesta a oído como "después de diez
+  minutos empieza a crujir".
+- **Nada de `AudioWorklet`**: requiere `addModule()` con una URL y no funciona
+  desde `file://`.
+
+**Distorsión continua desde el FSR.** `shaper.curve = ...` es una asignación
+discreta: cambiarla en caliente produce una discontinuidad audible. Por eso la
+curva `tanh(7·x)` se calcula una vez y no se toca nunca más, y lo que se mueve
+es un `AudioParam`:
+
+1. `preGain` empuja de 1 (zona lineal de tanh → limpio) a 15 (recorte duro).
+2. `postGain = 1/pre^0.7` compensa la sonoridad — sin esto, saturar más sube el
+   volumen y no se distingue distorsión de "más fuerte".
+3. Crossfade de **potencia constante** (`dry = cos θ`, `wet = sin θ`): con
+   crossfade lineal el punto medio se escucha hundido.
+4. `lpPost` baja de 12 kHz a 3,5 kHz con el drive; sin eso el waveshaping suena
+   áspero y metálico aun con `oversample = "4x"`.
+5. **Los cinco parámetros se mueven con `setTargetAtTime(..., τ=0.03)`.** Es la
+   pieza que resuelve que el FSR llegue a sólo 50 Hz: la rampa exponencial
+   interpola entre lecturas y no se escuchan escalones.
+
+**Polifonía**: tope de 12 voces, con **robo** de la más vieja en vez de descarte
+del golpe nuevo (descartar se siente como que el instrumento se cuelga). La voz
+robada queda marcada, porque sigue en el array los ~30 ms que tarda en apagarse
+y si no se la saltea se termina robando siempre la misma en una ráfaga.
+
+**Limitador soft-clip** (`tanh` unitario) como último nodo, en lugar de un
+`DynamicsCompressorNode`: el attack mínimo de 3 ms de ese nodo redondea
+justamente los ataques, que es lo único que hace que un golpe suene a golpe.
+
+## La imagen: dos capas
+
+```
+#acum   persistente, nunca se limpia   ← se le dibuja SÓLO el golpe nuevo, con multiply
+#over   se limpia en cada frame        ← anillos de impacto vivos (≤10), guías, cursor
+```
+
+El prototipo de círculos anterior redibujaba la lista completa en cada frame,
+porque el parpadeo por latido lo exigía. Acá eso no sirve: un guante genera 4–8
+golpes por segundo y a los pocos minutos serían cientos de arcos por frame. Y
+**no es sólo cuestión de fps**: el lector de Web Serial corre en el mismo hilo
+que el dibujo, así que un frame caro retrasa el sonido. El costo por frame
+constante es un requisito de latencia.
+
+Efecto lateral bienvenido: con lienzo persistente el `multiply` se aplica una
+sola vez por marca sobre lo ya pintado, que es la definición de tinta
+acumulándose. El orden temporal deja huella, cosa que antes no pasaba.
+
+**Efecto global del FSR**, la contraparte visual de la distorsión:
+
+1. **Filtro CSS sobre el elemento canvas** —`blur` + `contrast` + `saturate`
+   proporcionales a la presión—. Lo hace la GPU, cuesta cero JS. El string se
+   reescribe sólo cuando la fuerza cambia más de 0,02; si no, se fuerza un
+   recálculo de estilo 60 veces por segundo para nada.
+2. **Una tinta acumulada**, un solo `fillRect` con `multiply` y alpha muy baja:
+   apretar tiñe permanentemente lo ya dibujado. La distorsión es reversible en
+   el audio, pero en el lienzo deja registro de que la hubo.
+
+La fuerza visual se suaviza con **la misma constante que la del audio** (τ =
+0,03 s): si la imagen respondiera más rápido que el sonido, se notaría como
+desincronía.
+
+## Las dos variantes
+
+### (a) Nota fija por dedo — una pintura
+
+Dedo 0 en A2 (MIDI 45), dedo 1 en A3 (57). La intensidad controla volumen,
+brillo y decay, con ley `0.05 + 0.45·v^1.6`. El exponente mayor que 1 compensa
+que el ADC es lineal en fuerza y el oído logarítmico en sonoridad: sin él, los
+golpes suaves suenan casi igual de fuerte que los duros.
+
+La intensidad es una magnitud continua, así que se mapea a magnitudes continuas:
+**tamaño y opacidad**. Dedo 0 se dibuja como disco relleno, dedo 1 como anillo
+(se distinguen aun superpuestos, y cuestan lo mismo), con una pareja de colores
+elegible de la misma paleta fija de siempre.
+
+**Agrupamiento temporal**: un golpe que llega a menos de 250 ms del anterior se
+dibuja cerca de él, no al azar en toda la pantalla. Un redoble dibuja una
+constelación y los golpes espaciados se dispersan — el gesto rítmico se vuelve
+visible sin ninguna estructura de datos nueva.
+
+### (b) Pentatónica por intensidad — una notación
+
+Escala menor pentatónica (`[0,3,5,7,10,12]`, seis grados) con el dedo 0 sobre A2
+y el dedo 1 sobre A3. La intensidad del golpe elige la **altura de la nota**.
+
+Dos ajustes obligatorios respecto de (a):
+
+- **La ley de amplitud se aplana** a `0.25 + 0.30·v`. Con la ley agresiva de (a)
+  sería físicamente imposible tocar una nota aguda suave: la altura y el volumen
+  quedarían atados y la escala perdería sentido.
+- **El cuantizador tiene histéresis**: no cambia de grado hasta pasar el borde
+  por un 15 % del paso. Sin ella, una intensidad que cae justo sobre un borde
+  alterna entre dos notas golpe a golpe y se escucha como temblor.
+
+Como la intensidad ahora es una magnitud **discreta y musical**, la imagen tiene
+que mostrar esa discretización o miente: **la altura de la nota es la altura en
+pantalla**. Bandas horizontales, una por grado; el dedo determina el registro
+(dedo 0 en la mitad inferior, dedo 1 en la superior); y la x avanza con el
+tiempo, con una franja delgada borrándose por delante del cursor para que el
+pentagrama se recicle sin que la tinta vieja ensucie la pasada nueva. El lienzo
+acumulado se vuelve literalmente una partitura de lo que se tocó. El tamaño de
+la marca pasa a ser constante, porque la intensidad ya se gastó en la altura.
+
+Esa diferencia es lo que justifica que sean dos variantes y no dos presets: (a)
+es una pintura de energía y ritmo, (b) es una notación.
+
+## Latencia
+
+Presupuesto, término por término:
+
+| Etapa | Típico |
+|---|---|
+| Ventana de pico (deliberada) | 8 ms |
+| Loop del sketch hasta el `Serial.print` | <1 ms |
+| Buffer CDC → host (USB SOF cada 1 ms) | ~1 ms |
+| Web Serial: proceso de dispositivo → renderer | ~4 ms |
+| Web Audio (`outputLatency`, depende del SO) | 10–30 ms |
+| **Total** | **~25–30 ms** |
+
+Es tocable y expresivo, pero **no es percusión de precisión**: no se va a poder
+tocar un redoble apretado. Se documenta como propiedad del medio, no se esconde.
+La página muestra `baseLatency + outputLatency` en el panel, así que el número
+real de la máquina donde se exponga la tesis se puede leer ahí mismo.
+
+Lo que más molesta no es la latencia media —el cuerpo la compensa sola, como un
+baterista compensa la distancia al parche— sino el *jitter*. Su fuente dominante
+es el main thread, y por eso el lienzo persistente. **No se puede sacar Web
+Serial de ese hilo**: `SerialPort` no es transferible a un Worker. Es una
+limitación de la plataforma, no del diseño.
+
+## Cómo probarlo
+
+### 1. Harness de Node — `entorno-digital/tools/harness_golpes.js`
+
+`harness.js` no sirve acá: es específico de la bandada (sólo exporta
+`updateAccel`, sus perfiles son de acelerómetro, su DOM falso no tiene
+`createElement` ni `stroke`). `harness_golpes.js` es su hermano por copia.
+
+La idea: **el grafo de Web Audio es contabilidad de JavaScript puro**, así que
+se puede verificar entero sin producir un solo sonido.
+
+```
+node entorno-digital/tools/harness_golpes.js entorno-digital/prototipo_percusion_guante_b_dispositivo.html
+node entorno-digital/tools/harness_golpes.js <archivo.html> --golpes=500 --jitter=0.08 --frames=600
+```
+
+Verifica: que no queden nodos sin liberar tras 500 golpes, que todo `start()`
+tenga su `stop()`, que el robo de voz acote la polifonía en ráfaga, que la
+cantidad de `arc()` por frame no crezca con el historial, que cada lectura de
+FSR mueva los cinco parámetros con rampa suave, y —en la variante (b)— cuántas
+notas distintas salen de un mismo golpe cuando se le inyecta jitter.
+
+Esto **ya encontró un bug**: `robarVoz()` tomaba siempre `voces[0]`, que sigue
+en el array hasta que corre su `onended`, así que en ráfaga robaba la misma voz
+una y otra vez y la polifonía llegaba a 24 voces en vez de 12.
+
+Requisito que le impone al diseño de las páginas: **el `AudioContext` se
+construye perezosamente dentro de `asegurarAudio()`**. Si se construyera en el
+cuerpo del script, evaluarlo en Node explotaría.
+
+### 2. Verificación de sintaxis
+
+Extraer el `<script>` a un `.js` y correr `node --check`.
+
+### 3. Chrome o Edge, sin hardware
+
+Abrir cualquiera de las cuatro páginas y disparar con las teclas **A** y **L**
+(dedos 0 y 1) y **F** mantenida (presión del FSR); en las simuladas, además, los
+pads clicables y el slider. Es la única forma de **escuchar** el diseño de audio
+hoy. Confirmar: sin clicks en los ataques, la distorsión barre sin escalones, el
+crossfade no se hunde en el medio, y no hay clipping con golpes simultáneos.
+
+### 4. Con la placa (pendiente)
+
+Subir el sketch, abrir el Monitor Serial y verificar las líneas `G:` y `F:`. Ahí
+se calibran `UMBRAL_ON`, el factor de diafonía y los sliders `PICO_MIN`/
+`PICO_MAX` mientras se toca. Y se mide la latencia real contra la estimada.
+
+## Estado actual / pendiente
+
+- **No se probó contra el hardware**: no existe todavía el guante, y este
+  entorno no tiene Chrome ni la placa. Lo que sí está validado es el grafo de
+  audio y el costo de dibujo, por el harness.
+- **`UMBRAL_ON`, `FACTOR_DIAFONIA` y el rango de pico son estimaciones.** Los
+  tres se calibran con el guante puesto.
+- **Cuántos grados usar en la variante (b) queda abierto.** El plan original
+  asumía que diez grados sonarían aleatorios, pero el harness muestra que la
+  histéresis carga con casi todo el trabajo: con ±8 % de jitter, tanto seis como
+  once grados dan 1–2 notas por golpe repetido, y en una escalera ascendente se
+  alcanzan 6/6 y 10/11 grados respectivamente. Se dejan **seis** como punto de
+  partida sólo porque ese ±8 % es una estimación y no una medición. Una vez
+  medida la dispersión real del piezo, correr el harness con el `--jitter` real
+  y decidir con ese número.
+- **La diafonía mecánica entre los dos piezos es el riesgo abierto más grande.**
+  El árbitro del firmware y la espuma la mitigan, pero puede que nunca haya
+  separación perfecta.
+- Si alguna vez hiciera falta que ande en Firefox o Safari, la alternativa sería
+  un puente local (servidor que lea el puerto serie y lo reexponga por
+  WebSocket). No está implementado.

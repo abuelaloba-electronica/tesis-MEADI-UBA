@@ -22,7 +22,7 @@ protocolo binario, ni handshake, ni librería compartida.
 | Dispositivo | Placa | Sensores | Emite | Frecuencia | Lo consume |
 |---|---|---|---|---|---|
 | `dispositivo1` | Adafruit Flora V3 (ATmega32u4) | LSM6DSO32 por I2C (acelerómetro, ±4 g) | `A:<x>,<y>,<z>` en g | ~33/s | `entorno-digital/bandada_prototipo_v4a/v4b_dispositivo.html` |
-| `dispositivo2` | LilyPad Arduino USB (ATmega32u4, 8 MHz) | Pulse Sensor Amped (A5) + FSR (A4) | `F:<0-1023>` y `BPM: <n>` | ~33/s y por latido | `entorno-digital/prototipo_circulos_fuerza_pulso_dispositivo.html` |
+| `dispositivo2` | LilyPad Arduino USB (ATmega32u4, 8 MHz) | 2 piezos de guante (A2, A3) + FSR (A4) | `F:<0-1023>` y `G:<dedo>,<pico>` | ~50/s y por golpe | `entorno-digital/prototipo_percusion_guante_{a,b}[_dispositivo].html` |
 | `dispositivo3` | — | — | — | — | carpeta vacía, reservada |
 
 Las páginas ignoran en silencio cualquier línea que no reconozcan, así que los
@@ -79,13 +79,29 @@ No hay suite de tests. Tres técnicas, en orden de costo:
    **Comparar siempre contra el perfil `gravedad`** (mano inmóvil) antes de
    llamarle bug a un movimiento: la bandada deriva sola por diseño. El
    encabezado del archivo documenta los perfiles y qué mirar en la salida.
+
+   Ojo: `harness.js` es **específico de la bandada** (sólo expone
+   `updateAccel`, sus perfiles son de acelerómetro y su DOM falso es mínimo).
+   Para las páginas del guante está su hermano por copia
+   `entorno-digital/tools/harness_golpes.js`, que además del costo de dibujo
+   verifica el grafo de Web Audio —fugas de nodos, techo de polifonía,
+   cuantización de la escala— con un `AudioContext` falso, sin producir sonido.
+   Para eso las páginas construyen el `AudioContext` perezosamente dentro de
+   `asegurarAudio()`; construirlo en el cuerpo del script rompería el harness.
+
+   ```
+   node entorno-digital/tools/harness_golpes.js entorno-digital/prototipo_percusion_guante_b_dispositivo.html
+   node entorno-digital/tools/harness_golpes.js <archivo.html> --golpes=500 --jitter=0.08
+   ```
 2. **Captura headless con Firefox** para confirmar que la página renderiza:
    `firefox --headless --profile <dir-nuevo> --window-size=1280,800
    --screenshot <salida>.png "file:///<ruta>"`. Cuidado: dispara antes del
    primer frame de animación, así que un lienzo vacío no prueba que haya un bug.
 3. **Chrome o Edge de escritorio** para todo lo que involucre Web Serial —
    **la API no existe en Firefox ni en Safari**, y ahí el botón de conexión
-   queda deshabilitado a propósito.
+   queda deshabilitado a propósito. Es también la única forma de *escuchar* las
+   páginas del guante: tienen disparo por teclado (`A`/`L` para cada dedo, `F`
+   mantenida para el FSR) justamente para poder ajustar el timbre sin la placa.
 
 Verificación de sintaxis rápida: extraer el `<script>` a un `.js` y correr
 `node --check`.
@@ -99,17 +115,25 @@ Verificación de sintaxis rápida: extraer el `<script>` a un `.js` y correr
 - **El baudrate es nominal.** En ATmega32u4 el puerto es USB CDC virtual:
   `Serial.begin(9600)` y `baudRate: 9600` tienen que coincidir por formalidad,
   pero no limitan el caudal real.
-- **Las lecturas de reposo de los sensores analógicos no están centradas.** El
-  Pulse Sensor de `dispositivo2` descansa en ~656, no en 512; los umbrales fijos
-  heredados de código de referencia hay que calibrarlos contra el sensor real.
+- **Los umbrales heredados de código de referencia hay que recalibrarlos.** El
+  `threshold = 40` del proyecto de Adafruit corresponde a su front-end, no al
+  nuestro; lo mismo pasaba con el Pulse Sensor que se descartó, cuyo reposo real
+  estaba en ~656 y no en el 512 que asumía el código original.
+- **Un piezo sin filtrar no sirve para medir intensidad.** Resuena a 3-6 kHz y
+  el loop del 32u4 a 8 MHz muestrea a ~2,7 kHz, o sea por debajo de Nyquist: el
+  pico varía ±20-40 % entre golpes idénticos. Y con AREF = 3,3 V satura en 1023.
+  La corrección es un divisor RC en la punta del dedo, no muestrear más rápido.
+- **Los dos piezos del guante están acoplados mecánicamente.** Golpear un dedo
+  excita el piezo del otro; el sketch lo arbitra comparando picos en la misma
+  ventana, con un factor que hay que medir con el guante puesto.
 
 ## Dónde seguir leyendo
 
 | Para trabajar en… | Leer |
 |---|---|
 | el acelerómetro y su textil | `dispositivo1/README.md` |
-| el pulso y la fuerza | `dispositivo2/README.md` |
+| el guante de percusión y la fuerza | `dispositivo2/README.md` |
 | cualquier visualización | `entorno-digital/README.md` |
 | la bandada (física, señal, constantes de ajuste) | `entorno-digital/README.md` + `entorno-digital/prototipos/cambios_bandada_v4.md` |
-| los círculos de fuerza + pulso | `entorno-digital/documentacion_circulos_fuerza_pulso_dispositivo.md` |
+| el guante: circuito, audio, las dos variantes | `entorno-digital/documentacion_percusion_guante.md` |
 | visualizaciones sin hardware todavía (EMG, estiramiento) | `entorno-digital/prototipos/propuesta_*.md` |

@@ -17,7 +17,13 @@ versiones anteriores que se conservan para comparar.
 |---|---|---|---|
 | [`bandada_prototipo_v4a_dispositivo.html`](bandada_prototipo_v4a_dispositivo.html) | acelerómetro | [`dispositivo1`](../dispositivo1/) | acá abajo |
 | [`bandada_prototipo_v4b_dispositivo.html`](bandada_prototipo_v4b_dispositivo.html) | acelerómetro | [`dispositivo1`](../dispositivo1/) | acá abajo |
-| [`prototipo_circulos_fuerza_pulso_dispositivo.html`](prototipo_circulos_fuerza_pulso_dispositivo.html) | FSR + pulso | [`dispositivo2`](../dispositivo2/) | [`documentacion_circulos_fuerza_pulso_dispositivo.md`](documentacion_circulos_fuerza_pulso_dispositivo.md) |
+| [`prototipo_percusion_guante_a_dispositivo.html`](prototipo_percusion_guante_a_dispositivo.html) | 2 piezos + FSR | [`dispositivo2`](../dispositivo2/) | [`documentacion_percusion_guante.md`](documentacion_percusion_guante.md) |
+| [`prototipo_percusion_guante_b_dispositivo.html`](prototipo_percusion_guante_b_dispositivo.html) | 2 piezos + FSR | [`dispositivo2`](../dispositivo2/) | [`documentacion_percusion_guante.md`](documentacion_percusion_guante.md) |
+
+Las dos variantes del guante tienen su gemela con sensores simulados —
+`prototipo_percusion_guante_a.html` y `_b.html`, en esta misma carpeta— con
+pads clicables y un slider de fuerza. Son la única forma de escuchar el diseño
+de audio sin la placa en la mano.
 
 ### Prototipos (sensor simulado o versión anterior)
 
@@ -26,11 +32,18 @@ requerimiento original, el criterio de diseño y el mapeo de sensor a imagen.
 
 | Prototipo | Sensor que simula | Estado del hardware |
 |---|---|---|
-| `prototipo_circulos_fuerza_pulso.html` | fuerza + pulso | existe (`dispositivo2`) |
+| `prototipo_circulos_fuerza_pulso.html` · `_dispositivo` | fuerza + pulso | **el sensor de pulso se descartó** (ver abajo) |
 | `prototipo_estiramiento_lineas.html` | sensor de estiramiento | no existe todavía |
 | `prototipo_emg_fractura_v1.html` | EMG (fractura low-poly + temblor) | no existe todavía |
 | `prototipo_emg_acumulacion_v2.html` | EMG (mosaico que se acumula) | no existe todavía |
 | `bandada_prototipo.html` · `_v2` · `_v3` · `_v3_dispositivo` | acelerómetro | superados por v4a/v4b |
+
+**Sensor de pulso (descartado).** `dispositivo2` usaba un Pulse Sensor Amped
+que nunca llegó a dar lecturas estables; se reemplazó por el guante de
+percusión. Las dos páginas de círculos quedaron archivadas en `prototipos/`:
+siguen funcionando con el firmware nuevo, porque el formato `F:` del FSR no
+cambió, pero su parpadeo por latido quedó fijo en el valor por defecto de 72
+bpm. Ver [`documentacion_percusion_guante.md`](documentacion_percusion_guante.md).
 
 Historia de la bandada: [`propuesta_bandada.md`](prototipos/propuesta_bandada.md)
 (v1) → [`instrucciones_mejoras_bandada.md`](prototipos/instrucciones_mejoras_bandada.md)

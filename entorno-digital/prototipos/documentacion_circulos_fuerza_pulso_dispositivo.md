@@ -1,5 +1,15 @@
 # Documentación: `prototipo_circulos_fuerza_pulso_dispositivo.html`
 
+> **Archivado.** El sensor de pulso de `dispositivo2` se descartó: nunca llegó a
+> dar lecturas estables (ver `dispositivo2/README.md`, paso 1). En su lugar la
+> placa maneja ahora un guante de percusión con dos piezos —ver
+> [`documentacion_percusion_guante.md`](../documentacion_percusion_guante.md).
+>
+> Esta página sigue funcionando con el firmware nuevo, porque el formato `F:`
+> del FSR no cambió: los círculos se siguen creando al soltar la presión. Lo que
+> quedó muerto es la rama `BPM:`, así que todos parpadean al valor por defecto
+> de 72 bpm. Se conserva para poder comparar el comportamiento.
+
 ## Qué es
 
 Versión del prototipo de círculos (fuerza + pulso) que, en vez de simular los sensores con mouse/touch, lee los datos reales emitidos por el sketch `dispositivo2/dispositivo2.ino` (placa **LilyPad Arduino USB / ATmega32U4**) directamente desde el navegador, por USB, usando la **Web Serial API**.
