@@ -209,3 +209,76 @@ simulación: `WIND_K`, `HEADING_BIAS_K`, `TILT_DEADBAND`, `SHAKE_REF`,
 - `bandada_prototipo_v3_dispositivo.html` se conserva sin modificar.
 - `dispositivo1/dispositivo1.ino` no cambia: el protocolo `A:x,y,z` es el
   mismo y toda la corrección de gravedad ocurre del lado del navegador.
+
+## Addenda · pantalla llena en v4a (200 puntos)
+
+Cambios posteriores, **sólo en `bandada_prototipo_v4a_dispositivo.html`**
+(`v4b` queda con las constantes originales, justamente para poder comparar).
+
+El pedido fue doble: más puntos, que llenen el lienzo, y del tamaño que antes
+daba el máximo del slider.
+
+- Slider de cantidad: 10-40 → **10-250**, default **200**.
+- Slider de tamaño: arranca en **80 %** (`sizeMul = 0.8`) en vez de 100 %. Se
+  probó antes en 250 % con 135 puntos; a 200 puntos el punto grande solapa y
+  la bandada se lee como una mancha, el chico deja ver el reparto.
+- `initBirds()` reparte el arranque sobre **todo el mundo** (rectangular) en
+  vez de un disco central de radio `0.5·min(halfW, halfH)`, que dejaba los
+  bordes vacíos durante los primeros segundos.
+
+Con eso solo, la bandada llenaba el lienzo al arrancar y a los ~15 s se volvía
+a condensar en una mancha de ~570x450 px (radio RMS ~185 px, igual que con 24
+puntos). Para que ocupe superficie **de forma permanente** hizo falta tocar la
+física, y lo primero fue encontrar al culpable: no era la cohesión sola —con
+`COHESION_W = 0` y `CORE_PULL = 0` el RMS seguía en ~190 px—, porque lo que
+compacta al grupo es la combinación de alineación global (todos los puntos con
+el mismo rumbo) con el giro hacia adentro de los bordes: el frente del grupo
+dobla primero y el resto se le acumula encima.
+
+De ahí que la corrección no fuera bajar la alineación (que es el corazón de la
+bandada y se deja en `ALIGN_FACTOR = 0.22`) sino **volverla local**:
+
+- **`NEIGHBOR_R` deja de ser constante.** Sale de la densidad,
+  `clamp(1.55·√(área_mundo / n), 70, 420)`, y se recalcula en `initBirds()`,
+  en `setBirdCount()` y al redimensionar la ventana. Da ~260 px con 24 puntos
+  —el valor que tenía fijo— y ~90 px con 200. Con un radio fijo la cantidad
+  de puntos decidía sola si había bandada: a 260 px, 200 puntos se ven casi
+  todos y acuerdan un rumbo único; a 90 px fijos, 10 puntos no ven a nadie y
+  dejan de ser bandada, que es el mismo bug que v4 corrigió subiendo 64 → 260.
+  Ligado a la densidad, el problema desaparece en los dos extremos del slider.
+- **`SEP_FRAC`: 0,28 → 0,60.** En fracciones de un radio que ahora *es* el
+  espaciado medio, 0,60 ≈ 0,93 del espaciado de un reparto parejo: la
+  separación pasa a ser la que fija la distancia entre puntos. `ALIGN_FRAC`:
+  0,60 → 0,80; `SEP_WEIGHT`: 140 → 160.
+- **`COHESION_W`: 0,12 → 0,03** y **`CORE_PULL`: 0,03 → 0,006** (~4x y ~5x
+  menos). Seguían ganándole a la separación.
+- **`WANDER_STRENGTH`: 55 → 100.** Con menos cohesión, es la deriva propia la
+  que mantiene a cada punto recorriendo su zona en vez de flotando.
+
+### Validación
+
+Harness de Node, perfil `gravedad` (mano inmóvil), 150 s simulados, 200
+puntos: radio RMS estable entre **251 y 304 px** (media ~289) contra los
+~185 px de antes, y 365 px de un lienzo perfectamente lleno — o sea ~80 % de
+la dispersión ideal, sin colapsar ni quedarse pegado a los bordes. En el
+máximo del slider (250 puntos) sigue midiendo **60 fps**, con los ≤62500
+pares por frame del doble bucle.
+
+Con el slider en 10 y en 24 puntos el RMS queda en ~200-260 px, bastante por
+encima de los ~115 px que daba v4a con 24: el radio por densidad hace que
+también esas cantidades ocupen más lienzo, lo cual es coherente con el pedido.
+
+El perfil `auto` (gesto fuerte y sostenido) sigue aplastando al grupo contra el
+borde inferior durante unos segundos en el pico —y=721..776—,
+pero **eso ya pasaba en la versión anterior**, medido sobre
+`git show HEAD:...` con 24 y con 135 puntos: es el gesto ganándole al borde,
+no una regresión de estos cambios.
+
+### Lo que queda por decidir
+
+La simulación corre en un "mundo" que es el **66 % del lienzo** en cada eje
+(`WORLD_SCALE = 0.97 / 2^DEPTH_EXP`), porque la perspectiva de la variante *a*
+agranda hasta 1,46× y necesita ese margen: ni un mundo perfectamente lleno
+pasa del 44 % del área del lienzo. Bajar `DEPTH_EXP` de 0,55 a 0,35 lleva el
+mundo al 76 % y el RMS a ~320 de media, a cambio de un efecto de profundidad
+más plano. Sin aplicar, a la espera de verlo en pantalla.

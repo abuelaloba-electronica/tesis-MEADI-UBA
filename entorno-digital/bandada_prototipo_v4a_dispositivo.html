@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Bandada v4a · pocos puntos + profundidad con perspectiva (MAEDI, dispositivo real)</title>
+<title>Bandada v4a · pantalla llena + profundidad con perspectiva (MAEDI, dispositivo real)</title>
 <style>
   :root {
     --panel-bg: rgba(255,255,255,0.92);
@@ -213,7 +213,7 @@
     </span>
   </div>
   <div id="panelBody">
-  <p class="subtitle">v4a · pocos puntos · gesto directo · profundidad con perspectiva</p>
+  <p class="subtitle">v4a · pantalla llena · gesto directo · profundidad con perspectiva</p>
 
   <div class="section-title" style="font-size:11px;font-weight:600;color:#666;margin:0 0 8px;text-transform:uppercase;letter-spacing:0.05em;">Conexión con el dispositivo</div>
   <button id="connectBtn">Conectar dispositivo (USB)</button>
@@ -257,21 +257,22 @@
   </div>
 
   <div class="row">
-    <label>Cantidad de puntos <span class="val" id="valN">24</span></label>
-    <input type="range" id="sliderN" min="10" max="40" step="1" value="24">
+    <label>Cantidad de puntos <span class="val" id="valN">200</span></label>
+    <input type="range" id="sliderN" min="10" max="250" step="1" value="200">
   </div>
 
   <div class="row">
-    <label>Tamaño de los puntos <span class="val" id="valSize">100%</span></label>
-    <input type="range" id="sliderSize" min="50" max="250" step="5" value="100">
+    <label>Tamaño de los puntos <span class="val" id="valSize">80%</span></label>
+    <input type="range" id="sliderSize" min="50" max="250" step="5" value="80">
   </div>
 
   <button id="resetBtn">Reiniciar bandada</button>
 
   <div id="hint">
     <b>Qué cambió respecto a v3:</b> v3 estaba pensada para miles de puntos y la
-    entrada del acelerómetro apenas se notaba. v4 trabaja con 10–40 puntos y
-    hace que el gesto se lea de inmediato.
+    entrada del acelerómetro apenas se notaba. v4 trabaja con 10–250 puntos
+    (arranca en 200, llenando la pantalla) y hace que el gesto se lea de
+    inmediato.
     <br><br>
     <b>1 · Señal acondicionada.</b> El sketch envía g crudos, con la gravedad
     incluida: en reposo un eje marca ~1.0 de forma permanente, que en v3
@@ -302,10 +303,18 @@
     acelerómetro y de los núcleos. El gesto <i>sesga</i> el movimiento, nunca
     lo reemplaza: con el dispositivo quieto la bandada sigue respirando sola.
     <br><br>
-    <b>5 · Escala.</b> Radio de vecindad de 64 a 260 px (con 24 puntos en
-    pantalla completa, a 64 px no había vecinos y no había bandada) y puntos
-    de 4,5 px de radio al 100%. Se eliminó la grilla espacial: con ≤40 puntos
-    son ≤1600 comparaciones por frame.
+    <b>5 · Escala y superficie.</b> El radio de vecindad ya no es una
+    constante: sale de la <b>densidad</b> (1,55 · √(área / n)), así que da
+    ~260 px con 24 puntos y ~90 px con 200, y cada punto ve a una cantidad
+    parecida de vecinos en todo el rango del slider. Sobre esa base, la zona
+    de separación se extendió a 0,60 del radio —o sea casi exactamente el
+    espaciado de un reparto parejo— y la cohesión y los núcleos bajaron ~4x y
+    ~5x: eran ellos los que volvían a juntar la bandada en una mancha chica
+    unos segundos después del arranque. Resultado medido con el harness: radio
+    RMS del grupo ~290 px en vez de ~185 px, contra los 365 px de un lienzo
+    perfectamente lleno. Puntos de 4,5 px de radio al 100%, que el slider
+    arranca al 80%. Se eliminó la grilla espacial: con ≤250 puntos son ≤62500
+    comparaciones por frame.
     <br><br>
     Se conserva de v3 el modelo de rumbo objetivo con banking (flock2), las
     zonas concéntricas suavizadas (Starling-Simulation), el frenado en la
@@ -355,7 +364,11 @@
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
   }
-  window.addEventListener("resize", resize);
+  window.addEventListener("resize", () => {
+    resize();
+    // El radio depende del área del mundo, que depende del tamaño del lienzo.
+    if (birds.length) updateNeighborRadius();
+  });
   resize();
 
   const TWO_PI = Math.PI * 2;
@@ -675,10 +688,13 @@
   });
 
   // Radio del punto (px) a "tamaño 100%", multiplicado en draw() por
-  // sizeMul y por la escala de profundidad. Con 10-40 puntos en pantalla
-  // completa hacen falta puntos mucho más grandes que el 1.5px de v3.
+  // sizeMul y por la escala de profundidad. Con pocas decenas de puntos en
+  // pantalla completa hacen falta puntos mucho más grandes que el 1.5px de v3.
   const BASE_RADIUS = 4.5;
-  let sizeMul = 1;
+  // Arranca en el 80% del slider: con ~200 puntos repartidos por todo el
+  // lienzo, el punto chico es el que deja ver el reparto; al 250% la masa se
+  // solapa y se lee como una mancha.
+  let sizeMul = 0.8;
 
   sliderSize.addEventListener("input", () => {
     const pct = parseInt(sliderSize.value, 10);
@@ -696,23 +712,49 @@
   // Cada punto es {x, y, vx, vy, heading, bank, z, vz, wanderAngle}. Se
   // conserva el modelo de v3 (rumbo objetivo con velocidad angular máxima
   // + zonas concéntricas suavizadas + frenado en la curva), reescalado a
-  // 10-40 puntos, y se le agregan tres cosas: deriva propia (wander),
+  // 10-250 puntos, y se le agregan tres cosas: deriva propia (wander),
   // profundidad (z) y una respuesta mucho más directa al gesto.
   //
-  // A esta escala NO hace falta grilla espacial: 40 puntos son ≤1600
-  // comparaciones por frame. El escaneo de vecinos es un doble bucle
+  // A esta escala todavía NO hace falta grilla espacial: 250 puntos son
+  // ≤62500 comparaciones por frame. El escaneo de vecinos es un doble bucle
   // directo, y por eso también desaparece el tope MAX_NEIGHBORS de v3.
   // ---------------------------------------------------------------
 
-  const NEIGHBOR_R = 260;     // radio de percepción total (px)
-  const NEIGHBOR_R2 = NEIGHBOR_R * NEIGHBOR_R;
-  const SEP_FRAC = 0.28;      // 0..SEP_FRAC del radio -> zona de separación (< ~73px)
-  const ALIGN_FRAC = 0.60;    // SEP_FRAC..ALIGN_FRAC -> alineación (< ~156px); resto -> cohesión
+  // El radio de percepción NO es fijo: se deriva de la densidad, o sea del
+  // espaciado medio que tendrían los puntos repartidos por todo el mundo
+  // (sqrt(área / n)). Con un radio fijo la cantidad de puntos decide sola si
+  // hay bandada o no: a 260 px, 24 puntos ven a casi todos y se compactan en
+  // una masa chica, y a 90 px (lo que 200 puntos necesitan para llenar el
+  // lienzo) 10 puntos no ven a nadie y dejan de ser bandada — el mismo bug
+  // que v4 corrigió subiendo 64 -> 260. Ligándolo a la densidad, el radio da
+  // ~260 px con 24 puntos (igual que antes) y ~90 px con 200, y cada punto
+  // ve a una cantidad parecida de vecinos en todo el rango del slider.
+  const NEIGHBOR_SPACING_K = 1.55;
+  let neighborR = 260;
+  let neighborR2 = neighborR * neighborR;
 
-  const SEP_WEIGHT = 140;     // fuerza de separación (px/s² aprox.)
+  function updateNeighborRadius() {
+    const R = worldRect();
+    const n = Math.max(1, birds.length);
+    const spacing = Math.sqrt((R.halfW * 2) * (R.halfH * 2) / n);
+    neighborR = clamp(spacing * NEIGHBOR_SPACING_K, 70, 420);
+    neighborR2 = neighborR * neighborR;
+  }
+
+  // Las tres zonas, ahora en fracciones de ese espaciado: separación hasta
+  // ~0.93 del espaciado ideal, que es lo que empuja al reparto parejo por el
+  // lienzo en vez de a la masa compacta. (Antes la separación llegaba a 0.28
+  // del radio y la cohesión se quedaba con todo el resto.)
+  const SEP_FRAC = 0.60;      // 0..SEP_FRAC del radio -> zona de separación
+  const ALIGN_FRAC = 0.80;    // SEP_FRAC..ALIGN_FRAC -> alineación; resto -> cohesión
+
+  const SEP_WEIGHT = 160;     // fuerza de separación (px/s² aprox.)
   const SEP_CAP = 12;         // tope de la magnitud combinada de separación
   const ALIGN_FACTOR = 0.22;  // mezcla hacia la velocidad promedio vecina, por "frame" a 60fps
-  const COHESION_W = 0.12;    // peso fijo de cohesión (Z ya no lo regula: ahora es profundidad)
+  // Cohesión y núcleos bajados ~4x y ~5x: eran ellos los que volvían a juntar
+  // la bandada en una mancha de ~570x450 px unos segundos después del
+  // arranque, por encima de lo que la separación podía abrir.
+  const COHESION_W = 0.03;    // peso fijo de cohesión (Z ya no lo regula: ahora es profundidad)
 
   const WIND_K = 420;         // fuerza del viento por unidad de gesto (px/s²)
   const HEADING_BIAS_K = 1.6; // cuánto sesga el gesto al rumbo deseado (ver más abajo)
@@ -725,7 +767,9 @@
   const PREDATOR_TURN_MULT = 2.0;
   const SPEED_EASE = 0.16;    // suavizado del módulo de velocidad, por frame a 60fps
 
-  const WANDER_STRENGTH = 55; // px/s²: deriva propia de cada punto
+  const WANDER_STRENGTH = 100; // px/s²: deriva propia de cada punto. Subida junto con
+                              // la baja de cohesión: es lo que mantiene a cada punto
+                              // recorriendo su zona en vez de quedarse flotando.
   const WANDER_RATE = 2.2;    // rad/s: velocidad de la caminata aleatoria del ángulo de deriva
 
   // Profundidad -------------------------------------------------------
@@ -773,7 +817,7 @@
   // el tirón se subió (0.0035 -> 0.03) porque hay muchos menos vecinos
   // locales sosteniendo cada sub-grupo.
   // ---------------------------------------------------------------
-  const CORE_PULL = 0.03;
+  const CORE_PULL = 0.006;
   const CORE_CYCLE_PERIOD = 40;  // segundos del ciclo separación -> reunión -> separación
   let coreCount = parseInt(sliderCores.value, 10);
   let coreT = 0;
@@ -854,8 +898,17 @@
     const spread = Math.min(R.halfW, R.halfH) * 0.5;
     birds = new Array(n);
     for (let i = 0; i < n; i++) {
-      birds[i] = makeBird(R.cx, R.cy, spread);
+      const b = makeBird(R.cx, R.cy, spread);
+      // Con ~200 puntos el arranque se reparte por TODO el mundo (rectangular,
+      // no en un disco central): a esta cantidad lo que se quiere ver desde el
+      // primer frame es la pantalla llena, y el disco de radio
+      // 0.5*min(halfW,halfH) deja los bordes vacíos varios segundos. La física
+      // es la de siempre: la cohesión y los núcleos siguen agrupando después.
+      b.x = rand(R.left + BOUND_MARGIN * 0.5, R.right - BOUND_MARGIN * 0.5);
+      b.y = rand(R.top + BOUND_MARGIN * 0.5, R.bottom - BOUND_MARGIN * 0.5);
+      birds[i] = b;
     }
+    updateNeighborRadius();
   }
 
   function makeBird(cx, cy, spread) {
@@ -898,6 +951,7 @@
       const add = n - birds.length;
       for (let i = 0; i < add; i++) birds.push(makeBird(c.x, c.y, spread));
     }
+    updateNeighborRadius();
   }
 
   initBirds(parseInt(sliderN.value, 10));
@@ -1047,7 +1101,7 @@
       const b = birds[i];
 
       // --- vecinos, clasificados en 3 zonas concéntricas suavizadas ---
-      // Con ≤40 puntos el doble bucle es más barato que mantener una grilla.
+      // Con ≤250 puntos el doble bucle es más barato que mantener una grilla.
       let sepX = 0, sepY = 0, sepCount = 0, zSep = 0;
       let avgVX = 0, avgVY = 0, alignW = 0;
       let cohX = 0, cohY = 0, cohW = 0;
@@ -1058,10 +1112,10 @@
         const ob = birds[j];
         const ddx = b.x - ob.x, ddy = b.y - ob.y;
         const d2 = ddx * ddx + ddy * ddy;
-        if (d2 >= NEIGHBOR_R2 || d2 <= 0.0001) continue;
+        if (d2 >= neighborR2 || d2 <= 0.0001) continue;
 
         const d = Math.sqrt(d2);
-        const frac = d / NEIGHBOR_R;
+        const frac = d / neighborR;
 
         if (frac < SEP_FRAC) {
           // Zona de separación: empuje que crece fuerte cerca del centro y
@@ -1253,7 +1307,7 @@
     ctx.fillRect(0, 0, w, h);
 
     // Se dibuja de atrás hacia adelante para que los puntos cercanos tapen
-    // a los lejanos. Con ≤40 puntos, ordenar y hacer un fill() por punto no
+    // a los lejanos. Con ≤250 puntos, ordenar y hacer un fill() por punto no
     // tiene costo apreciable (v3 necesitaba un único path porque dibujaba
     // hasta 16000).
     drawOrder.length = birds.length;
