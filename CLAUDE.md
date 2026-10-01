@@ -19,9 +19,13 @@ El contrato entre las dos mitades es **una línea de texto por lectura**, con
 prefijo, terminada en `\n`, a 9600 baudios nominales. Nada más. No hay
 protocolo binario, ni handshake, ni librería compartida.
 
-| Dispositivo | Placa | Sensores | Emite | Frecuencia | Lo consume |
+Un dispositivo puede además tener **actuadores propios**, que no pasan por el
+contrato: `dispositivo1` enciende una tira de LEDs a partir de la misma lectura
+que envía. El navegador no se enteró y no tiene que enterarse.
+
+| Dispositivo | Placa | Sensores / actuadores | Emite | Frecuencia | Lo consume |
 |---|---|---|---|---|---|
-| `dispositivo1` | Adafruit Flora V3 (ATmega32u4) | LSM6DSO32 por I2C (acelerómetro, ±4 g) | `A:<x>,<y>,<z>` en g | ~33/s | `entorno-digital/bandada_prototipo_v4a/v4b_dispositivo.html` |
+| `dispositivo1` | Adafruit Flora V3 (ATmega32u4) | LSM6DSO32 por I2C (acelerómetro, ±4 g); tira de 13 LEDs WS2812B en D6 | `A:<x>,<y>,<z>` en g | ~33/s | `entorno-digital/bandada_prototipo_v4a/v4b_dispositivo.html` |
 | `dispositivo2` | LilyPad Arduino USB (ATmega32u4, 8 MHz) | 2 piezos de guante (A2, A3) + FSR (A4) | `F:<0-1023>` y `G:<dedo>,<pico>` | ~50/s y por golpe | `entorno-digital/prototipo_percusion_guante_{a,b}[_dispositivo].html` |
 | `dispositivo3` | LilyPad Arduino USB (ATmega32u4, 8 MHz) | AD8232 en la pantorrilla (A2, leads-off en 2 y 3) | `E:<amplitud MAV>` y `L:<0\|1>` | 50/s y al cambiar | todavía ninguna (candidatos: `prototipos/prototipo_emg_*.html`) |
 
@@ -111,7 +115,10 @@ Verificación de sintaxis rápida: extraer el `<script>` a un `.js` y correr
 - **El acelerómetro incluye la gravedad.** En reposo, un eje marca ~1.0 g de
   forma permanente. Usar la lectura cruda como si fuera "movimiento" produce un
   empuje constante de fondo; la corrección vive del lado del navegador (filtros
-  + referencia de reposo), no en el sketch.
+  + referencia de reposo) y, para la tira de LEDs, dentro del propio sketch de
+  `dispositivo1`: el brillo sale del módulo de la aceleración **menos** una
+  línea de base exponencial, no del módulo crudo. Con el módulo crudo la tira
+  quedaría encendida a media asta para siempre.
 - **El baudrate es nominal.** En ATmega32u4 el puerto es USB CDC virtual:
   `Serial.begin(9600)` y `baudRate: 9600` tienen que coincidir por formalidad,
   pero no limitan el caudal real.
@@ -131,7 +138,7 @@ Verificación de sintaxis rápida: extraer el `<script>` a un `.js` y correr
 
 | Para trabajar en… | Leer |
 |---|---|
-| el acelerómetro y su textil | `dispositivo1/README.md` |
+| el acelerómetro, su textil y su tira de LEDs | `dispositivo1/README.md` |
 | el guante de percusión y la fuerza | `dispositivo2/README.md` |
 | cualquier visualización | `entorno-digital/README.md` |
 | la bandada (física, señal, constantes de ajuste) | `entorno-digital/README.md` + `entorno-digital/prototipos/cambios_bandada_v4.md` |
