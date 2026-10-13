@@ -25,7 +25,7 @@ que envía. El navegador no se enteró y no tiene que enterarse.
 
 | Dispositivo | Placa | Sensores / actuadores | Emite | Frecuencia | Lo consume |
 |---|---|---|---|---|---|
-| `dispositivo1` | Adafruit Flora V3 (ATmega32u4) | LSM6DSO32 por I2C (acelerómetro, ±4 g); tira de 13 LEDs WS2812B en D6 | `A:<x>,<y>,<z>` en g | ~33/s | `entorno-digital/bandada_prototipo_v4a/v4b_dispositivo.html` |
+| `dispositivo1` | Adafruit Flora V3 (ATmega32u4) | LSM6DSO32 por I2C (acelerómetro, ±4 g); tira de 13 LEDs WS2812B en D6 | `A:<x>,<y>,<z>` en g | ~33/s | `entorno-digital/bandada_prototipo_v5a_dispositivo.html` (y las v4a/v4b anteriores) |
 | `dispositivo2` | LilyPad Arduino USB (ATmega32u4, 8 MHz) | 2 piezos de guante (A2, A3) + FSR (A4) | `F:<0-1023>` y `G:<dedo>,<pico>` | ~50/s y por golpe | `entorno-digital/prototipo_percusion_guante_{a,b}[_dispositivo].html` |
 | `dispositivo3` | LilyPad Arduino USB (ATmega32u4, 8 MHz) | AD8232 en la pantorrilla (A2, leads-off en 2 y 3) | `E:<amplitud MAV>` y `L:<0\|1>` | 50/s y al cambiar | todavía ninguna (candidatos: `prototipos/prototipo_emg_*.html`) |
 
@@ -80,8 +80,11 @@ No hay suite de tests. Tres técnicas, en orden de costo:
    node entorno-digital/tools/harness.js <archivo.html> --segundos=15 --perfil=tiltX --muestreo=1
    ```
 
-   **Comparar siempre contra el perfil `gravedad`** (mano inmóvil) antes de
-   llamarle bug a un movimiento: la bandada deriva sola por diseño. El
+   **Comparar siempre contra el perfil de control** antes de llamarle bug a un
+   movimiento: la bandada deriva sola por diseño. En v4 el control es
+   `gravedad` (mano inmóvil); en v5a es `despertar`, porque v5a arranca
+   dormida y con `gravedad` no se mueve nada —eso mide el requisito de
+   arranque quieto, no la deriva—. `--caja` apaga el campo continuo de v5a. El
    encabezado del archivo documenta los perfiles y qué mirar en la salida.
 
    Ojo: `harness.js` es **específico de la bandada** (sólo expone
@@ -142,5 +145,6 @@ Verificación de sintaxis rápida: extraer el `<script>` a un `.js` y correr
 | el guante de percusión y la fuerza | `dispositivo2/README.md` |
 | cualquier visualización | `entorno-digital/README.md` |
 | la bandada (física, señal, constantes de ajuste) | `entorno-digital/README.md` + `entorno-digital/prototipos/cambios_bandada_v4.md` |
+| la bandada v5a (arranque quieto, campo continuo, encuadre) | `entorno-digital/prototipos/cambios_bandada_v5.md` |
 | el guante: circuito, audio, las dos variantes | `entorno-digital/documentacion_percusion_guante.md` |
 | visualizaciones sin hardware todavía (EMG, estiramiento) | `entorno-digital/prototipos/propuesta_*.md` |

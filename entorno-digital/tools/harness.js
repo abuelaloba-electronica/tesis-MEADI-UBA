@@ -30,12 +30,21 @@
 //   --muestreo=N   segundos entre filas     (default 10)
 //   --puntos=N     cantidad de puntos       (default 24)
 //   --nucleos=N    cantidad de núcleos      (default 2)
+//   --caja         apaga el campo continuo  (sólo v5: mide el modo con paredes)
 //
 // Perfiles disponibles:
 //   quieto     sin ninguna entrada: verifica que la deriva autónoma siga viva
 //   gravedad   1 g constante en Z, mano inmóvil. Es el CONTROL: cualquier
 //              medición sobre otro perfil hay que compararla contra este para
-//              distinguir un bug del movimiento propio de la bandada
+//              distinguir un bug del movimiento propio de la bandada.
+//              OJO con v5: la escena arranca dormida y este perfil NO la
+//              despierta (ese es justamente el requisito), así que mide
+//              quietud, no deriva. Para el control de deriva de v5 está
+//              `despertar`
+//   despertar  1 g constante, con una sacudida breve a los 1,0 s. Es el
+//              control de v5: despierta la escena y después deja la mano
+//              inmóvil, o sea mide la deriva autónoma igual que `gravedad`
+//              medía en v4
 //   tiltX      ciclo de 12s: 3s de reposo, 2s de inclinación fuerte en X, y
 //              reposo. Sirve para ver la respuesta al gesto y su relajación
 //   auto       el perfil del "modo demo automático" del panel, más gravedad
@@ -56,6 +65,17 @@
 //   - varios puntos con el mismo valor de x o y -> aplastados contra un borde
 //   - rango de radios siempre pegado a sus extremos -> la profundidad está
 //     saturada y el eje Z dejó de leerse
+//
+// Dos avisos para v5 (campo continuo):
+//   - `n` puede superar la cantidad de puntos: los que están a menos de un
+//     radio de un borde se dibujan dos veces (o cuatro, en una esquina), que
+//     es lo que hace invisible la costura. La diferencia son las copias
+//     fantasma, no puntos de más.
+//   - rms y centroide DEJAN DE SIGNIFICAR ALGO: son promedios de coordenadas
+//     envueltas. En su lugar está la columna `arrastre`, que la página expone
+//     por window.__diag: el módulo del desplazamiento medio sin envolver, o
+//     sea cuánto movió el gesto al campo entero. La deriva propia de cada
+//     punto se cancela en ese promedio; el empuje común, no.
 
 "use strict";
 
@@ -80,8 +100,9 @@ const PERFIL = opt("perfil", "auto");
 const MUESTREO = parseFloat(opt("muestreo", "10"));
 const PUNTOS = opt("puntos", "24");
 const NUCLEOS = opt("nucleos", "2");
+const CAJA = args.includes("--caja");
 
-const PERFILES = ["quieto", "gravedad", "tiltX", "auto"];
+const PERFILES = ["quieto", "gravedad", "despertar", "tiltX", "auto"];
 if (!PERFILES.includes(PERFIL)) {
   console.error(`Perfil desconocido "${PERFIL}". Disponibles: ${PERFILES.join(", ")}`);
   process.exit(1);
@@ -109,7 +130,9 @@ function elementoFalso(id) {
     className: "",
     style: {},
     classList: { add() {}, remove() {}, toggle() { return false; }, contains() { return false; } },
-    addEventListener() {},
+    // Los oyentes se guardan para poder disparar eventos a mano (ver --caja).
+    _ev: {},
+    addEventListener(tipo, fn) { (this._ev[tipo] || (this._ev[tipo] = [])).push(fn); },
   };
   // Los sliders arrancan con su valor por defecto: el script los lee al
   // inicializarse (parseInt(sliderN.value), etc.).
@@ -156,9 +179,19 @@ const windowFalso = { addEventListener() {}, innerWidth: W, innerHeight: H };
 
 const runner = new Function(
   "document", "window", "navigator", "performance", "requestAnimationFrame", "TextDecoderStream",
-  code + "\n; return { get updateAccel() { return window.updateAccel; } };"
+  code + "\n; return { get updateAccel() { return window.updateAccel; }," +
+         "\n          get diag() { return window.__diag; } };"
 );
 const api = runner(document, windowFalso, navigator, performance, requestAnimationFrame, function () {});
+
+// --caja: apaga el campo continuo disparando a mano el "change" de la casilla,
+// que es la única forma de cambiarlo desde afuera (la página no lee su estado
+// al arrancar, justamente para que este harness no mida siempre el modo caja).
+if (CAJA) {
+  const el = document.getElementById("toroideBox");
+  el.checked = false;
+  (el._ev.change || []).forEach((fn) => fn());
+}
 
 // --- perfiles de entrada -------------------------------------------------
 function alimentar(t) {
@@ -167,6 +200,11 @@ function alimentar(t) {
       return;                                        // ninguna llamada a updateAccel
     case "gravedad":
       return api.updateAccel(0, 0, 1.0);             // control: mano inmóvil
+    case "despertar":
+      // Una sacudida corta al segundo 1 y después mano inmóvil: despierta la
+      // escena de v5 y mide la deriva autónoma, igual que `gravedad` en v4.
+      if (t > 1.0 && t < 1.3) return api.updateAccel(0.9, 0.6, 1.0);
+      return api.updateAccel(0, 0, 1.0);
     case "tiltX": {
       const fase = t % 12;
       if (fase < 3) api.updateAccel(0, 0, 1.0);      // reposo
@@ -228,6 +266,9 @@ function medir(t) {
   }
   rms = Math.sqrt(rms / pts.length);
 
+  // Sólo v5 expone diagnóstico; en v4 estas columnas quedan vacías.
+  const d = api.diag ? api.diag() : null;
+
   return {
     t: t.toFixed(1),
     n: pts.length,
@@ -236,12 +277,15 @@ function medir(t) {
     x: `${minX.toFixed(0)}..${maxX.toFixed(0)}`,
     y: `${minY.toFixed(0)}..${maxY.toFixed(0)}`,
     radio: `${minR.toFixed(2)}..${maxR.toFixed(2)}`,
+    desp: d ? (d.despierto ? "si" : "NO") : "",
+    arrastre: d ? d.arrastre.toFixed(0) : "",
     stats: elementos.has("stats") ? elementos.get("stats").textContent : "",
   };
 }
 
 console.log(
   `${path.basename(htmlPath)} · perfil "${PERFIL}" · ${SEGUNDOS}s simulados · ` +
-  `lienzo ${W}x${H} · ${PUNTOS} puntos · ${NUCLEOS} núcleos`
+  `lienzo ${W}x${H} · ${PUNTOS} puntos · ${NUCLEOS} núcleos` +
+  (CAJA ? " · modo caja" : "")
 );
 console.table(muestras);

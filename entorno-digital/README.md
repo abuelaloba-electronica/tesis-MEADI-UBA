@@ -15,6 +15,7 @@ versiones anteriores que se conservan para comparar.
 
 | Archivo | Sensor | Dispositivo | Documentación |
 |---|---|---|---|
+| [`bandada_prototipo_v5a_dispositivo.html`](bandada_prototipo_v5a_dispositivo.html) | acelerómetro | [`dispositivo1`](../dispositivo1/) | acá abajo + [`cambios_bandada_v5.md`](prototipos/cambios_bandada_v5.md) |
 | [`bandada_prototipo_v4a_dispositivo.html`](bandada_prototipo_v4a_dispositivo.html) | acelerómetro | [`dispositivo1`](../dispositivo1/) | acá abajo |
 | [`bandada_prototipo_v4b_dispositivo.html`](bandada_prototipo_v4b_dispositivo.html) | acelerómetro | [`dispositivo1`](../dispositivo1/) | acá abajo |
 | [`prototipo_percusion_guante_a_dispositivo.html`](prototipo_percusion_guante_a_dispositivo.html) | 2 piezos + FSR | [`dispositivo2`](../dispositivo2/) | [`documentacion_percusion_guante.md`](documentacion_percusion_guante.md) |
@@ -48,7 +49,40 @@ bpm. Ver [`documentacion_percusion_guante.md`](documentacion_percusion_guante.md
 Historia de la bandada: [`propuesta_bandada.md`](prototipos/propuesta_bandada.md)
 (v1) → [`instrucciones_mejoras_bandada.md`](prototipos/instrucciones_mejoras_bandada.md)
 (v2, boids) → [`cambios_bandada_v3.md`](prototipos/cambios_bandada_v3.md) →
-[`cambios_bandada_v4.md`](prototipos/cambios_bandada_v4.md).
+[`cambios_bandada_v4.md`](prototipos/cambios_bandada_v4.md) →
+[`cambios_bandada_v5.md`](prototipos/cambios_bandada_v5.md).
+
+---
+
+# Bandada v5a — `bandada_prototipo_v5a_dispositivo.html`
+
+La versión activa. Hereda entera la física de v4a —señal acondicionada,
+obediencia al gesto, rumbo objetivo con banking, profundidad con perspectiva—
+así que **todo lo que explica la sección de v4, más abajo, sigue valiendo**.
+Lo que cambia es el encuadre y el arranque. En una línea cada uno, con el
+detalle y las mediciones en
+[`cambios_bandada_v5.md`](prototipos/cambios_bandada_v5.md):
+
+1. **El mundo es el tronco de visión.** v4a simulaba en una caja achicada al
+   66% del lienzo para que la perspectiva no sacara los puntos de pantalla, y
+   dejaba un marco vacío permanente. Ahora la caja de cada punto es el lienzo
+   retroproyectado a *su* profundidad: a cualquier z se puede usar todo el
+   lienzo sin cortarse.
+2. **Arranque quieto.** Nada se mueve hasta que el acelerómetro registra
+   movimiento de verdad; la gravedad que aparece al conectar el USB no cuenta.
+   Despierta con una rampa de 1,5 s y no se vuelve a dormir.
+3. **Campo continuo.** Lo que sale por un borde entra por el opuesto, con
+   vecinos de mínima imagen y copias fantasma en los bordes. Desaparece la
+   pelea entre el gesto y la pared que v4 tenía que arbitrar. Hay una casilla
+   para volver al modo caja y comparar.
+4. **Sin núcleos en campo continuo**: en un espacio que envuelve, orbitar "el
+   centro" sólo produce un grumo fijo.
+5. **400 puntos (10–600) y profundidad en todo el rango**, para que siempre
+   haya campo alrededor y el abanico de opacidad y tamaño se lea.
+6. **La barra espaciadora termina la interacción**: congela el lienzo, suelta
+   el puerto serie y apaga los controles. Se sale recargando.
+
+`v4a` y `v4b` se conservan tal cual para comparar.
 
 ---
 
@@ -207,14 +241,33 @@ node entorno-digital/tools/harness.js <archivo.html> --segundos=15 --perfil=tilt
 ```
 
 Perfiles: `quieto` (verifica la deriva autónoma), `gravedad` (control, mano
-inmóvil), `tiltX` (gesto de 2 s y relajación), `auto` (el del modo demo). El
-encabezado del archivo explica cómo leer la salida y qué patrones delatan un
-problema. **Comparar siempre contra `gravedad` antes de llamarle bug a un
-movimiento**: la bandada deriva sola por diseño.
+inmóvil), `despertar` (una sacudida al segundo 1 y después mano inmóvil),
+`tiltX` (gesto de 2 s y relajación), `auto` (el del modo demo). El encabezado
+del archivo explica cómo leer la salida y qué patrones delatan un problema.
+**Comparar siempre contra el control antes de llamarle bug a un movimiento**:
+la bandada deriva sola por diseño.
+
+Para v5a hay tres diferencias:
+
+- El control es **`despertar`**, no `gravedad`: con v5a dormida no hay
+  movimiento que medir, así que `gravedad` mide quietud (que es lo que
+  verifica el requisito del arranque quieto, pero no sirve de comparación).
+- `--caja` apaga el campo continuo y mide la física con paredes.
+- Las columnas **`desp`** y **`arrastre`** salen de `window.__diag`. Con campo
+  continuo el radio RMS y el centroide dejan de significar algo —son promedios
+  de coordenadas envueltas—; `arrastre` es el desplazamiento medio sin
+  envolver, o sea cuánto empujó el gesto al campo entero.
 
 ## Estado
 
-Validado con ese harness: 5 minutos simulados en ambas variantes,
+**v5a**: validada con el harness (arranque inmóvil con 1 g, pantalla llena en
+todo momento, sin costura en la densidad, 3,45 ms de CPU por cuadro con 400
+puntos) y con captura headless. Falta la confirmación con el dispositivo en la
+mano, sobre todo para calibrar el umbral de despertar. Ver
+[`cambios_bandada_v5.md`](prototipos/cambios_bandada_v5.md), sección
+Validación.
+
+**v4a / v4b**: validadas con ese harness: 5 minutos simulados en ambas variantes,
 radio del grupo entre ~66 y ~210 px (nunca colapsa a un punto ni llena el
 lienzo), todo dentro de pantalla, y con el perfil "quieto" la bandada deriva
 sola con sacudida 0,00. Falta la **confirmación con el dispositivo en la mano**,
