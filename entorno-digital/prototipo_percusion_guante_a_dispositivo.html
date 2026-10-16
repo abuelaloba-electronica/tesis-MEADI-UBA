@@ -37,7 +37,56 @@
     font-size: 12px;
     backdrop-filter: blur(4px);
     box-shadow: 0 4px 16px rgba(0,0,0,0.10);
+    transition: transform 0.32s ease, opacity 0.32s ease;
   }
+  /* Oculto hacia la izquierda: se desliza fuera de pantalla */
+  #panel.hidden {
+    transform: translateX(calc(-100% - 24px));
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  /* Cabecera con título + botón de colapsar/ocultar */
+  #panelHeader {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  #panelCollapse, #panelHide, #panelShow {
+    border: 1px solid #999;
+    background: #fff;
+    cursor: pointer;
+  }
+  #panelCollapse:hover, #panelHide:hover, #panelShow:hover { background: #f2f2f2; }
+  #panelCollapse, #panelHide {
+    flex-shrink: 0;
+    padding: 2px 7px;
+    font-size: 13px;
+    line-height: 1;
+    border-radius: 5px;
+    color: #555;
+  }
+  /* Cuando el panel está colapsado, se esconde todo menos la cabecera */
+  #panel.collapsed #panelBody { display: none; }
+
+  /* Pestaña flotante para volver a mostrar el panel oculto */
+  #panelShow {
+    position: fixed;
+    z-index: 2;
+    top: 16px; left: 0;
+    padding: 8px 10px;
+    font-size: 13px;
+    line-height: 1;
+    border-left: none;
+    border-radius: 0 8px 8px 0;
+    background: var(--panel-bg);
+    box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+    backdrop-filter: blur(4px);
+    color: #555;
+    display: none;
+  }
+  #panelShow.visible { display: block; }
   #panel h1 {
     font-size: 12px;
     text-transform: uppercase;
@@ -201,8 +250,17 @@
 <canvas id="acum"></canvas>
 <canvas id="over"></canvas>
 
+<button id="panelShow" title="Mostrar panel">☰ Panel</button>
+
 <div id="panel">
-  <h1>Percusión · Guante (a)</h1>
+  <div id="panelHeader">
+    <h1>Percusión · Guante (a)</h1>
+    <span style="display:flex;gap:4px;flex-shrink:0;">
+      <button id="panelCollapse" title="Colapsar / expandir">–</button>
+      <button id="panelHide" title="Ocultar hacia la izquierda">‹</button>
+    </span>
+  </div>
+  <div id="panelBody">
   <p class="subtitle">MAEDI — nota fija por dedo, leyendo el dispositivo real por USB</p>
 
   <div class="section-title">Conexión con el dispositivo</div>
@@ -268,6 +326,7 @@
   <hr class="divider">
   <button class="plain" id="resetBtn">Limpiar lienzo</button>
   <div id="hint">Teclas <b>A</b> y <b>L</b> disparan los dedos 0 y 1 sin la placa (intensidad al azar), y <b>F</b> mantenida simula la presión del FSR. Sirve para ajustar el timbre sin el guante.</div>
+  </div>
 </div>
 
 <div id="stats">
@@ -278,6 +337,31 @@
 <script>
 (function () {
   "use strict";
+
+  // ===============================================================
+  // Panel: colapsible y ocultable hacia la izquierda
+  // ===============================================================
+  (function setupPanelChrome() {
+    const panel = document.getElementById("panel");
+    const btnCollapse = document.getElementById("panelCollapse");
+    const btnHide = document.getElementById("panelHide");
+    const btnShow = document.getElementById("panelShow");
+
+    btnCollapse.addEventListener("click", function () {
+      const collapsed = panel.classList.toggle("collapsed");
+      btnCollapse.textContent = collapsed ? "+" : "–";
+    });
+
+    btnHide.addEventListener("click", function () {
+      panel.classList.add("hidden");
+      btnShow.classList.add("visible");
+    });
+
+    btnShow.addEventListener("click", function () {
+      panel.classList.remove("hidden");
+      btnShow.classList.remove("visible");
+    });
+  })();
 
   // ===============================================================
   // Lienzo: dos capas.
@@ -345,7 +429,10 @@
   let picoMax = 600;         // por encima, como el mas fuerte
   let volumen = 0.8;
 
-  const R_MIN_FRAC = 0.012;  // radio minimo, relativo a min(W,H)
+  const R_MIN_FRAC = 0.08;   // radio minimo, relativo a min(W,H). Cerca del maximo a
+                             // proposito: todos los circulos salen grandes y la
+                             // intensidad solo los hace oscilar un 20 % entre si
+                             // (con 0.012 los golpes suaves eran puntos)
   const R_MAX_FRAC = 0.10;   // bastante menor que el 0.30 del prototipo anterior:
                              // con 10-20 veces mas eventos, los tamanos viejos
                              // saturaban la pantalla en un minuto
