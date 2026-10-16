@@ -19,6 +19,7 @@ versiones anteriores que se conservan para comparar.
 | [`bandada_prototipo_v4a_dispositivo.html`](bandada_prototipo_v4a_dispositivo.html) | acelerómetro | [`dispositivo1`](../dispositivo1/) | acá abajo |
 | [`bandada_prototipo_v4b_dispositivo.html`](bandada_prototipo_v4b_dispositivo.html) | acelerómetro | [`dispositivo1`](../dispositivo1/) | acá abajo |
 | [`prototipo_percusion_guante_a_dispositivo.html`](prototipo_percusion_guante_a_dispositivo.html) | 2 piezos + FSR | [`dispositivo2`](../dispositivo2/) | [`documentacion_percusion_guante.md`](documentacion_percusion_guante.md) |
+| [`prototipo_percusion_guante_a_midi_dispositivo.html`](prototipo_percusion_guante_a_midi_dispositivo.html) | 2 piezos + FSR (sonido en Helm por MIDI) | [`dispositivo2`](../dispositivo2/) | [`documentacion_percusion_guante.md`](documentacion_percusion_guante.md) + [`cambios_percusion_guante_midi.md`](prototipos/cambios_percusion_guante_midi.md) |
 | [`prototipo_percusion_guante_b_dispositivo.html`](prototipo_percusion_guante_b_dispositivo.html) | 2 piezos + FSR | [`dispositivo2`](../dispositivo2/) | [`documentacion_percusion_guante.md`](documentacion_percusion_guante.md) |
 
 Las dos variantes del guante tienen su gemela con sensores simulados —

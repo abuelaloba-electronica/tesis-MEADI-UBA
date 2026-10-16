@@ -7,8 +7,8 @@ mano; dos piezos cosidos en las puntas de dos dedos detectan golpes contra una
 superficie, y un FSR —el mismo que ya usaba `dispositivo2`— se toca con la mano
 opuesta.
 
-Cada golpe **suena** (una nota sintetizada en la propia página) y **deja una
-marca** en el lienzo. La presión del FSR **distorsiona el sonido** y aplica un
+Cada golpe **suena** (una nota sintetizada en la propia página o, en la
+versión `_midi_`, en Helm) y **deja una marca** en el lienzo. La presión del FSR **distorsiona el sonido** y aplica un
 efecto **global** sobre la imagen.
 
 Reemplaza al par fuerza + pulso: el Pulse Sensor Amped nunca llegó a dar
@@ -21,18 +21,20 @@ De ahí sale el gesto y el circuito base. Lo que **no** tomamos es su detección
 —un umbral binario que manda siempre velocity 127— porque acá la intensidad del
 golpe es justamente lo que da la expresión.
 
-## Los cuatro archivos
+## Los cinco archivos
 
-| Archivo | Variante musical | Datos |
-|---|---|---|
-| `prototipo_percusion_guante_a.html` | (a) nota fija por dedo | pads y sliders manuales |
-| `prototipo_percusion_guante_a_dispositivo.html` | (a) | Web Serial |
-| `prototipo_percusion_guante_b.html` | (b) pentatónica por intensidad | pads y sliders manuales |
-| `prototipo_percusion_guante_b_dispositivo.html` | (b) | Web Serial |
+| Archivo | Variante musical | Datos | Sonido |
+|---|---|---|---|
+| `prototipo_percusion_guante_a.html` | (a) nota fija por dedo | pads y sliders manuales | Web Audio |
+| `prototipo_percusion_guante_a_dispositivo.html` | (a) | Web Serial | Web Audio |
+| `prototipo_percusion_guante_a_midi_dispositivo.html` | (a) | Web Serial | **Helm**, por Web MIDI |
+| `prototipo_percusion_guante_b.html` | (b) pentatónica por intensidad | pads y sliders manuales | Web Audio |
+| `prototipo_percusion_guante_b_dispositivo.html` | (b) | Web Serial | Web Audio |
 
-Las cuatro comparten la misma cadena de audio y el mismo motor de dibujo; lo
-único que cambia entre (a) y (b) es de dónde sale la nota y, en consecuencia,
-qué representa la imagen.
+Las cuatro páginas con Web Audio comparten la misma cadena de audio, y las cinco
+el mismo motor de dibujo; lo único que cambia entre (a) y (b) es de dónde sale
+la nota y, en consecuencia, qué representa la imagen. La versión `_midi_` no
+tiene voz propia: ver [Sonido en Helm por MIDI](#sonido-en-helm-por-midi).
 
 ## Requisitos para probarlo
 
@@ -147,10 +149,10 @@ guante. Es el ajuste que más va a costar.
 
 ## El sonido: cadena de Web Audio
 
-Helm no entra acá: es un sintetizador nativo (VST/standalone) y no corre en el
-navegador. Meterlo hubiera exigido Web MIDI más un puerto virtual configurado a
-mano en cada arranque. La página sintetiza su propia voz percusiva, lo que la
-mantiene autocontenida y sin dependencias, como el resto del repo.
+Esta sección describe la voz propia de las páginas con Web Audio, que suenan
+sin nada instalado. Helm no puede correr *dentro* del navegador, pero sí *en
+paralelo*, recibiendo los golpes por MIDI: eso es la versión `_midi_`, en la
+sección siguiente.
 
 ```
 por golpe (efímeros):
@@ -205,6 +207,72 @@ y si no se la saltea se termina robando siempre la misma en una ráfaga.
 **Limitador soft-clip** (`tanh` unitario) como último nodo, en lugar de un
 `DynamicsCompressorNode`: el attack mínimo de 3 ms de ese nodo redondea
 justamente los ataques, que es lo único que hace que un golpe suene a golpe.
+
+## Sonido en Helm por MIDI
+
+`prototipo_percusion_guante_a_midi_dispositivo.html` es la variante (a) con el
+sonido delegado a **Helm** corriendo en paralelo como aplicación standalone.
+La página no produce ningún sonido; la imagen es idéntica. El porqué de cada
+decisión está en
+[`prototipos/cambios_percusion_guante_midi.md`](prototipos/cambios_percusion_guante_midi.md).
+
+```
+dispositivo2 ──USB serie──→ página (Web Serial) ──→ dibujo
+                               │
+                               └─ Web MIDI ──puerto MIDI──→ Helm ──→ parlantes
+```
+
+| Entrada | Mensaje MIDI |
+|---|---|
+| golpe del dedo 0 | noteOn 45 (A2), canal 1, velocity `13 + 114·v^1.6`; noteOff a los 80 ms |
+| golpe del dedo 1 | noteOn 57 (A3), ídem |
+| FSR | CC1 (rueda de modulación) 0–127, sólo cuando cambia |
+| cerrar la página, cambiar de puerto, desconectar, botón de pánico | noteOff pendientes + CC123 + CC120 + CC1 = 0 |
+
+### Puesta en marcha
+
+1. **Un puerto MIDI entre Chrome y Helm.**
+   - **Linux**: no hace falta instalar nada. El kernel ya trae *Midi Through
+     Port-0* (`aconnect -o` lo lista). Si Helm aparece con su propio nombre en
+     el selector de la página, también sirve elegirlo directamente.
+   - **macOS**: *Configuración de Audio MIDI → Estudio MIDI → IAC Driver →*
+     activar "El dispositivo está en línea". Una sola vez.
+   - **Windows**: instalar loopMIDI, crear un puerto y dejarlo en el inicio.
+2. **Helm**: abrir la aplicación y, en su configuración de audio/MIDI, activar
+   como entrada ese mismo puerto. La elección persiste.
+3. **La página**, en Chrome o Edge: *Habilitar salida MIDI* (la primera vez
+   Chrome pide permiso; después se habilita sola), elegir el puerto si no lo
+   eligió sola, y *Conectar dispositivo (USB)*.
+4. Probar con **A**, **L** y **F** antes de ponerse el guante.
+
+El orden de apertura no importa: si Helm se abre después, la lista de puertos
+se actualiza sola.
+
+### El patch de Helm
+
+Un patch de teclado no suena a golpe. Lo mínimo para que sea percusivo:
+
+- **Envolvente de amplitud**: attack en 0, sustain en 0, decay corto
+  (0,1–0,5 s), release igual al decay. Con sustain 0 la duración de la nota no
+  importa, y con release = decay un retrigger corta la nota anterior sin que
+  se note.
+- **`velocity_track` al máximo**: es lo que hace que la intensidad del golpe
+  se escuche. La ley de velocity de la página ya trae la curva perceptiva.
+- **Rueda de modulación → distorsión**: activar la distorsión de Helm y
+  arrastrar la fuente *mod wheel* al `distortion_drive` (y, si se quiere, al
+  corte del filtro). Es la contraparte del efecto global del FSR sobre la
+  imagen. Alternativa: clic derecho sobre la perilla → *Learn MIDI
+  Assignment* y apretar el FSR.
+- Guardar el patch en `~/.helm/User Patches` y anotar en este documento cuál
+  se usa en la muestra.
+
+### Latencia
+
+Mandar el mensaje MIDI cuesta menos de 1 ms. La etapa de Web Audio (10–30 ms)
+de la tabla de [Latencia](#latencia) se reemplaza por el buffer de audio de
+Helm, que se elige en su configuración: 128–256 muestras a 48 kHz son
+3–5 ms, más la latencia del driver (con JACK en Linux puede quedar por debajo
+de Web Audio). La página ya no puede mostrar este número: se lee en Helm.
 
 ## La imagen: dos capas
 
@@ -337,6 +405,16 @@ Requisito que le impone al diseño de las páginas: **el `AudioContext` se
 construye perezosamente dentro de `asegurarAudio()`**. Si se construyera en el
 cuerpo del script, evaluarlo en Node explotaría.
 
+Para la versión `_midi_` está su hermano `tools/harness_midi.js`: con un
+`MIDIAccess` falso verifica que no se construya ningún `AudioContext`, que
+todo noteOn tenga su noteOff, que un retrigger cierre la nota anterior antes
+del noteOn nuevo, que el FSR mande CC sólo al cambiar, el pánico al cerrar la
+página y el costo de dibujo.
+
+```
+node entorno-digital/tools/harness_midi.js entorno-digital/prototipo_percusion_guante_a_midi_dispositivo.html
+```
+
 ### 2. Verificación de sintaxis
 
 Extraer el `<script>` a un `.js` y correr `node --check`.
@@ -373,6 +451,9 @@ se calibran `UMBRAL_ON`, el factor de diafonía y los sliders `PICO_MIN`/
 - **La diafonía mecánica entre los dos piezos es el riesgo abierto más grande.**
   El árbitro del firmware y la espuma la mitigan, pero puede que nunca haya
   separación perfecta.
+- **La versión `_midi_` no se probó contra Helm real**: el harness valida el
+  flujo de mensajes, pero el envío por Web MIDI necesita Chrome. Falta también
+  armar el patch percusivo y elegir qué controla la rueda de modulación.
 - Si alguna vez hiciera falta que ande en Firefox o Safari, la alternativa sería
   un puente local (servidor que lea el puerto serie y lo reexponga por
   WebSocket). No está implementado.

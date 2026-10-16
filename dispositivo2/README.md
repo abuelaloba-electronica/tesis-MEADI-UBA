@@ -58,7 +58,9 @@ recalibrar el rango con sliders mientras se toca.
 
 Quién lo consume:
 [`entorno-digital/prototipo_percusion_guante_a_dispositivo.html`](../entorno-digital/prototipo_percusion_guante_a_dispositivo.html)
-y su variante `_b_`, por Web Serial (Chrome o Edge de escritorio). Ver
+y su variante `_b_`, por Web Serial (Chrome o Edge de escritorio), y
+`prototipo_percusion_guante_a_midi_dispositivo.html`, que además reenvía los
+golpes a Helm por MIDI. Ver
 [`entorno-digital/documentacion_percusion_guante.md`](../entorno-digital/documentacion_percusion_guante.md).
 
 ## Archivos del sketch
@@ -120,5 +122,5 @@ ya es de ~25–30 ms de punta a punta.
   estimaciones; los tres se calibran con el guante puesto.
 - La diafonía mecánica entre los dos piezos es el riesgo abierto más grande.
 - **Si se cambia el formato de las líneas `G:` o `F:`, hay que actualizar
-  `handleLine()` en las cuatro páginas `prototipo_percusion_guante_*.html`.** Las
+  `handleLine()` en las cinco páginas `prototipo_percusion_guante_*.html`.** Las
   dos mitades están acopladas sólo por ese formato de texto.
