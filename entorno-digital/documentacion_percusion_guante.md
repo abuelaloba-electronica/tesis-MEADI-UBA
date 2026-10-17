@@ -1,5 +1,7 @@
 # Documentación: `prototipo_percusion_guante_{a,b}[_dispositivo].html`
 
+Y sus variantes con Helm, `prototipo_percusion_guante_a_midi[_v2]_dispositivo.html`.
+
 ## Qué es
 
 Un guante de percusión. La placa **LilyPad Arduino USB** va en el dorso de la
@@ -7,9 +9,12 @@ mano; dos piezos cosidos en las puntas de dos dedos detectan golpes contra una
 superficie, y un FSR —el mismo que ya usaba `dispositivo2`— se toca con la mano
 opuesta.
 
-Cada golpe **suena** (una nota sintetizada en la propia página o, en la
-versión `_midi_`, en Helm) y **deja una marca** en el lienzo. La presión del FSR **distorsiona el sonido** y aplica un
-efecto **global** sobre la imagen.
+Cada golpe **suena** (una nota sintetizada en la propia página o, en las
+versiones `_midi_`, en Helm) y **deja una marca** en el lienzo. La presión del
+FSR **modula el sonido** (en las páginas con Web Audio, lo distorsiona; en las
+`_midi_`, mueve el parámetro de Helm que se le asigne) y se ve de dos maneras
+según la versión: como un efecto **global** sobre toda la imagen, o —en la
+`_midi_v2_`— como una **marca propia**, un disco azul.
 
 Reemplaza al par fuerza + pulso: el Pulse Sensor Amped nunca llegó a dar
 lecturas estables y se descartó. Las páginas de círculos quedaron archivadas en
@@ -21,20 +26,22 @@ De ahí sale el gesto y el circuito base. Lo que **no** tomamos es su detección
 —un umbral binario que manda siempre velocity 127— porque acá la intensidad del
 golpe es justamente lo que da la expresión.
 
-## Los cinco archivos
+## Los seis archivos
 
 | Archivo | Variante musical | Datos | Sonido |
 |---|---|---|---|
 | `prototipo_percusion_guante_a.html` | (a) nota fija por dedo | pads y sliders manuales | Web Audio |
 | `prototipo_percusion_guante_a_dispositivo.html` | (a) | Web Serial | Web Audio |
 | `prototipo_percusion_guante_a_midi_dispositivo.html` | imagen de (a); la intensidad elige la nota de una escala elegible | Web Serial | **Helm**, por Web MIDI |
+| `prototipo_percusion_guante_a_midi_v2_dispositivo.html` | igual que la anterior; cambia la imagen: los dos dedos son anillos y el FSR dibuja un disco azul propio | Web Serial | **Helm**, por Web MIDI |
 | `prototipo_percusion_guante_b.html` | (b) pentatónica por intensidad | pads y sliders manuales | Web Audio |
 | `prototipo_percusion_guante_b_dispositivo.html` | (b) | Web Serial | Web Audio |
 
-Las cuatro páginas con Web Audio comparten la misma cadena de audio, y las cinco
+Las cuatro páginas con Web Audio comparten la misma cadena de audio, y las seis
 el mismo motor de dibujo; lo único que cambia entre (a) y (b) es de dónde sale
-la nota y, en consecuencia, qué representa la imagen. La versión `_midi_` no
-tiene voz propia: ver [Sonido en Helm por MIDI](#sonido-en-helm-por-midi).
+la nota y, en consecuencia, qué representa la imagen. Las versiones `_midi_` no
+tienen voz propia: ver [Sonido en Helm por MIDI](#sonido-en-helm-por-midi). La
+`_midi_v2_` sólo cambia la imagen: ver [El FSR como disco azul](#el-fsr-como-disco-azul-versión-_midi_v2_).
 
 ## Requisitos para probarlo
 
@@ -210,7 +217,8 @@ justamente los ataques, que es lo único que hace que un golpe suene a golpe.
 
 ## Sonido en Helm por MIDI
 
-`prototipo_percusion_guante_a_midi_dispositivo.html` tiene la imagen de la
+`prototipo_percusion_guante_a_midi_dispositivo.html` (y su `_v2_`, que suena
+exactamente igual) tiene la imagen de la
 variante (a) y el sonido delegado a **Helm**, que corre en paralelo como
 aplicación standalone. La página no produce ningún sonido. A diferencia de la
 (a) con Web Audio, la nota no es fija por dedo: la intensidad del golpe elige
@@ -293,11 +301,22 @@ Un patch de teclado no suena a golpe. Lo mínimo para que sea percusivo:
   se note.
 - **`velocity_track` al máximo**: la velocity que manda la página ya es
   plana (de 45 % a 100 %), así que Helm sólo tiene que respetarla.
-- **Rueda de modulación → distorsión**: activar la distorsión de Helm y
-  arrastrar la fuente *mod wheel* al `distortion_drive` (y, si se quiere, al
-  corte del filtro). Es la contraparte del efecto global del FSR sobre la
-  imagen. Alternativa: clic derecho sobre la perilla → *Learn MIDI
-  Assignment* y apretar el FSR.
+- **Rueda de modulación → el parámetro que controle el FSR.** La página sólo
+  manda CC1; **si no se conecta en Helm, apretar el FSR no cambia nada del
+  sonido**. Para conectarla: clic derecho sobre la perilla → *Learn MIDI
+  Assignment* y apretar el FSR (o mantener **F**), o arrastrar el botón de
+  modulación de la rueda *mod* sobre una o varias perillas. Destinos
+  posibles (ninguno probado todavía contra Helm real):
+  - **distorsión** (`distortion_drive`, con la sección encendida y el *mix*
+    arriba): apretar ensucia el golpe;
+  - **corte del filtro**: el cambio más fácil de oír, bueno para una primera
+    prueba;
+  - **delay**: conviene modular el *feedback* (con el *mix* fijo en un valor
+    medio) y no el *mix*, porque al soltar el FSR el *mix* vuelve a 0 y corta
+    de golpe los ecos que estaban sonando; con el *feedback* se apagan solos.
+  Como el golpe es corto, el efecto se escucha mientras se toca: mantener el
+  FSR (o **F**) y golpear a la vez. Para verificar que el CC llega, la rueda
+  *mod* de Helm tiene que moverse al apretar.
 - Guardar el patch en `~/.helm/User Patches` y anotar en este documento cuál
   se usa en la muestra.
 
@@ -327,7 +346,9 @@ Efecto lateral bienvenido: con lienzo persistente el `multiply` se aplica una
 sola vez por marca sobre lo ya pintado, que es la definición de tinta
 acumulándose. El orden temporal deja huella, cosa que antes no pasaba.
 
-**Efecto global del FSR**, la contraparte visual de la distorsión:
+**Efecto global del FSR**, la contraparte visual de la distorsión (todas las
+páginas salvo la `_midi_v2_`, que lo reemplaza por un disco; ver la sección
+siguiente):
 
 1. **Filtro CSS sobre el elemento canvas** —`blur` + `contrast` + `saturate`
    proporcionales a la presión—. Lo hace la GPU, cuesta cero JS. El string se
@@ -340,6 +361,58 @@ acumulándose. El orden temporal deja huella, cosa que antes no pasaba.
 La fuerza visual se suaviza con **la misma constante que la del audio** (τ =
 0,03 s): si la imagen respondiera más rápido que el sonido, se notaría como
 desincronía.
+
+## El FSR como disco azul (versión `_midi_v2_`)
+
+En `prototipo_percusion_guante_a_midi_v2_dispositivo.html` el FSR deja de ser
+un efecto sobre todo el lienzo y pasa a tener **su propia marca**, como los
+piezos. El sonido no cambia: la presión sigue saliendo como CC1 hacia Helm,
+con el mismo filtro de repetidos y el mismo pánico.
+
+**Los dos dedos son anillos.** El disco relleno que antes era del dedo 0 queda
+reservado para el FSR, así que los dos piezos se dibujan como anillos huecos
+(mismo grosor, `0.35·r`) y se distinguen sólo por el tono: amarillo `#FFDE21`
+el dedo 0 y naranja `#FF8C1A` el dedo 1, por defecto. El selector de color
+ofrece tres pares (amarillo + naranja, amarillo + rojo anaranjado, amarillo
+fluo + naranja); el azul del FSR, `#0000FF`, es fijo. La forma basta para
+separar las dos fuentes de datos —anillo = golpe, disco = presión— y el tono
+separa los dedos entre sí.
+
+**Una presión es un evento.** El FSR es una señal continua, pero el disco se
+dibuja por gesto:
+
+```
+fuerza > 0,06           → empieza la presión: se elige una posición al azar
+mientras se aprieta     → el disco vive en el overlay; radio y opacidad siguen
+                          el PICO de la fuerza suavizada (crece, nunca se achica)
+fuerza < 0,03           → se estampa en el lienzo acumulado con ese pico
+```
+
+| Decisión | Por qué |
+|---|---|
+| Umbral 0,06 / 0,03, con histéresis | El FSR en reposo no marca 0 exacto. Sin umbral el ruido dibujaría discos solos; sin histéresis, una presión floja que ronda el umbral se partiría en muchos discos. |
+| El disco sigue el **pico**, no la fuerza actual | Si siguiera la fuerza actual, al aflojar se achicaría y el disco estampado (del pico) saltaría de tamaño al soltar. Así lo que se ve mientras se aprieta es exactamente lo que queda. |
+| Radio de `0,05` a `0,14 · min(W,H)` | Más amplio que el de los anillos (`0,08`–`0,10`): el tamaño es lo único que distingue una presión de otra. |
+| Opacidad con la misma ley que los golpes (piso 0,08) | Una presión suave nunca queda invisible. |
+| `mix-blend-mode: multiply` en `#over` | El disco vivo compone igual que el estampado en `#acum`; sin esto, al soltar se oscurecería de golpe. Los anillos de impacto también pasan a componer así, con un cambio apenas visible. |
+| Posición al azar, independiente de los golpes | El agrupamiento temporal de 250 ms es para redobles; una presión dura segundos y no tiene "anterior". |
+| Desconectar el cable estampa la presión en curso | Si no, un disco quedaría vivo para siempre en el overlay. |
+
+**Se quitó el efecto global** (filtro CSS `blur`/`contrast`/`saturate` y la
+tinta violeta acumulada). Con el FSR como marca propia, el desenfoque global
+borronearía también el disco azul, y la tinta oscurecía todo el lienzo en
+pocos segundos de presión sostenida.
+
+**La tecla F ahora es una rampa.** Mantenida, la presión simulada sube de 0 a
+1 en 1,5 s (antes saltaba a 0,68 fija). Sin la placa, así se ven discos de
+distinto tamaño según cuánto se mantenga, y en Helm se escucha el barrido
+completo del CC1 en lugar de un único valor.
+
+**Costo de dibujo**: el disco vivo suma un arco por frame mientras se aprieta,
+y el estampado es un arco por presión. Sigue siendo constante.
+
+El porqué de cada cambio, en detalle, está en
+[`prototipos/cambios_percusion_guante_midi_v2.md`](prototipos/cambios_percusion_guante_midi_v2.md).
 
 ## Las dos variantes
 
@@ -449,7 +522,15 @@ notas, que los tramos tengan ancho parejo, el jitter, y el cambio a 11 notas.
 
 ```
 node entorno-digital/tools/harness_midi.js entorno-digital/prototipo_percusion_guante_a_midi_dispositivo.html
+node entorno-digital/tools/harness_midi.js entorno-digital/prototipo_percusion_guante_a_midi_v2_dispositivo.html
 ```
+
+La `_v2_` pasa todas las verificaciones sin cambios en el harness. Su costo de
+dibujo da un arco más por frame que la anterior (~2,8 contra ~1,8): es el disco
+vivo, porque la prueba de pánico deja el FSR apretado en 0,8. El harness no
+verifica el ciclo de vida del disco (que aparezca, que se estampe con el mismo
+tamaño al soltar, que el ruido bajo el umbral no dibuje); eso se comprobó con
+una prueba aparte, no incorporada.
 
 ### 2. Verificación de sintaxis
 
@@ -487,6 +568,9 @@ se calibran `UMBRAL_ON`, el factor de diafonía y los sliders `PICO_MIN`/
 - **La diafonía mecánica entre los dos piezos es el riesgo abierto más grande.**
   El árbitro del firmware y la espuma la mitigan, pero puede que nunca haya
   separación perfecta.
+- **La `_midi_v2_` no se probó en Chrome**: el ciclo del disco se verificó en
+  Node, pero no se vio todavía en pantalla con el FSR real; los umbrales
+  0,06/0,03 hay que confirmarlos con el reposo real del sensor.
 - **La versión `_midi_` no se probó contra Helm real**: el harness valida el
   flujo de mensajes, pero el envío por Web MIDI necesita Chrome. Falta también
   armar el patch percusivo y elegir qué controla la rueda de modulación.
