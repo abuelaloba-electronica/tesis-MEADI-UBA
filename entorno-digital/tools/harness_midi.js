@@ -326,6 +326,80 @@ function verificar(nombre, ok, detalle) {
             vels.length === 2 && vels[0] < vels[1] && vels[1] === 127);
   mensajes.length = 0;
 
+  // --- 3b. Escala por intensidad ----------------------------------------
+  // Si la pagina tiene selector de escala, la intensidad elige la nota. Se
+  // verifica que el rango de calibracion se parta en tantos tramos como notas
+  // tenga la escala, que los tramos tengan ancho parejo, que el mismo golpe
+  // con la dispersion del piezo no salte entre muchas notas, y que cambiar de
+  // escala cambie la cantidad de notas.
+  const escalaSel = elementos.escalaSelect;
+  console.log("");
+  if (escalaSel && (escalaSel._oyentes.change || []).length > 0) {
+    const PMIN = 30, PMAX = 600;   // calibracion por defecto de la pagina
+    const notaDe = function (pico) {
+      mensajes.length = 0;
+      api.feedGolpe(0, pico);
+      avanzar(150);
+      const on = mensajes.find(function (x) { return esNoteOn(x.bytes); });
+      return on ? on.bytes[1] : -1;
+    };
+    // Barrido ascendente: cuantas notas aparecen y cuantos pasos ocupa cada una.
+    const barrer = function () {
+      const cuenta = new Map();
+      for (let i = 0; i <= 400; i++) {
+        const nota = notaDe(Math.round(PMIN + (PMAX - PMIN) * i / 400));
+        cuenta.set(nota, (cuenta.get(nota) || 0) + 1);
+      }
+      return cuenta;
+    };
+    const cambiarEscala = function (valor) {
+      escalaSel.value = valor;
+      escalaSel._oyentes.change.forEach(function (f) { f(); });
+    };
+
+    console.log("Escala por intensidad");
+    cambiarEscala("pentaMenor6");
+    notaDe(0);   // arranca desde abajo, para que la histeresis no arrastre nada
+    let cuenta = barrer();
+    const notas6 = Array.from(cuenta.keys()).sort(function (x, y) { return x - y; });
+    const anchos = Array.from(cuenta.values());
+    const desparejo = Math.max.apply(null, anchos) / Math.min.apply(null, anchos);
+    console.log("  pentatonica de 6: notas " + notas6.join(", ") +
+                "  ancho de cada tramo (pasos de 400): " + notas6.map(function (n) { return cuenta.get(n); }).join(", "));
+    verificar("el barrido recorre las 6 notas de la escala", notas6.length === 6,
+              notas6.length + " notas");
+    const intervalos = notas6.map(function (n) { return n - notas6[0]; }).join(",");
+    verificar("las notas son las de la pentatonica menor", intervalos === "0,3,5,7,10,12", intervalos);
+    // La histeresis corre los bordes un 15 %, asi que en un barrido ascendente
+    // el primer tramo queda un poco mas ancho y el ultimo un poco mas angosto
+    // (1,15 contra 0,85, cociente 1,35). Con tramos a la mitad en los extremos,
+    // como redondeaba la (b) con Web Audio, el cociente pasaria de 2,5.
+    verificar("los tramos tienen ancho parejo (cociente max/min < 1,5)", desparejo < 1.5,
+              desparejo.toFixed(2));
+
+    // Jitter: el mismo golpe repetido con la dispersion real estimada (+-8 %).
+    [0.25, 0.5, 0.75].forEach(function (centro) {
+      const vistas = new Set();
+      for (let i = 0; i < 200; i++) {
+        const ruido = 1 + (Math.random() * 2 - 1) * 0.08;
+        vistas.add(notaDe(Math.round((PMIN + centro * (PMAX - PMIN)) * ruido)));
+      }
+      verificar("golpe al " + (centro * 100) + " % con jitter +-8 %: a lo sumo 2 notas",
+                vistas.size <= 2, vistas.size + " nota(s)");
+    });
+
+    cambiarEscala("pentaMenor11");
+    notaDe(0);
+    cuenta = barrer();
+    verificar("con la escala de 11 notas el barrido recorre 11", cuenta.size === 11,
+              cuenta.size + " notas");
+    cambiarEscala("pentaMenor6");
+    avanzar(2000);
+    mensajes.length = 0;
+  } else {
+    console.log("Escala por intensidad: no aplica (la nota no depende de la intensidad en esta pagina)");
+  }
+
   // --- 4. Rafaga sobre la misma nota: retrigger -----------------------
   // Golpes cada 20ms, mas rapido que la compuerta de la nota: cada golpe cae
   // con la nota anterior todavia abierta.

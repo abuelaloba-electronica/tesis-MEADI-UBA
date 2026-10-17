@@ -147,3 +147,96 @@ o el filtro de CC repetidos, las pruebas correspondientes fallan.
 
 **Lo que no se probó**: el envío real a Helm. Este entorno no tiene Chrome, y
 Web MIDI no se puede ejercitar sin él.
+
+---
+
+# Segunda parte: la intensidad elige la nota
+
+Mismo archivo, `prototipo_percusion_guante_a_midi_dispositivo.html`,
+modificado en su lugar por pedido explícito. La versión de la primera parte
+(nota fija por dedo) queda en el historial de git, en el commit que agregó la
+página.
+
+El pedido: que los golpes no den siempre la misma nota, sino que el rango de
+lecturas del piezo se parta en tramos y cada tramo dispare una nota distinta.
+Es la idea de la variante (b), que hasta ahora sólo sonaba con Web Audio.
+
+Primero se probó como página aparte, una (b) con MIDI que tenía la notación
+de la (b): bandas horizontales con un cursor que avanza. Gustó el sonido pero
+no la imagen, así que esa página se descartó sin llegar a commitearse. Su
+manejo del sonido se integró acá, sobre la imagen de la (a): círculos en
+posiciones al azar, agrupados en los redobles.
+
+## 1 · Escala por intensidad, con tramos iguales de verdad
+
+`feedGolpe` ahora cuantiza la intensidad: `nota = TONICA[dedo] + GRADOS[g]`,
+con la tónica en A2 para el dedo 0 y en A3 para el dedo 1.
+
+**Tramos iguales.** El cuantizador de la (b) redondeaba `v·(n−1)`. Eso da
+tramos de ancho 1 en el medio pero de ancho ½ en los dos extremos, así que la
+nota más grave y la más aguda eran las más difíciles de tocar a propósito.
+Medido con el harness en un barrido ascendente de 400 pasos y seis notas:
+`53, 80, 80, 80, 80, 28` pasos por nota. Acá `x = v·n − 0.5` pone el centro de
+cada tramo en un entero y les da a todos el mismo ancho, que es lo que se
+había pedido ("partir el rango en segmentos"). Mismo barrido: `77, 67, 67,
+66, 67, 57`. La asimetría que queda es la histéresis, que en un barrido que
+sólo sube corre todos los bordes hacia arriba.
+
+**Histéresis.** Igual que en la (b): para salir de la nota que viene sonando
+hay que pasarse del borde un 15 % del tramo. Sin eso, un golpe que cae justo
+en el borde alternaría entre dos notas golpe a golpe.
+
+## 2 · Selector de escala: cuántas notas y cuáles
+
+| Opción | Notas | Por qué está |
+|---|---|---|
+| Pentatónica menor · 6 | `0,3,5,7,10,12` | la de la (b), punto de partida |
+| Pentatónica menor · 11 | dos octavas | la versión "diez segmentos" del pedido. El harness de golpes ya había medido que la histéresis la sostiene con ±8 % de jitter |
+| Pentatónica mayor · 6 | `0,2,4,7,9,12` | mismo tamaño, carácter más luminoso: para comparar a oído |
+| Mayor · 8 | do-re-mi-fa-sol-la-si-do | la escala más reconocible |
+| Cromática · 13 | todas | **contraste**: tiene notas a un semitono, y se escucha por qué las otras no |
+
+Por qué escalas y no notas consecutivas: con tramos que avanzaran de a una
+nota (la cromática), cualquier secuencia de golpes chocaría. Las pentatónicas
+no tienen ningún par de notas a un semitono, así que tocadas en cualquier
+orden suenan a música. Por eso una de ellas es el valor por defecto.
+
+Cambiar de escala reinicia la histéresis pero **no limpia el lienzo**: en la
+imagen de la (a) los círculos no dependen de la nota. En la (b) descartada sí
+había que limpiar, porque cambiaba la cantidad de bandas.
+
+## 3 · Tabla de tramos en el panel
+
+Muestra, para la escala y la calibración actuales, qué rango de pico crudo
+dispara qué nota en cada dedo, y resalta la fila del último golpe. Se rearma
+al mover `picoMin` o `picoMax`. Sirve para entender el instrumento sin saber
+música, y para calibrar con el guante puesto: golpear "suave" y ver si cae en
+la fila de abajo.
+
+## 4 · Velocity plana
+
+Pasó de `13 + 114·v^1.6` a `58 + 69·v`, la misma ley que la amplitud de la
+(b) con Web Audio (`0.25 + 0.30·v`, de 45 % a 100 %) llevada a 1–127. Si la
+intensidad eligiera la nota **y además** dominara el volumen, sería imposible
+tocar una nota aguda suave.
+
+## 5 · Lo que no cambió: la imagen
+
+`dibujarGolpe(dedo, v)` sigue recibiendo la intensidad continua. El tamaño y
+la opacidad del círculo no se cuantizan, y quedan coherentes con el sonido:
+un círculo más grande es un golpe más fuerte, y por lo tanto una nota más
+aguda.
+
+## Validación
+
+`harness_midi.js` ganó una sección que corre si la página tiene selector de
+escala:
+
+- el barrido recorre las 6 notas, que son exactamente la pentatónica menor;
+- tramos parejos: el cociente entre el tramo más ancho y el más angosto es
+  1,35. Con el redondeo de la (b) da 2,86, y la prueba falla (se comprobó);
+- el mismo golpe repetido con ±8 % de jitter da 1–2 notas;
+- con la escala de 11 notas, el barrido recorre 11.
+
+Todo lo de la primera parte (notas colgadas, retrigger, CC, pánico, costo de
+dibujo) sigue pasando. Sigue sin probarse contra Helm real.

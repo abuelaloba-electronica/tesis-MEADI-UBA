@@ -27,7 +27,7 @@ golpe es justamente lo que da la expresión.
 |---|---|---|---|
 | `prototipo_percusion_guante_a.html` | (a) nota fija por dedo | pads y sliders manuales | Web Audio |
 | `prototipo_percusion_guante_a_dispositivo.html` | (a) | Web Serial | Web Audio |
-| `prototipo_percusion_guante_a_midi_dispositivo.html` | (a) | Web Serial | **Helm**, por Web MIDI |
+| `prototipo_percusion_guante_a_midi_dispositivo.html` | imagen de (a); la intensidad elige la nota de una escala elegible | Web Serial | **Helm**, por Web MIDI |
 | `prototipo_percusion_guante_b.html` | (b) pentatónica por intensidad | pads y sliders manuales | Web Audio |
 | `prototipo_percusion_guante_b_dispositivo.html` | (b) | Web Serial | Web Audio |
 
@@ -210,9 +210,12 @@ justamente los ataques, que es lo único que hace que un golpe suene a golpe.
 
 ## Sonido en Helm por MIDI
 
-`prototipo_percusion_guante_a_midi_dispositivo.html` es la variante (a) con el
-sonido delegado a **Helm** corriendo en paralelo como aplicación standalone.
-La página no produce ningún sonido; la imagen es idéntica. El porqué de cada
+`prototipo_percusion_guante_a_midi_dispositivo.html` tiene la imagen de la
+variante (a) y el sonido delegado a **Helm**, que corre en paralelo como
+aplicación standalone. La página no produce ningún sonido. A diferencia de la
+(a) con Web Audio, la nota no es fija por dedo: la intensidad del golpe elige
+una nota de una escala (ver abajo), y la misma intensidad sigue dando el
+tamaño y la opacidad del círculo. El porqué de cada
 decisión está en
 [`prototipos/cambios_percusion_guante_midi.md`](prototipos/cambios_percusion_guante_midi.md).
 
@@ -224,10 +227,42 @@ dispositivo2 ──USB serie──→ página (Web Serial) ──→ dibujo
 
 | Entrada | Mensaje MIDI |
 |---|---|
-| golpe del dedo 0 | noteOn 45 (A2), canal 1, velocity `13 + 114·v^1.6`; noteOff a los 80 ms |
-| golpe del dedo 1 | noteOn 57 (A3), ídem |
+| golpe | noteOn de la nota del tramo de intensidad donde cayó el golpe, dentro de la escala elegida (desde A2 el dedo 0, desde A3 el dedo 1), canal 1, velocity plana `58 + 69·v`; noteOff a los 80 ms |
 | FSR | CC1 (rueda de modulación) 0–127, sólo cuando cambia |
 | cerrar la página, cambiar de puerto, desconectar, botón de pánico | noteOff pendientes + CC123 + CC120 + CC1 = 0 |
+
+### Escala elegible y tabla de tramos
+
+La página parte el rango de calibración (`picoMin`–`picoMax`) en tantos
+tramos **iguales** como notas tenga la escala, y cada tramo dispara una nota.
+Se elige la escala en el panel: pentatónica menor de 6 notas (por defecto) o
+de 11 (dos octavas), pentatónica mayor de 6, mayor de 8, o cromática de 13
+como contraste. Debajo, una tabla muestra qué rango de pico dispara qué nota
+en cada dedo y resalta la del último golpe. Cambiar de escala no limpia el
+lienzo: los círculos no dependen de la nota.
+
+Para alguien sin formación musical, alcanza con esto:
+
+- **Nota MIDI** es un número: 60 es el do central del piano, y sumar 1 sube
+  una tecla (blanca o negra). Sumar 12 da la misma nota una **octava** más
+  aguda.
+- **Escala** es la lista de notas permitidas. En vez de usar las 12 de cada
+  octava, se usa un subconjunto que suena bien en cualquier orden.
+- **Pentatónica** es una escala de 5 notas por octava (6 contando la repetición
+  de arriba) sin ningún par de notas pegadas: por eso cualquier secuencia de
+  golpes suena a música. Es la escala de muchas músicas tradicionales y del
+  blues.
+- **Velocity** es la fuerza con que se "aprieta la tecla" (1–127). Acá la
+  fuerza ya eligió la nota, así que la velocity varía poco: si además
+  dominara el volumen, sería imposible tocar una nota aguda suave.
+
+Cuántas notas usar es un compromiso: más notas son tramos más angostos, y un
+mismo golpe repetido cae más fácil en dos notas distintas. Una histéresis (un
+15 % de margen para cambiar de nota) lo contiene, y el harness muestra 1–2
+notas por golpe repetido con ±8 % de dispersión, tanto con 6 como con 11.
+Detalle en
+[`prototipos/cambios_percusion_guante_midi.md`](prototipos/cambios_percusion_guante_midi.md),
+segunda parte.
 
 ### Puesta en marcha
 
@@ -256,8 +291,8 @@ Un patch de teclado no suena a golpe. Lo mínimo para que sea percusivo:
   (0,1–0,5 s), release igual al decay. Con sustain 0 la duración de la nota no
   importa, y con release = decay un retrigger corta la nota anterior sin que
   se note.
-- **`velocity_track` al máximo**: es lo que hace que la intensidad del golpe
-  se escuche. La ley de velocity de la página ya trae la curva perceptiva.
+- **`velocity_track` al máximo**: la velocity que manda la página ya es
+  plana (de 45 % a 100 %), así que Helm sólo tiene que respetarla.
 - **Rueda de modulación → distorsión**: activar la distorsión de Helm y
   arrastrar la fuente *mod wheel* al `distortion_drive` (y, si se quiere, al
   corte del filtro). Es la contraparte del efecto global del FSR sobre la
@@ -409,7 +444,8 @@ Para la versión `_midi_` está su hermano `tools/harness_midi.js`: con un
 `MIDIAccess` falso verifica que no se construya ningún `AudioContext`, que
 todo noteOn tenga su noteOff, que un retrigger cierre la nota anterior antes
 del noteOn nuevo, que el FSR mande CC sólo al cambiar, el pánico al cerrar la
-página y el costo de dibujo.
+página y el costo de dibujo. Y la escala: que el barrido recorra todas las
+notas, que los tramos tengan ancho parejo, el jitter, y el cambio a 11 notas.
 
 ```
 node entorno-digital/tools/harness_midi.js entorno-digital/prototipo_percusion_guante_a_midi_dispositivo.html

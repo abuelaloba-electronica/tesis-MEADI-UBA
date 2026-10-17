@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Percusión · Guante (a) · Helm por MIDI — dispositivo real</title>
+<title>Percusión · Guante (a) · escala por intensidad, Helm por MIDI — dispositivo real</title>
 <style>
   :root {
     --panel-bg: rgba(255,255,255,0.94);
@@ -172,8 +172,22 @@
   #hit1Fill { background: #e0a12a; }
 
   #midiSelect { width: 100%; margin-top: 8px; }
+  #escalaSelect { width: 100%; }
+  #tablaRangos {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 8px;
+    font-size: 10.5px;
+    font-variant-numeric: tabular-nums;
+  }
+  #tablaRangos th {
+    text-align: left; font-weight: 600; color: #777;
+    border-bottom: 1px solid var(--line); padding: 2px 4px;
+  }
+  #tablaRangos td { padding: 1px 4px; color: #555; }
+  #tablaRangos tr.ultima td { background: #fdeaf3; color: var(--ink); font-weight: 600; }
   .color-row { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
-  #colorSelect, #midiSelect {
+  #colorSelect, #midiSelect, #escalaSelect {
     flex: 1;
     padding: 6px 8px;
     font-size: 11.5px;
@@ -262,7 +276,7 @@
     </span>
   </div>
   <div id="panelBody">
-  <p class="subtitle">MAEDI — nota fija por dedo, leyendo el dispositivo real por USB; el sonido lo genera Helm por MIDI</p>
+  <p class="subtitle">MAEDI — la intensidad del golpe elige la nota de una escala y el tamaño del círculo, leyendo el dispositivo real por USB; el sonido lo genera Helm por MIDI</p>
 
   <div class="section-title">Conexión con el dispositivo</div>
   <button id="connectBtn">Conectar dispositivo (USB)</button>
@@ -286,14 +300,27 @@
 
   <div class="section-title">Calibración de intensidad</div>
   <div class="row">
-    <label><span>Pico mínimo (golpe suave)</span><span class="val" id="picoMinVal">30</span></label>
+    <label><span>Pico mínimo (golpe suave, nota más grave)</span><span class="val" id="picoMinVal">30</span></label>
     <input type="range" id="picoMin" min="0" max="400" step="5" value="30">
   </div>
   <div class="row">
-    <label><span>Pico máximo (golpe fuerte)</span><span class="val" id="picoMaxVal">600</span></label>
+    <label><span>Pico máximo (golpe fuerte, nota más aguda)</span><span class="val" id="picoMaxVal">600</span></label>
     <input type="range" id="picoMax" min="100" max="1023" step="10" value="600">
   </div>
-  <div class="note">El sketch manda el pico crudo del piezo (0–1023). Este rango es el que se estira a 0–1 para la velocity que recibe Helm y para el tamaño y la opacidad del círculo. Ajustarlo tocando.</div>
+  <div class="note">El sketch manda el pico crudo del piezo (0–1023). Este rango se parte en tantos tramos iguales como notas tenga la escala: cada tramo es una nota. El mismo rango se estira a 0–1 para el tamaño y la opacidad del círculo. Ajustarlo tocando.</div>
+
+  <hr class="divider">
+
+  <div class="section-title">Escala: cuántas notas y cuáles</div>
+  <select id="escalaSelect">
+    <option value="pentaMenor6" selected>Pentatónica menor · 6 notas (1 octava)</option>
+    <option value="pentaMenor11">Pentatónica menor · 11 notas (2 octavas)</option>
+    <option value="pentaMayor6">Pentatónica mayor · 6 notas (1 octava)</option>
+    <option value="mayor8">Mayor (do-re-mi) · 8 notas (1 octava)</option>
+    <option value="cromatica13">Cromática · 13 notas (todas, más disonante)</option>
+  </select>
+  <table id="tablaRangos"><thead><tr><th>Pico</th><th>Dedo 0</th><th>Dedo 1</th></tr></thead><tbody id="tablaRangosBody"></tbody></table>
+  <div class="note">Cada fila es un tramo del rango de calibración y la nota que dispara en cada dedo. Se resalta la del último golpe. Para cambiar de nota hay que pasar el borde del tramo por un 15 %: así un golpe que cae justo en el borde no alterna entre dos notas.</div>
 
   <hr class="divider">
 
@@ -323,11 +350,11 @@
     <label><span>Fuerza → CC1 (rueda de modulación)</span><span class="val" id="ccVal">—</span></label>
   </div>
   <button class="plain" id="panicBtn">Silenciar todo (pánico)</button>
-  <div class="note">La página no produce sonido: manda nota 45 (dedo 0) y 57 (dedo 1) por el canal 1, con la intensidad del golpe como velocity, y la presión del FSR como CC1. En Linux, elegir <b>Midi Through</b> acá y la misma entrada en Helm. El volumen y la latencia de audio se ajustan en Helm.</div>
+  <div class="note">La página no produce sonido: manda la nota del tramo donde cayó el golpe por el canal 1, y la presión del FSR como CC1. En Linux, elegir <b>Midi Through</b> acá y la misma entrada en Helm. El volumen y la latencia de audio se ajustan en Helm.</div>
 
   <hr class="divider">
   <button class="plain" id="resetBtn">Limpiar lienzo</button>
-  <div id="hint">Teclas <b>A</b> y <b>L</b> disparan los dedos 0 y 1 sin la placa (intensidad al azar), y <b>F</b> mantenida simula la presión del FSR. Sirve para diseñar el patch de Helm sin el guante.</div>
+  <div id="hint">Teclas <b>A</b> y <b>L</b> disparan los dedos 0 y 1 sin la placa (intensidad al azar, o sea nota al azar), y <b>F</b> mantenida simula la presión del FSR. Sirve para diseñar el patch de Helm sin el guante.</div>
   </div>
 </div>
 
@@ -442,9 +469,34 @@
   const ALPHA_MIN = 0.08;    // piso heredado del prototipo anterior: un golpe suave
                              // nunca queda invisible
 
-  // Nota fija por dedo: dedo 0 grave (MIDI 45, A2), dedo 1 agudo (MIDI 57, A3).
-  const NOTA_DEDO = [45, 57];
-  const NOMBRE_NOTA = ["A2", "A3"];
+  // Escalas: cada una es la lista de distancias, en semitonos, desde la nota
+  // mas grave del dedo (la tonica). Un semitono es el paso mas chico del
+  // piano (de una tecla a la siguiente, blanca o negra) y en MIDI es sumar 1
+  // al numero de nota; 12 semitonos son una octava, la misma nota mas aguda.
+  //
+  // Usar una escala y no notas consecutivas es lo que hace que cualquier
+  // secuencia de golpes suene a musica: las pentatonicas no tienen ningun par
+  // de notas a un semitono de distancia, que es el choque mas aspero. Por eso
+  // la cromatica (todas las notas) queda como contraste, para escuchar la
+  // diferencia.
+  //
+  // Cuantas notas usar es un compromiso con la dispersion del piezo: aun con
+  // el filtro RC, el pico tiene 5-8 % de dispersion entre golpes iguales.
+  // Con mas notas los tramos son mas angostos y es mas facil que un mismo
+  // golpe caiga en dos notas distintas. El harness de golpes midio que la
+  // histeresis sostiene hasta 11 notas con +-8 % de jitter; con la dispersion
+  // real medida en el guante, decidir cual queda.
+  const ESCALAS = {
+    pentaMenor6:  [0, 3, 5, 7, 10, 12],
+    pentaMenor11: [0, 3, 5, 7, 10, 12, 15, 17, 19, 22, 24],
+    pentaMayor6:  [0, 2, 4, 7, 9, 12],
+    mayor8:       [0, 2, 4, 5, 7, 9, 11, 12],
+    cromatica13:  [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+  };
+  let GRADOS = ESCALAS.pentaMenor6;
+  const TONICA = [45, 57];   // dedo 0 desde A2 (registro grave), dedo 1 una octava arriba
+  const NOMBRES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+
 
   function hexToRgb(hex) {
     const clean = hex.replace("#", "");
@@ -461,6 +513,34 @@
 
   function intensidadAAlpha(v) {
     return ALPHA_MIN + Math.min(1, Math.max(0, v)) * (1 - ALPHA_MIN);
+  }
+
+  // Numero de nota MIDI -> nombre en notacion inglesa (A = la, C = do). El
+  // numero final es la octava: A2 es el la grave, A3 el siguiente hacia arriba.
+  function nombreNota(nota) {
+    return NOMBRES[((nota % 12) + 12) % 12] + (Math.floor(nota / 12) - 1);
+  }
+
+  // Cuantizador: parte la intensidad 0-1 en n tramos IGUALES, uno por nota.
+  // La variante (b) con Web Audio redondeaba v*(n-1), lo que deja los dos
+  // tramos de los extremos a la mitad de ancho: la nota mas grave y la mas
+  // aguda eran las mas dificiles de tocar a proposito. Aca x = v*n - 0.5 pone
+  // el centro de cada tramo en un entero, con el mismo ancho para todos.
+  //
+  // Con histeresis: sin ella, una intensidad que cae justo sobre un borde
+  // alterna entre dos notas golpe a golpe y se escucha como temblor. El borde
+  // natural esta a 0.5 de distancia; exigir 0.65 equivale a pedir un 15 % del
+  // tramo de mas para cambiar de nota.
+  const gradoPrevio = [-1, -1];
+  function cuantizar(dedo, v) {
+    const n = GRADOS.length;
+    const x = v * n - 0.5;
+    let g = Math.round(x);
+    const prev = gradoPrevio[dedo];
+    if (prev >= 0 && Math.abs(x - prev) < 0.65) g = prev;
+    g = Math.min(n - 1, Math.max(0, g));
+    gradoPrevio[dedo] = g;
+    return g;
   }
 
   // ===============================================================
@@ -480,7 +560,7 @@
   // ===============================================================
   // Salida MIDI hacia Helm (Web MIDI API, sin dependencias externas)
   //
-  //   feedGolpe ─→ noteOn(nota del dedo, velocity) ... noteOff a los GATE_MS
+  //   feedGolpe ─→ noteOn(nota del tramo, velocity) ... noteOff a los GATE_MS
   //   feedForce ─→ CC1 (rueda de modulacion), solo cuando cambia
   //
   // La pagina no tiene voz propia: Helm corre en paralelo como aplicacion
@@ -496,8 +576,7 @@
   const GATE_MS = 80;        // duracion de la nota. En un patch percusivo
                              // (sustain 0, release ~ decay) no se escucha: solo
                              // tiene que ser mas corta que el golpe siguiente
-  const VEL_MIN = 13;        // piso de velocity: el 10 % del maximo, igual que
-                             // el piso 0.05/0.5 que tenia la voz de Web Audio
+  const VEL_MIN = 58;        // ley PLANA, ver velocity()
   const TAU = 0.03;          // suavizado de la fuerza visual (ver draw())
   const CLAVE_PUERTO = "guanteMidiPuerto";
 
@@ -507,14 +586,14 @@
   let ultimoCC = -1;         // ultimo valor de CC enviado; -1 = ninguno todavia
   const compuertas = {};     // nota -> timer del noteOff pendiente
 
-  // Intensidad -> velocity. Misma ley que la amplitud de la voz anterior
-  // (exponente 1.6: el ADC es lineal en fuerza y el oido logaritmico en
-  // sonoridad), suponiendo que Helm escala la amplitud linealmente con la
-  // velocity (velocity_track al maximo). 0 no se puede mandar: noteOn con
-  // velocity 0 significa noteOff.
+  // Intensidad -> velocity. Plana: la intensidad ya eligio la nota, asi que si ademas dominara el volumen seria
+  // fisicamente imposible tocar una nota aguda suave y la escala perderia
+  // sentido. Es la misma ley que la amplitud de la (b) con Web Audio
+  // (0.25 + 0.30*v, o sea de 45 % a 100 %), trasladada a 58-127. 0 no se
+  // puede mandar: noteOn con velocity 0 significa noteOff.
   function velocity(v) {
     const x = Math.min(1, Math.max(0, v));
-    return Math.max(1, Math.min(127, Math.round(VEL_MIN + (127 - VEL_MIN) * Math.pow(x, 1.6))));
+    return Math.max(1, Math.min(127, Math.round(VEL_MIN + (127 - VEL_MIN) * x)));
   }
 
   function enviar(bytes) {
@@ -694,9 +773,11 @@
   window.feedGolpe = function (dedo, pico) {
     const d = (dedo === 1 || dedo === "1") ? 1 : 0;
     const v = picoAIntensidad(pico);
-    dispararNota(NOTA_DEDO[d], v);
-    dibujarGolpe(d, v);
-    registrarGolpe(d, pico, v);
+    const g = cuantizar(d, v);
+    const nota = TONICA[d] + GRADOS[g];
+    dispararNota(nota, v);
+    dibujarGolpe(d, v);      // el dibujo de (a) sigue usando la intensidad continua
+    registrarGolpe(d, pico, v, nota, g);
   };
 
   // Lectura del FSR normalizada a 0-1.
@@ -974,11 +1055,51 @@
   picoMinSlider.addEventListener("input", function () {
     picoMin = parseInt(picoMinSlider.value, 10);
     picoMinValEl.textContent = String(picoMin);
+    armarTablaRangos();
   });
   picoMaxSlider.addEventListener("input", function () {
     picoMax = parseInt(picoMaxSlider.value, 10);
     picoMaxValEl.textContent = String(picoMax);
+    armarTablaRangos();
   });
+
+  // Tabla de tramos: que pico crudo dispara que nota. Es la respuesta
+  // explicita a "en que rango cayo el golpe", y se rearma al mover la
+  // calibracion o cambiar de escala. Los bordes son los nominales; la
+  // histeresis los corre un 15 % hacia afuera de la nota que viene sonando.
+  const tablaRangosBody = document.getElementById("tablaRangosBody");
+  let filasRangos = [];
+  function armarTablaRangos() {
+    const n = GRADOS.length;
+    const rango = picoMax - picoMin;
+    tablaRangosBody.innerHTML = "";
+    filasRangos = [];
+    // De la nota mas aguda a la mas grave.
+    for (let g = n - 1; g >= 0; g--) {
+      const desde = Math.round(picoMin + rango * g / n);
+      const hasta = Math.round(picoMin + rango * (g + 1) / n);
+      const textoPico = (g === 0 ? "≤ " + hasta : g === n - 1 ? "≥ " + desde : desde + "–" + hasta);
+      const tr = document.createElement("tr");
+      [textoPico, nombreNota(TONICA[0] + GRADOS[g]), nombreNota(TONICA[1] + GRADOS[g])]
+        .forEach(function (txt) {
+          const td = document.createElement("td");
+          td.textContent = txt;
+          tr.appendChild(td);
+        });
+      tablaRangosBody.appendChild(tr);
+      filasRangos[g] = tr;
+    }
+  }
+
+  const escalaSelect = document.getElementById("escalaSelect");
+  escalaSelect.addEventListener("change", function () {
+    const nueva = ESCALAS[escalaSelect.value];
+    if (!nueva) return;
+    GRADOS = nueva;
+    gradoPrevio[0] = gradoPrevio[1] = -1;   // la histeresis no se arrastra entre escalas
+    armarTablaRangos();
+  });
+  armarTablaRangos();
 
   document.getElementById("resetBtn").addEventListener("click", function () {
     pintarFondo();
@@ -1001,16 +1122,17 @@
   const midiCountValEl = document.getElementById("midiCountVal");
   const ccValEl = document.getElementById("ccVal");
 
-  function registrarGolpe(dedo, pico, v) {
+  function registrarGolpe(dedo, pico, v, nota, g) {
     golpes++;
     countValEl.textContent = String(golpes);
-    hitVal[dedo].textContent = pico + " · " + Math.round(v * 100) + "%";
+    hitVal[dedo].textContent = pico + " · " + nombreNota(nota);
     hitFill[dedo].style.width = Math.round(v * 100) + "%";
     const rgb = colorDedo[dedo];
     swatchEl.style.background =
       "rgba(" + rgb[0] + "," + rgb[1] + "," + rgb[2] + "," + intensidadAAlpha(v).toFixed(2) + ")";
     lastValEl.textContent =
-      "dedo " + dedo + " · " + NOMBRE_NOTA[dedo] + " · vel " + velocity(v);
+      "dedo " + dedo + " · " + nombreNota(nota) + " · vel " + velocity(v);
+    filasRangos.forEach(function (tr, i) { tr.className = (i === g) ? "ultima" : ""; });
   }
 
   function actualizarLecturas() {

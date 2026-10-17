@@ -104,7 +104,8 @@ No hay suite de tests. Tres técnicas, en orden de costo:
    La página `_midi_` no tiene voz propia (el sonido lo hace Helm, que corre
    en paralelo y recibe los golpes por Web MIDI): para ella está
    `entorno-digital/tools/harness_midi.js`, que con un `MIDIAccess` falso
-   verifica notas colgadas, retrigger, CC del FSR y pánico.
+   verifica notas colgadas, retrigger, CC del FSR, pánico y el reparto de la
+   intensidad en tramos de la escala.
 2. **Captura headless con Firefox** para confirmar que la página renderiza:
    `firefox --headless --profile <dir-nuevo> --window-size=1280,800
    --screenshot <salida>.png "file:///<ruta>"`. Cuidado: dispara antes del
