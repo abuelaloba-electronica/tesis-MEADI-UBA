@@ -26,7 +26,7 @@ que envía. El navegador no se enteró y no tiene que enterarse.
 | Dispositivo | Placa | Sensores / actuadores | Emite | Frecuencia | Lo consume |
 |---|---|---|---|---|---|
 | `dispositivo1` | Adafruit Flora V3 (ATmega32u4) | LSM6DSO32 por I2C (acelerómetro, ±4 g); tira de 13 LEDs WS2812B en D6 | `A:<x>,<y>,<z>` en g | ~33/s | `entorno-digital/bandada_prototipo_v5a_dispositivo.html` (y las v4a/v4b anteriores) |
-| `dispositivo2` | LilyPad Arduino USB (ATmega32u4, 8 MHz) | 2 piezos de guante (A2, A3) + FSR (A4) | `F:<0-1023>` y `G:<dedo>,<pico>` | ~50/s y por golpe | `entorno-digital/prototipo_percusion_guante_{a,b}[_dispositivo].html`, `..._a_midi_dispositivo.html` y `..._a_midi_v2_dispositivo.html` (sonido en Helm; la v2 dibuja el FSR como disco azul) |
+| `dispositivo2` | LilyPad Arduino USB (ATmega32u4, 8 MHz) | 2 piezos de guante (A2, A3) + FSR (A4) | `F:<0-1023>` y `G:<dedo>,<pico>` | ~50/s y por golpe | `entorno-digital/prototipo_percusion_guante_a[_dispositivo].html`, `..._a_midi_dispositivo.html` y `..._a_midi_v2_dispositivo.html` (sonido en Helm; la v2 dibuja el FSR como disco azul) |
 | `dispositivo3` | LilyPad Arduino USB (ATmega32u4, 8 MHz) | AD8232 en la pantorrilla (A2, leads-off en 2 y 3) | `E:<amplitud MAV>` y `L:<0\|1>` | 50/s y al cambiar | todavía ninguna (candidatos: `prototipos/prototipo_emg_*.html`) |
 
 Las páginas ignoran en silencio cualquier línea que no reconozcan, así que los
@@ -97,7 +97,7 @@ No hay suite de tests. Tres técnicas, en orden de costo:
    `asegurarAudio()`; construirlo en el cuerpo del script rompería el harness.
 
    ```
-   node entorno-digital/tools/harness_golpes.js entorno-digital/prototipo_percusion_guante_b_dispositivo.html
+   node entorno-digital/tools/harness_golpes.js entorno-digital/prototipo_percusion_guante_a_dispositivo.html
    node entorno-digital/tools/harness_golpes.js <archivo.html> --golpes=500 --jitter=0.08
    ```
 
@@ -152,6 +152,6 @@ Verificación de sintaxis rápida: extraer el `<script>` a un `.js` y correr
 | cualquier visualización | `entorno-digital/README.md` |
 | la bandada (física, señal, constantes de ajuste) | `entorno-digital/README.md` + `entorno-digital/prototipos/cambios_bandada_v4.md` |
 | la bandada v5a (arranque quieto, campo continuo, encuadre) | `entorno-digital/prototipos/cambios_bandada_v5.md` |
-| el guante: circuito, audio, las dos variantes | `entorno-digital/documentacion_percusion_guante.md` |
+| el guante: circuito, audio, variantes | `entorno-digital/documentacion_percusion_guante.md` |
 | el guante con Helm por MIDI | `entorno-digital/prototipos/cambios_percusion_guante_midi.md` (y `..._midi_v2.md`, el FSR como disco) |
 | visualizaciones sin hardware todavía (EMG, estiramiento) | `entorno-digital/prototipos/propuesta_*.md` |

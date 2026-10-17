@@ -1,4 +1,4 @@
-# Documentación: `prototipo_percusion_guante_{a,b}[_dispositivo].html`
+# Documentación: `prototipo_percusion_guante_a[_dispositivo].html`
 
 Y sus variantes con Helm, `prototipo_percusion_guante_a_midi[_v2]_dispositivo.html`.
 
@@ -26,7 +26,7 @@ De ahí sale el gesto y el circuito base. Lo que **no** tomamos es su detección
 —un umbral binario que manda siempre velocity 127— porque acá la intensidad del
 golpe es justamente lo que da la expresión.
 
-## Los seis archivos
+## Los cuatro archivos
 
 | Archivo | Variante musical | Datos | Sonido |
 |---|---|---|---|
@@ -34,12 +34,9 @@ golpe es justamente lo que da la expresión.
 | `prototipo_percusion_guante_a_dispositivo.html` | (a) | Web Serial | Web Audio |
 | `prototipo_percusion_guante_a_midi_dispositivo.html` | imagen de (a); la intensidad elige la nota de una escala elegible | Web Serial | **Helm**, por Web MIDI |
 | `prototipo_percusion_guante_a_midi_v2_dispositivo.html` | igual que la anterior; cambia la imagen: los dos dedos son anillos y el FSR dibuja un disco azul propio | Web Serial | **Helm**, por Web MIDI |
-| `prototipo_percusion_guante_b.html` | (b) pentatónica por intensidad | pads y sliders manuales | Web Audio |
-| `prototipo_percusion_guante_b_dispositivo.html` | (b) | Web Serial | Web Audio |
 
-Las cuatro páginas con Web Audio comparten la misma cadena de audio, y las seis
-el mismo motor de dibujo; lo único que cambia entre (a) y (b) es de dónde sale
-la nota y, en consecuencia, qué representa la imagen. Las versiones `_midi_` no
+Las dos páginas con Web Audio comparten la misma cadena de audio, y las cuatro
+el mismo motor de dibujo. Las versiones `_midi_` no
 tienen voz propia: ver [Sonido en Helm por MIDI](#sonido-en-helm-por-midi). La
 `_midi_v2_` sólo cambia la imagen: ver [El FSR como disco azul](#el-fsr-como-disco-azul-versión-_midi_v2_).
 
@@ -414,9 +411,7 @@ y el estampado es un arco por presión. Sigue siendo constante.
 El porqué de cada cambio, en detalle, está en
 [`prototipos/cambios_percusion_guante_midi_v2.md`](prototipos/cambios_percusion_guante_midi_v2.md).
 
-## Las dos variantes
-
-### (a) Nota fija por dedo — una pintura
+## La variante (a): nota fija por dedo — una pintura
 
 Dedo 0 en A2 (MIDI 45), dedo 1 en A3 (57). La intensidad controla volumen,
 brillo y decay, con ley `0.05 + 0.45·v^1.6`. El exponente mayor que 1 compensa
@@ -433,31 +428,12 @@ dibuja cerca de él, no al azar en toda la pantalla. Un redoble dibuja una
 constelación y los golpes espaciados se dispersan — el gesto rítmico se vuelve
 visible sin ninguna estructura de datos nueva.
 
-### (b) Pentatónica por intensidad — una notación
-
-Escala menor pentatónica (`[0,3,5,7,10,12]`, seis grados) con el dedo 0 sobre A2
-y el dedo 1 sobre A3. La intensidad del golpe elige la **altura de la nota**.
-
-Dos ajustes obligatorios respecto de (a):
-
-- **La ley de amplitud se aplana** a `0.25 + 0.30·v`. Con la ley agresiva de (a)
-  sería físicamente imposible tocar una nota aguda suave: la altura y el volumen
-  quedarían atados y la escala perdería sentido.
-- **El cuantizador tiene histéresis**: no cambia de grado hasta pasar el borde
-  por un 15 % del paso. Sin ella, una intensidad que cae justo sobre un borde
-  alterna entre dos notas golpe a golpe y se escucha como temblor.
-
-Como la intensidad ahora es una magnitud **discreta y musical**, la imagen tiene
-que mostrar esa discretización o miente: **la altura de la nota es la altura en
-pantalla**. Bandas horizontales, una por grado; el dedo determina el registro
-(dedo 0 en la mitad inferior, dedo 1 en la superior); y la x avanza con el
-tiempo, con una franja delgada borrándose por delante del cursor para que el
-pentagrama se recicle sin que la tinta vieja ensucie la pasada nueva. El lienzo
-acumulado se vuelve literalmente una partitura de lo que se tocó. El tamaño de
-la marca pasa a ser constante, porque la intensidad ya se gastó en la altura.
-
-Esa diferencia es lo que justifica que sean dos variantes y no dos presets: (a)
-es una pintura de energía y ritmo, (b) es una notación.
+Hubo una variante (b), con la pentatónica por intensidad sonando en Web Audio
+y una imagen de partitura (bandas horizontales y un cursor que avanza). Se
+eliminó: su manejo del sonido —escala por intensidad, velocity plana,
+histéresis— sigue vivo en las páginas `_midi_` (ver
+[Escala elegible y tabla de tramos](#escala-elegible-y-tabla-de-tramos)), y la
+imagen de partitura se descartó. Queda en el historial de git.
 
 ## Latencia
 
@@ -495,15 +471,17 @@ La idea: **el grafo de Web Audio es contabilidad de JavaScript puro**, así que
 se puede verificar entero sin producir un solo sonido.
 
 ```
-node entorno-digital/tools/harness_golpes.js entorno-digital/prototipo_percusion_guante_b_dispositivo.html
+node entorno-digital/tools/harness_golpes.js entorno-digital/prototipo_percusion_guante_a_dispositivo.html
 node entorno-digital/tools/harness_golpes.js <archivo.html> --golpes=500 --jitter=0.08 --frames=600
 ```
 
 Verifica: que no queden nodos sin liberar tras 500 golpes, que todo `start()`
 tenga su `stop()`, que el robo de voz acote la polifonía en ráfaga, que la
 cantidad de `arc()` por frame no crezca con el historial, que cada lectura de
-FSR mueva los cinco parámetros con rampa suave, y —en la variante (b)— cuántas
-notas distintas salen de un mismo golpe cuando se le inyecta jitter.
+FSR mueva los cinco parámetros con rampa suave, y —si la página cuantiza la
+intensidad en una escala— cuántas notas distintas salen de un mismo golpe
+cuando se le inyecta jitter. Con la (a) esa última sección no aplica: la nota
+no depende de la intensidad.
 
 Esto **ya encontró un bug**: `robarVoz()` tomaba siempre `voces[0]`, que sigue
 en el array hasta que corre su `onended`, así que en ráfaga robaba la misma voz
@@ -538,7 +516,7 @@ Extraer el `<script>` a un `.js` y correr `node --check`.
 
 ### 3. Chrome o Edge, sin hardware
 
-Abrir cualquiera de las cuatro páginas y disparar con las teclas **A** y **L**
+Abrir cualquiera de las páginas y disparar con las teclas **A** y **L**
 (dedos 0 y 1) y **F** mantenida (presión del FSR); en las simuladas, además, los
 pads clicables y el slider. Es la única forma de **escuchar** el diseño de audio
 hoy. Confirmar: sin clicks en los ataques, la distorsión barre sin escalones, el
@@ -557,14 +535,12 @@ se calibran `UMBRAL_ON`, el factor de diafonía y los sliders `PICO_MIN`/
   audio y el costo de dibujo, por el harness.
 - **`UMBRAL_ON`, `FACTOR_DIAFONIA` y el rango de pico son estimaciones.** Los
   tres se calibran con el guante puesto.
-- **Cuántos grados usar en la variante (b) queda abierto.** El plan original
-  asumía que diez grados sonarían aleatorios, pero el harness muestra que la
-  histéresis carga con casi todo el trabajo: con ±8 % de jitter, tanto seis como
-  once grados dan 1–2 notas por golpe repetido, y en una escalera ascendente se
-  alcanzan 6/6 y 10/11 grados respectivamente. Se dejan **seis** como punto de
-  partida sólo porque ese ±8 % es una estimación y no una medición. Una vez
-  medida la dispersión real del piezo, correr el harness con el `--jitter` real
-  y decidir con ese número.
+- **Cuántas notas usar en la escala de las páginas `_midi_` queda abierto.**
+  El harness muestra que la histéresis carga con casi todo el trabajo: con
+  ±8 % de jitter, tanto seis como once notas dan 1–2 notas por golpe repetido.
+  Se dejan **seis** por defecto sólo porque ese ±8 % es una estimación y no una
+  medición. Una vez medida la dispersión real del piezo, decidir con ese
+  número (el selector de escala ya permite probar las dos).
 - **La diafonía mecánica entre los dos piezos es el riesgo abierto más grande.**
   El árbitro del firmware y la espuma la mitigan, pero puede que nunca haya
   separación perfecta.

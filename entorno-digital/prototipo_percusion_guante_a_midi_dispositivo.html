@@ -522,7 +522,7 @@
   }
 
   // Cuantizador: parte la intensidad 0-1 en n tramos IGUALES, uno por nota.
-  // La variante (b) con Web Audio redondeaba v*(n-1), lo que deja los dos
+  // La antigua variante (b) con Web Audio redondeaba v*(n-1), lo que deja los dos
   // tramos de los extremos a la mitad de ancho: la nota mas grave y la mas
   // aguda eran las mas dificiles de tocar a proposito. Aca x = v*n - 0.5 pone
   // el centro de cada tramo en un entero, con el mismo ancho para todos.
@@ -588,7 +588,7 @@
 
   // Intensidad -> velocity. Plana: la intensidad ya eligio la nota, asi que si ademas dominara el volumen seria
   // fisicamente imposible tocar una nota aguda suave y la escala perderia
-  // sentido. Es la misma ley que la amplitud de la (b) con Web Audio
+  // sentido. Es la misma ley que la amplitud de la antigua (b) con Web Audio
   // (0.25 + 0.30*v, o sea de 45 % a 100 %), trasladada a 58-127. 0 no se
   // puede mandar: noteOn con velocity 0 significa noteOff.
   function velocity(v) {

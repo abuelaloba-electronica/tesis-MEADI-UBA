@@ -20,11 +20,11 @@ versiones anteriores que se conservan para comparar.
 | [`bandada_prototipo_v4b_dispositivo.html`](bandada_prototipo_v4b_dispositivo.html) | acelerómetro | [`dispositivo1`](../dispositivo1/) | acá abajo |
 | [`prototipo_percusion_guante_a_dispositivo.html`](prototipo_percusion_guante_a_dispositivo.html) | 2 piezos + FSR | [`dispositivo2`](../dispositivo2/) | [`documentacion_percusion_guante.md`](documentacion_percusion_guante.md) |
 | [`prototipo_percusion_guante_a_midi_dispositivo.html`](prototipo_percusion_guante_a_midi_dispositivo.html) | 2 piezos + FSR (escala por intensidad, sonido en Helm por MIDI) | [`dispositivo2`](../dispositivo2/) | [`documentacion_percusion_guante.md`](documentacion_percusion_guante.md) + [`cambios_percusion_guante_midi.md`](prototipos/cambios_percusion_guante_midi.md) |
-| [`prototipo_percusion_guante_b_dispositivo.html`](prototipo_percusion_guante_b_dispositivo.html) | 2 piezos + FSR | [`dispositivo2`](../dispositivo2/) | [`documentacion_percusion_guante.md`](documentacion_percusion_guante.md) |
+| [`prototipo_percusion_guante_a_midi_v2_dispositivo.html`](prototipo_percusion_guante_a_midi_v2_dispositivo.html) | 2 piezos + FSR (como la anterior; el FSR se dibuja como disco azul) | [`dispositivo2`](../dispositivo2/) | [`documentacion_percusion_guante.md`](documentacion_percusion_guante.md) + [`cambios_percusion_guante_midi_v2.md`](prototipos/cambios_percusion_guante_midi_v2.md) |
 
-Las dos variantes del guante tienen su gemela con sensores simulados —
-`prototipo_percusion_guante_a.html` y `_b.html`, en esta misma carpeta— con
-pads clicables y un slider de fuerza. Son la única forma de escuchar el diseño
+La variante (a) del guante tiene su gemela con sensores simulados —
+`prototipo_percusion_guante_a.html`, en esta misma carpeta— con pads
+clicables y un slider de fuerza. Son la única forma de escuchar el diseño
 de audio sin la placa en la mano.
 
 ### Prototipos (sensor simulado o versión anterior)

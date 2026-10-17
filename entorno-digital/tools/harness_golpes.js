@@ -15,9 +15,10 @@
 //   - fugas de nodos: el bug que despues de diez minutos se manifiesta como
 //     "empieza a crujir", y que aca aparece como un contador que no vuelve a 0
 //   - techo de polifonia y robo de voz
-//   - cuantizacion pentatonica de la variante (b): cuantas notas distintas
-//     salen de un mismo golpe cuando se le inyecta el jitter real del piezo.
-//     Es lo que responde "6 grados o 10" sin necesidad de hardware
+//   - cuantizacion por escala, si la pagina la tiene (la tuvo la variante (b),
+//     ya eliminada; la (a) no): cuantas notas distintas salen de un mismo
+//     golpe cuando se le inyecta el jitter real del piezo. Es lo que responde
+//     "6 grados o 10" sin necesidad de hardware
 //   - costo por frame constante: que la cantidad de arc() por frame no crezca
 //     con el tiempo (el test directo de la decision de lienzo persistente)
 //
@@ -394,8 +395,8 @@ verificar("el costo por frame no crece con el historial (lienzo persistente)",
           pFin <= pIni + 2, "de " + pIni.toFixed(2) + " a " + pFin.toFixed(2));
 
 // --- 4. Cuantizacion: cuantas notas distintas da un mismo golpe ----
-// Solo tiene sentido en la variante (b), donde la altura depende de la
-// intensidad. Se detecta preguntandole a la pagina: si el texto del ultimo
+// Solo tiene sentido si la altura depende de la intensidad (como en la
+// antigua variante (b)). Se detecta preguntandole a la pagina: si el texto del ultimo
 // golpe cambia de nota ante intensidades iguales, hay cuantizacion.
 const lastVal = conseguir("lastVal");
 function notaDe(pico) {
