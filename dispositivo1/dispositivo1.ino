@@ -1,7 +1,7 @@
 
 //  Lee un acelerómetro/giroscopio LSM6DSO32 por I2C y envía los tres ejes
-//  de aceleración por Serial, para que bandada_prototipo_v4a_dispositivo.html
-//  (o su variante v4b) los reciba via Web Serial y alimente
+//  de aceleración por Serial, para que bandada_prototipo_v5a_dispositivo.html
+//  (o las versiones archivadas en prototipos/) los reciba via Web Serial y alimente
 //  window.updateAccel(x, y, z). El LSM6DSO32 es un IMU de 6 ejes
 //  (acelerómetro + giroscopio); acá solo se usa el canal de acelerómetro.
 //

@@ -57,10 +57,11 @@ El pico va **crudo**, no normalizado: la corrección vive del lado del navegador
 recalibrar el rango con sliders mientras se toca.
 
 Quién lo consume:
-[`entorno-digital/prototipo_percusion_guante_a_dispositivo.html`](../entorno-digital/prototipo_percusion_guante_a_dispositivo.html)
-y su variante `_b_`, por Web Serial (Chrome o Edge de escritorio), y
-`prototipo_percusion_guante_a_midi_dispositivo.html`, que además reenvía los
-golpes a Helm por MIDI. Ver
+[`entorno-digital/prototipo_percusion_guante_a_midi_v2_dispositivo.html`](../entorno-digital/prototipo_percusion_guante_a_midi_v2_dispositivo.html),
+por Web Serial (Chrome o Edge de escritorio), que reenvía los golpes y la
+presión a Helm por MIDI. Las versiones anteriores, con voz propia de Web Audio
+o con la primera salida MIDI, están archivadas en
+[`entorno-digital/prototipos/`](../entorno-digital/prototipos/). Ver
 [`entorno-digital/documentacion_percusion_guante.md`](../entorno-digital/documentacion_percusion_guante.md).
 
 ## Archivos del sketch

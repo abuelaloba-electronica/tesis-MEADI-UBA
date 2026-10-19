@@ -84,8 +84,11 @@ cómo quedó orientado el textil. Ver
 
 ## Quién lo consume
 
-[`entorno-digital/bandada_prototipo_v4a_dispositivo.html`](../entorno-digital/bandada_prototipo_v4a_dispositivo.html)
-y su variante `v4b`, por Web Serial (Chrome o Edge de escritorio).
+[`entorno-digital/bandada_prototipo_v5a_dispositivo.html`](../entorno-digital/bandada_prototipo_v5a_dispositivo.html),
+por Web Serial (Chrome o Edge de escritorio). Las versiones anteriores
+(`v4a`, `v4b` y previas) están archivadas en
+[`entorno-digital/prototipos/`](../entorno-digital/prototipos/) y leen el
+mismo protocolo.
 
 Sumar la tira **no cambió el protocolo**: el formato de línea, los decimales y
 la frecuencia son los mismos que antes, así que las páginas funcionan sin tocar
@@ -238,7 +241,7 @@ las masas) y no desde el USB.
 ## Cómo probarlo
 
 1. **Que no se haya roto el contrato serial** — es lo único que no se puede
-   romper. Abrir `bandada_prototipo_v4a_dispositivo.html` en Chrome o Edge,
+   romper. Abrir `bandada_prototipo_v5a_dispositivo.html` en Chrome o Edge,
    conectar, y confirmar que *gesto* y *sacudida* del panel se mueven como antes
    y que los fps no bajan.
 2. **La luz**, con el textil en la mano: inmóvil sobre la mesa 10 s → brasa

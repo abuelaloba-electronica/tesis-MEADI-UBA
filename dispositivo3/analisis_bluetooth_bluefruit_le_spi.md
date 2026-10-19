@@ -160,7 +160,7 @@ if (ble.isConnected()) ble.print(bufferLineas);
 
 Por qué esto no rompe nada: el lector de las páginas acumula bytes y parte por
 `\n` antes de pasar cada línea a `handleLine()` (ver
-`entorno-digital/prototipo_percusion_guante_a_dispositivo.html:894-919`). La
+`entorno-digital/prototipos/prototipo_percusion_guante_a_dispositivo.html:894-919`). La
 página ve **exactamente las mismas líneas** que por USB, en la misma cantidad;
 sólo llegan en tandas de cinco en vez de de a una. Baja a ~10 transacciones por
 segundo, o sea ~5 % de duty.
@@ -220,7 +220,7 @@ La página habla directamente con el módulo, sin nada instalado en el medio.
 **Qué cambia en el código de la página**
 
 Sólo el bloque de conexión. El equivalente del bloque de Web Serial de
-`prototipo_percusion_guante_a_dispositivo.html:817-929` sería:
+`entorno-digital/prototipos/prototipo_percusion_guante_a_dispositivo.html:817-929` sería:
 
 ```js
 const NUS     = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";

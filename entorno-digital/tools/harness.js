@@ -1,5 +1,5 @@
 // Banco de pruebas: corre la física real de una visualización de bandada
-// (bandada_prototipo_v4*.html) sin abrir un navegador, para poder medirla en
+// (bandada_prototipo_v5a_dispositivo.html, o las v4 archivadas en prototipos/) sin abrir un navegador, para poder medirla en
 // números en vez de mirarla.
 //
 // Cómo funciona, en cuatro pasos:
@@ -50,8 +50,8 @@
 //   auto       el perfil del "modo demo automático" del panel, más gravedad
 //
 // Ejemplos:
-//   node entorno-digital/tools/harness.js entorno-digital/bandada_prototipo_v4a_dispositivo.html
-//   node entorno-digital/tools/harness.js entorno-digital/bandada_prototipo_v4b_dispositivo.html --segundos=15 --perfil=tiltX --muestreo=1
+//   node entorno-digital/tools/harness.js entorno-digital/bandada_prototipo_v5a_dispositivo.html --perfil=despertar
+//   node entorno-digital/tools/harness.js entorno-digital/prototipos/bandada_prototipo_v4b_dispositivo.html --segundos=15 --perfil=tiltX --muestreo=1
 //
 // Cómo leer la salida: una fila por muestra, con la cantidad de puntos
 // dibujados, el radio RMS del grupo (qué tan disperso está), el centroide, el

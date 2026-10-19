@@ -25,8 +25,8 @@ que envía. El navegador no se enteró y no tiene que enterarse.
 
 | Dispositivo | Placa | Sensores / actuadores | Emite | Frecuencia | Lo consume |
 |---|---|---|---|---|---|
-| `dispositivo1` | Adafruit Flora V3 (ATmega32u4) | LSM6DSO32 por I2C (acelerómetro, ±4 g); tira de 13 LEDs WS2812B en D6 | `A:<x>,<y>,<z>` en g | ~33/s | `entorno-digital/bandada_prototipo_v5a_dispositivo.html` (y las v4a/v4b anteriores) |
-| `dispositivo2` | LilyPad Arduino USB (ATmega32u4, 8 MHz) | 2 piezos de guante (A2, A3) + FSR (A4) | `F:<0-1023>` y `G:<dedo>,<pico>` | ~50/s y por golpe | `entorno-digital/prototipo_percusion_guante_a[_dispositivo].html`, `..._a_midi_dispositivo.html` y `..._a_midi_v2_dispositivo.html` (sonido en Helm; la v2 dibuja el FSR como disco azul) |
+| `dispositivo1` | Adafruit Flora V3 (ATmega32u4) | LSM6DSO32 por I2C (acelerómetro, ±4 g); tira de 13 LEDs WS2812B en D6 | `A:<x>,<y>,<z>` en g | ~33/s | `entorno-digital/bandada_prototipo_v5a_dispositivo.html` (las v4a/v4b anteriores, archivadas en `prototipos/`) |
+| `dispositivo2` | LilyPad Arduino USB (ATmega32u4, 8 MHz) | 2 piezos de guante (A2, A3) + FSR (A4) | `F:<0-1023>` y `G:<dedo>,<pico>` | ~50/s y por golpe | `entorno-digital/prototipo_percusion_guante_a_midi_v2_dispositivo.html` (sonido en Helm; el FSR como disco azul). Las versiones anteriores, archivadas en `prototipos/` |
 | `dispositivo3` | LilyPad Arduino USB (ATmega32u4, 8 MHz) | AD8232 en la pantorrilla (A2, leads-off en 2 y 3) | `E:<amplitud MAV>` y `L:<0\|1>` | 50/s y al cambiar | todavía ninguna (candidatos: `prototipos/prototipo_emg_*.html`) |
 
 Las páginas ignoran en silencio cualquier línea que no reconozcan, así que los
@@ -59,7 +59,8 @@ hardware real por USB. Las versiones simuladas siguen siendo útiles: son la
 única forma de trabajar sin la placa en la mano.
 
 **`entorno-digital/prototipos/` es histórico.** Versiones anteriores y
-propuestas de visualizaciones cuyo dispositivo todavía no existe. No editar
+propuestas de visualizaciones cuyo dispositivo todavía no existe. En
+`entorno-digital/` queda sólo la versión activa de cada dispositivo. No editar
 salvo pedido expreso; el trabajo activo vive en `entorno-digital/`.
 
 **Commits en español, sin tildes** (así está el historial).
@@ -76,7 +77,7 @@ No hay suite de tests. Tres técnicas, en orden de costo:
    `entorno-digital/prototipos/cambios_bandada_v4.md`, sección Validación).
 
    ```
-   node entorno-digital/tools/harness.js entorno-digital/bandada_prototipo_v4a_dispositivo.html
+   node entorno-digital/tools/harness.js entorno-digital/bandada_prototipo_v5a_dispositivo.html --perfil=despertar
    node entorno-digital/tools/harness.js <archivo.html> --segundos=15 --perfil=tiltX --muestreo=1
    ```
 
@@ -89,20 +90,20 @@ No hay suite de tests. Tres técnicas, en orden de costo:
 
    Ojo: `harness.js` es **específico de la bandada** (sólo expone
    `updateAccel`, sus perfiles son de acelerómetro y su DOM falso es mínimo).
-   Para las páginas del guante está su hermano por copia
-   `entorno-digital/tools/harness_golpes.js`, que además del costo de dibujo
+   Para las páginas archivadas del guante con Web Audio está su hermano por
+   copia `entorno-digital/tools/harness_golpes.js`, que además del costo de dibujo
    verifica el grafo de Web Audio —fugas de nodos, techo de polifonía,
    cuantización de la escala— con un `AudioContext` falso, sin producir sonido.
    Para eso las páginas construyen el `AudioContext` perezosamente dentro de
    `asegurarAudio()`; construirlo en el cuerpo del script rompería el harness.
 
    ```
-   node entorno-digital/tools/harness_golpes.js entorno-digital/prototipo_percusion_guante_a_dispositivo.html
+   node entorno-digital/tools/harness_golpes.js entorno-digital/prototipos/prototipo_percusion_guante_a_dispositivo.html
    node entorno-digital/tools/harness_golpes.js <archivo.html> --golpes=500 --jitter=0.08
    ```
 
-   La página `_midi_` no tiene voz propia (el sonido lo hace Helm, que corre
-   en paralelo y recibe los golpes por Web MIDI): para ella está
+   Las páginas `_midi_`, incluida la activa, no tienen voz propia (el sonido lo hace Helm, que corre
+   en paralelo y recibe los golpes por Web MIDI): para ellas está
    `entorno-digital/tools/harness_midi.js`, que con un `MIDIAccess` falso
    verifica notas colgadas, retrigger, CC del FSR, pánico y el reparto de la
    intensidad en tramos de la escala.
