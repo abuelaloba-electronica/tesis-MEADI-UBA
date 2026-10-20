@@ -17,6 +17,7 @@ están en [`prototipos/`](prototipos/).
 |---|---|---|---|
 | [`bandada_prototipo_v5a_dispositivo.html`](bandada_prototipo_v5a_dispositivo.html) | acelerómetro | [`dispositivo1`](../dispositivo1/) | acá abajo + [`cambios_bandada_v5.md`](prototipos/cambios_bandada_v5.md) |
 | [`prototipo_percusion_guante_a_midi_v2_dispositivo.html`](prototipo_percusion_guante_a_midi_v2_dispositivo.html) | 2 piezos + FSR (escala por intensidad, sonido en Helm por MIDI, el FSR como disco azul) | [`dispositivo2`](../dispositivo2/) | [`documentacion_percusion_guante.md`](documentacion_percusion_guante.md) |
+| [`prototipo_emg_acumulacion_v3_dispositivo.html`](prototipo_emg_acumulacion_v3_dispositivo.html) | EMG (cuadriláteros superpuestos derivados de un rectángulo invisible; la intensidad elige el color) | [`dispositivo3`](../dispositivo3/) | [`cambios_emg_acumulacion_v3.md`](prototipos/cambios_emg_acumulacion_v3.md) |
 
 ### Archivadas en `prototipos/`
 
@@ -33,7 +34,7 @@ requerimiento original, el criterio de diseño y el mapeo de sensor a imagen.
 | `prototipo_circulos_fuerza_pulso.html` · `_dispositivo` | fuerza + pulso | **el sensor de pulso se descartó** (ver abajo) |
 | `prototipo_estiramiento_lineas.html` | sensor de estiramiento | no existe todavía |
 | `prototipo_emg_fractura_v1.html` | EMG (fractura low-poly + temblor) | no existe todavía |
-| `prototipo_emg_acumulacion_v2.html` | EMG (mosaico que se acumula) | no existe todavía |
+| `prototipo_emg_acumulacion_v2.html` | EMG (mosaico que se acumula) | base de la v3 activa; sólo simulada |
 
 Las ideas del guante, versión por versión, están resumidas en
 [`documentacion_percusion_guante.md`](documentacion_percusion_guante.md#versiones).

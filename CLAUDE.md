@@ -27,7 +27,7 @@ que envía. El navegador no se enteró y no tiene que enterarse.
 |---|---|---|---|---|---|
 | `dispositivo1` | Adafruit Flora V3 (ATmega32u4) | LSM6DSO32 por I2C (acelerómetro, ±4 g); tira de 13 LEDs WS2812B en D6 | `A:<x>,<y>,<z>` en g | ~33/s | `entorno-digital/bandada_prototipo_v5a_dispositivo.html` (las v4a/v4b anteriores, archivadas en `prototipos/`) |
 | `dispositivo2` | LilyPad Arduino USB (ATmega32u4, 8 MHz) | 2 piezos de guante (A2, A3) + FSR (A4) | `F:<0-1023>` y `G:<dedo>,<pico>` | ~50/s y por golpe | `entorno-digital/prototipo_percusion_guante_a_midi_v2_dispositivo.html` (sonido en Helm; el FSR como disco azul). Las versiones anteriores, archivadas en `prototipos/` |
-| `dispositivo3` | LilyPad Arduino USB (ATmega32u4, 8 MHz) | AD8232 en la pantorrilla (A2, leads-off en 2 y 3) | `E:<amplitud MAV>` y `L:<0\|1>` | 50/s y al cambiar | todavía ninguna (candidatos: `prototipos/prototipo_emg_*.html`) |
+| `dispositivo3` | LilyPad Arduino USB (ATmega32u4, 8 MHz) | AD8232 en la pantorrilla (A2, leads-off en 2 y 3) | `E:<amplitud MAV>` y `L:<0\|1>` | 50/s y al cambiar | `entorno-digital/prototipo_emg_acumulacion_v3_dispositivo.html` (cuadriláteros superpuestos; la v2 y la fractura v1, simuladas, en `prototipos/`) |
 
 Las páginas ignoran en silencio cualquier línea que no reconozcan, así que los
 sketches pueden seguir imprimiendo diagnósticos legibles para el Monitor Serial
@@ -155,4 +155,5 @@ Verificación de sintaxis rápida: extraer el `<script>` a un `.js` y correr
 | la bandada v5a (arranque quieto, campo continuo, encuadre) | `entorno-digital/prototipos/cambios_bandada_v5.md` |
 | el guante: circuito, audio, variantes | `entorno-digital/documentacion_percusion_guante.md` |
 | el guante con Helm por MIDI | `entorno-digital/prototipos/cambios_percusion_guante_midi.md` (y `..._midi_v2.md`, el FSR como disco) |
+| la acumulación EMG v3 (cuadriláteros, lector del dispositivo3) | `entorno-digital/prototipos/cambios_emg_acumulacion_v3.md` |
 | visualizaciones sin hardware todavía (EMG, estiramiento) | `entorno-digital/prototipos/propuesta_*.md` |

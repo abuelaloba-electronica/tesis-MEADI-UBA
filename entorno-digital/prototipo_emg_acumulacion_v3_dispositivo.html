@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EMG · Acumulación de cuadriláteros (V3, dispositivo) — MAEDI</title>
+<style>
+  :root {
+    --panel-bg: rgba(255,255,255,0.94);
+    --ink: #222;
+    --line: #ddd;
+    --accent: #c22a44;
+    --ok: #2e9e5b;
+    --bad: #c0392b;
+  }
+  html, body {
+    margin: 0; padding: 0; overflow: hidden;
+    background: #fdf7f5;
+    font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+    color: var(--ink);
+  }
+  canvas { display: block; }
+
+  #panel {
+    position: fixed;
+    top: 16px; left: 16px;
+    width: 300px;
+    max-height: calc(100vh - 32px);
+    overflow-y: auto;
+    box-sizing: border-box;
+    background: var(--panel-bg);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 16px 18px 12px;
+    font-size: 12px;
+    backdrop-filter: blur(4px);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.10);
+  }
+  #panel h1 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; margin: 0 0 2px; font-weight: 600; color: #555; }
+  #panel .subtitle { font-size: 10.5px; color: #999; margin: 0 0 12px; }
+  .section-title { font-size: 11px; font-weight: 600; color: #666; margin: 14px 0 8px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .section-title:first-of-type { margin-top: 0; }
+
+  #connectBtn {
+    width: 100%; padding: 9px 8px; margin-top: 0;
+    font-size: 12px; font-weight: 600;
+    border: 1px solid var(--accent); background: var(--accent); color: #fff;
+    border-radius: 8px; cursor: pointer;
+  }
+  #connectBtn:hover { filter: brightness(1.05); background: var(--accent); }
+  #connectBtn:disabled { cursor: default; filter: none; opacity: 0.5; }
+  #connectBtn.connected { background: #fff; color: var(--ok); border-color: var(--ok); }
+
+  .status-row { display: flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 11px; color: #777; }
+  #statusDot, #leadsDot { width: 9px; height: 9px; border-radius: 50%; background: #bbb; flex-shrink: 0; }
+  #statusDot.connected, #leadsDot.connected { background: var(--ok); }
+  #statusDot.error, #leadsDot.error { background: var(--bad); }
+  #unsupportedNote { display: none; margin-top: 8px; font-size: 10.5px; color: var(--bad); line-height: 1.4; }
+
+  #emgPad {
+    position: relative; width: 100%; height: 90px;
+    border: 1.5px dashed #d9b9bd; border-radius: 10px;
+    background: linear-gradient(180deg, rgba(194,42,68,0.10), rgba(255,255,255,0.10));
+    display: flex; align-items: center; justify-content: center; text-align: center;
+    color: #888; font-size: 11px; line-height: 1.4; cursor: pointer;
+    user-select: none; touch-action: none; overflow: hidden; transition: opacity 0.2s;
+  }
+  #emgPad.active { border-style: solid; border-color: var(--accent); }
+  #emgPad.disabled { opacity: 0.45; pointer-events: none; }
+  #emgFill { position: absolute; left: 0; right: 0; bottom: 0; height: 0%; background: linear-gradient(180deg, rgba(194,42,68,0.32), rgba(194,42,68,0.08)); pointer-events: none; }
+  #emgLabel { position: relative; z-index: 1; pointer-events: none; padding: 0 10px; }
+
+  .bar-row { margin: 8px 0; }
+  .bar-row label { display: flex; justify-content: space-between; font-size: 10.5px; color: #777; margin-bottom: 3px; }
+  .bar-track { width: 100%; height: 6px; background: #ececec; border-radius: 3px; overflow: hidden; }
+  .bar-fill { height: 100%; width: 0%; border-radius: 3px; background: #999; }
+  #envFill { background: linear-gradient(90deg, #f2b4c0, #c22a44); }
+
+  .check-row { display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: #555; margin: 10px 0 4px; }
+
+  .row { margin-bottom: 10px; }
+  .row label { display: flex; justify-content: space-between; margin-bottom: 3px; font-size: 11.5px; }
+  .row label span.val { font-variant-numeric: tabular-nums; color: #666; }
+  .raw-row { font-size: 10.5px; color: #777; margin: 4px 0 6px; font-variant-numeric: tabular-nums; }
+  input[type=range] { width: 100%; }
+  .divider { border: none; border-top: 1px solid var(--line); margin: 12px 0; }
+
+  button { width: 100%; padding: 7px 8px; font-size: 11.5px; border: 1px solid #999; background: #fff; border-radius: 6px; cursor: pointer; margin-top: 4px; }
+  button:hover { background: #f2f2f2; }
+
+  .note { font-size: 10.5px; color: #999; line-height: 1.4; margin-top: 6px; }
+
+  #stats { position: fixed; bottom: 16px; right: 16px; background: var(--panel-bg); border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; font-size: 11px; color: #666; line-height: 1.6; box-shadow: 0 2px 10px rgba(0,0,0,0.08); }
+  #stats b { color: #333; }
+  #swatch { display: inline-block; width: 10px; height: 10px; border-radius: 50%; vertical-align: middle; margin-right: 4px; border: 1px solid rgba(0,0,0,0.15); }
+</style>
+</head>
+<body>
+
+<canvas id="canvas"></canvas>
+
+<div id="panel">
+  <h1>EMG · Acumulación de cuadriláteros</h1>
+  <p class="subtitle">MAEDI — V3 · dispositivo3 (AD8232, pantorrilla)</p>
+
+  <div class="section-title">Dispositivo</div>
+  <button id="connectBtn">Conectar dispositivo (USB)</button>
+  <div class="status-row"><div id="statusDot"></div><span id="statusText">Sin conexión</span></div>
+  <div class="status-row"><div id="leadsDot"></div><span id="leadsText">Electrodos: sin datos</span></div>
+  <div id="unsupportedNote">Este navegador no soporta Web Serial API. Probá con Chrome o Edge de escritorio.</div>
+
+  <div class="raw-row">E: <b id="rawVal">—</b> · máx. visto <b id="rawMaxVal">—</b> cuentas</div>
+  <div class="row">
+    <label><span>Techo de amplitud</span><span class="val" id="techoVal">100</span></label>
+    <input type="range" id="techo" min="10" max="512" step="1" value="100">
+  </div>
+  <button id="techoMaxBtn">Usar el máximo visto como techo</button>
+
+  <div class="section-title" style="margin-top:14px">Sensor EMG (simulado, respaldo)</div>
+  <div id="emgPad">
+    <div id="emgFill"></div>
+    <div id="emgLabel">Presioná, mantené y soltá para simular una contracción completa.</div>
+  </div>
+
+  <div class="bar-row">
+    <label><span>Contracción (envolvente)</span><span id="envVal">0%</span></label>
+    <div class="bar-track"><div class="bar-fill" id="envFill"></div></div>
+  </div>
+
+  <div class="check-row">
+    <input type="checkbox" id="autoMode">
+    <label for="autoMode">Modo automático (repeticiones demo)</label>
+  </div>
+
+  <hr class="divider">
+
+  <div class="row">
+    <label><span>Duración mínima</span><span class="val" id="minDurVal">0.3s</span></label>
+    <input type="range" id="minDur" min="0.1" max="1.5" step="0.1" value="0.3">
+  </div>
+  <div class="row">
+    <label><span>Duración máxima</span><span class="val" id="maxDurVal">3.0s</span></label>
+    <input type="range" id="maxDur" min="1" max="6" step="0.5" value="3.0">
+  </div>
+  <div class="row">
+    <label><span>Opacidad de cada capa</span><span class="val" id="opacidadVal">22%</span></label>
+    <input type="range" id="opacidad" min="0.05" max="0.6" step="0.01" value="0.22">
+  </div>
+
+  <hr class="divider">
+  <button id="resetBtn">Limpiar lienzo</button>
+  <div class="note">Cada contracción sostenida agrega un cuadrilátero derivado de un rectángulo invisible centrado: rotado al azar alrededor de su centro y con las cuatro esquinas desplazadas al azar. La intensidad de la contracción elige el color. Las capas nunca se borran: se superponen y registran la sesión.</div>
+</div>
+
+<div id="stats">
+  Cuadriláteros: <b id="repCountVal">0</b><br>
+  Último: <span id="swatch"></span><b id="lastVal">—</b>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  // ---------------------------------------------------------------
+  // Canvas setup. Ademas del lienzo visible hay una "capa" offscreen
+  // donde se estampan los cuadrilateros ya asentados: como nunca se
+  // borran, redibujarlos todos en cada frame haria que el costo crezca
+  // con la sesion. Asi cada frame cuesta un drawImage mas las piezas
+  // que todavia estan apareciendo.
+  // ---------------------------------------------------------------
+  const canvas = document.getElementById("canvas");
+  const ctx = canvas.getContext("2d");
+  const capa = document.createElement("canvas");
+  const ctxCapa = capa.getContext("2d");
+  let W = 0, H = 0, DPR = Math.max(1, window.devicePixelRatio || 1);
+
+  // Rectangulo original (invisible), en pixeles. Se recalcula en resize.
+  let rectCx = 0, rectCy = 0, rectSemiAlto = 1;
+
+  function resize() {
+    W = window.innerWidth;
+    H = window.innerHeight;
+    canvas.width = W * DPR;
+    canvas.height = H * DPR;
+    canvas.style.width = W + "px";
+    canvas.style.height = H + "px";
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    capa.width = W * DPR;
+    capa.height = H * DPR;
+    ctxCapa.setTransform(DPR, 0, 0, DPR, 0, 0);
+
+    rectCx = W / 2;
+    rectCy = H / 2;
+    rectSemiAlto = (ALTO_FRAC * H) / 2;
+    // En una pantalla angosta (vertical) el ancho no entraria: se achica
+    // todo el rectangulo, conservando la proporcion.
+    const semiAnchoMax = (W / 2) * 0.9;
+    if (rectSemiAlto * RATIO > semiAnchoMax) rectSemiAlto = semiAnchoMax / RATIO;
+
+    reconstruirCapa();
+  }
+
+  const BG_COLOR = "#fdf7f5";
+  const clamp01 = (v) => Math.min(1, Math.max(0, v));
+  const nowSec = () => performance.now() / 1000;
+
+  // ---------------------------------------------------------------
+  // Config
+  // ---------------------------------------------------------------
+  let minDurationSec = 0.3;
+  let maxDurationSec = 3.0;
+  let opacidadCapa = 0.22;
+  const PRESS_THRESHOLD = 0.08;
+  const POP_MS = 260;
+
+  // Rectangulo original: alto ~75 % del viewport, mas alto que ancho.
+  const ALTO_FRAC = 0.75;
+  const RATIO = 0.45;          // ancho / alto
+  // Deformacion: cada esquina se aleja o acerca del centro hasta un
+  // DEF relativo, y gira alrededor del centro hasta JIT (ver abajo).
+  const DEF = 0.2;
+  const ROT_MAX = 35 * Math.PI / 180;   // rotacion de la figura entera, +-
+
+  // Esquinas del rectangulo original en coordenadas polares respecto de
+  // su centro, en unidades de semi-alto (asi la rotacion es isotropa).
+  // Orden: sup-izq, sup-der, inf-der, inf-izq (sentido horario en pantalla).
+  const ESQ_RADIO = Math.hypot(RATIO, 1);
+  const ESQ_ANG = [
+    Math.atan2(-1, -RATIO),
+    Math.atan2(-1, RATIO),
+    Math.atan2(1, RATIO),
+    Math.atan2(1, -RATIO),
+  ];
+  // Hueco angular mas chico entre esquinas contiguas: el que subtiende el
+  // lado corto (arriba/abajo), 2*atan(RATIO) ~ 48 grados. Si cada esquina
+  // se mueve menos de la mitad de ese hueco, dos vecinas nunca se cruzan:
+  // el orden angular alrededor del centro se conserva y el cuadrilatero
+  // queda simple (sus lados no se cortan), aunque pueda ser concavo.
+  const JIT = 0.8 * Math.atan(RATIO);
+
+  // Paleta calida, ordenada de suave a intensa: la intensidad media de
+  // la contraccion elige la zona de la paleta.
+  const PALETA = ["#f2a7a1", "#e9b44c", "#f07a5f", "#e8692c", "#c2306f", "#7d1d3f"];
+
+  // ---------------------------------------------------------------
+  // Cuadrilateros acumulados. Se guardan normalizados (vertices ya
+  // rotados, en unidades de semi-alto respecto del centro) para poder
+  // reconstruir la capa al cambiar el tamano de la ventana.
+  // ---------------------------------------------------------------
+  const cuads = [];      // {v:[[x,y]x4], color, alpha, birthTime, estampado}
+  let ultimoColorIdx = -1;
+  let maxIntensidadVista = 0.4;
+
+  function nuevoCuadrilatero(intensidad) {
+    const theta = (Math.random() * 2 - 1) * ROT_MAX;
+    const v = ESQ_ANG.map((ang) => {
+      const r = ESQ_RADIO * (1 + (Math.random() * 2 - 1) * DEF);
+      const a = ang + (Math.random() * 2 - 1) * JIT + theta;
+      return [Math.cos(a) * r, Math.sin(a) * r];
+    });
+
+    // Intensidad reescalada entre el umbral y la mayor vista en la sesion,
+    // para recorrer toda la paleta aunque el rango real sea chico.
+    maxIntensidadVista = Math.max(maxIntensidadVista, intensidad);
+    const norm = clamp01((intensidad - PRESS_THRESHOLD) / Math.max(0.0001, maxIntensidadVista - PRESS_THRESHOLD));
+    const n = PALETA.length;
+    let idx = Math.round(norm * (n - 1)) + Math.floor(Math.random() * 3) - 1;
+    idx = Math.min(n - 1, Math.max(0, idx));
+    // Nunca el mismo color que el anterior: correrse hacia el lado que
+    // tenga lugar.
+    if (idx === ultimoColorIdx) idx = idx < n - 1 ? idx + 1 : idx - 1;
+    ultimoColorIdx = idx;
+
+    const cuad = { v, color: PALETA[idx], alpha: opacidadCapa, birthTime: nowSec(), estampado: false };
+    cuads.push(cuad);
+    return { cuad, theta };
+  }
+
+  function dibujarCuad(c, cuad, escala, alpha) {
+    c.globalAlpha = alpha;
+    c.fillStyle = cuad.color;
+    c.beginPath();
+    for (let i = 0; i < 4; i++) {
+      const x = rectCx + cuad.v[i][0] * rectSemiAlto * escala;
+      const y = rectCy + cuad.v[i][1] * rectSemiAlto * escala;
+      if (i === 0) c.moveTo(x, y); else c.lineTo(x, y);
+    }
+    c.closePath();
+    c.fill();
+    c.globalAlpha = 1;
+  }
+
+  function reconstruirCapa() {
+    ctxCapa.clearRect(0, 0, W, H);
+    for (const cuad of cuads) {
+      if (cuad.estampado) dibujarCuad(ctxCapa, cuad, 1, cuad.alpha);
+    }
+  }
+
+  // ---------------------------------------------------------------
+  // Señal EMG: envolvente suavizada. La detección de inicio/fin de
+  // repetición se hace sobre la envolvente (no sobre la lectura
+  // cruda) para no disparar repeticiones falsas por el ruido propio
+  // de la señal EMG. Igual que en V2.
+  // ---------------------------------------------------------------
+  const ENV_ALPHA = 0.15;
+  let envelope = 0;
+  let contracting = false, repStart = 0, sumEnv = 0, sampleCount = 0;
+  let liveIntensity = 0;
+
+  // Punto de enganche público: alimentar con una lectura EMG
+  // normalizada 0-1. Lo llaman el lector serie (a 50/s) o, sin placa,
+  // el simulador (una vez por frame). Toda la detección vive acá.
+  window.feedEMG = function (raw01) {
+    const v = clamp01(raw01);
+    envelope += (v - envelope) * ENV_ALPHA;
+    liveIntensity = envelope;
+
+    if (!contracting && envelope > PRESS_THRESHOLD) {
+      contracting = true;
+      repStart = nowSec();
+      sumEnv = 0; sampleCount = 0;
+    }
+    if (contracting) {
+      sumEnv += envelope; sampleCount += 1;
+      if (envelope <= PRESS_THRESHOLD) {
+        const elapsed = nowSec() - repStart;
+        contracting = false;
+        finalizeRep(elapsed);
+      }
+    }
+  };
+
+  // Descarta una contraccion en curso sin convertirla en cuadrilatero:
+  // al soltarse un electrodo o al desconectar, la caida de la senal no
+  // es una relajacion real.
+  function cancelarContraccion() {
+    contracting = false;
+    envelope = 0;
+    liveIntensity = 0;
+  }
+
+  function finalizeRep(elapsedSec) {
+    if (elapsedSec < minDurationSec) {
+      flashTooShort();
+      return;
+    }
+    const clamped = Math.min(elapsedSec, maxDurationSec);
+    const avgIntensity = sampleCount > 0 ? sumEnv / sampleCount : 0;
+    const { cuad, theta } = nuevoCuadrilatero(avgIntensity);
+    updateLastStats(clamped, avgIntensity, cuad, theta);
+  }
+
+  function flashTooShort() {
+    const el = document.getElementById("emgLabel");
+    const original = el.innerHTML;
+    el.innerHTML = "Muy breve — descartado<br>(mínimo " + minDurationSec.toFixed(1) + "s)";
+    setTimeout(() => { el.innerHTML = original; }, 900);
+  }
+
+  // ---------------------------------------------------------------
+  // Simulación del sensor (respaldo sin placa): pad vertical (manual)
+  // + modo automático. Se apaga mientras haya un puerto conectado,
+  // para que una sola fuente alimente la envolvente.
+  // ---------------------------------------------------------------
+  let pressing = false, target = 0, autoMode = false, autoT = 0;
+
+  function simRawSample(dt) {
+    if (autoMode) {
+      autoT += dt;
+      const amp = 0.6 + 0.4 * Math.sin(autoT * 0.17);
+      target = Math.max(0, Math.sin(autoT * 1.0)) * amp;
+    }
+    const base = (pressing || autoMode) ? target : 0;
+    const noiseAmp = 0.02 + base * 0.12;
+    const now = performance.now();
+    const n = (Math.sin(now * 0.013 + 0.9) + (Math.random() * 2 - 1)) / 2;
+    return clamp01(base + n * noiseAmp);
+  }
+
+  const pad = document.getElementById("emgPad");
+  const emgFill = document.getElementById("emgFill");
+  const autoCheck = document.getElementById("autoMode");
+
+  function targetFromPointer(e) {
+    const rect = pad.getBoundingClientRect();
+    const relY = (e.clientY - rect.top) / rect.height;
+    return clamp01(1 - relY);
+  }
+
+  let pointerDown = false;
+  pad.addEventListener("pointerdown", (e) => {
+    if (autoMode || port) return;
+    pointerDown = true; pressing = true;
+    pad.classList.add("active");
+    pad.setPointerCapture(e.pointerId);
+    target = targetFromPointer(e);
+  });
+  pad.addEventListener("pointermove", (e) => {
+    if (!pointerDown) return;
+    target = targetFromPointer(e);
+  });
+  function endPointer() {
+    if (!pointerDown) return;
+    pointerDown = false; pressing = false;
+    pad.classList.remove("active");
+    target = 0;
+  }
+  pad.addEventListener("pointerup", endPointer);
+  pad.addEventListener("pointercancel", endPointer);
+  pad.addEventListener("pointerleave", () => { if (pointerDown) endPointer(); });
+
+  autoCheck.addEventListener("change", (e) => {
+    autoMode = e.target.checked;
+    pad.classList.toggle("disabled", autoMode);
+    if (!autoMode) { pressing = false; target = 0; }
+  });
+
+  function habilitarSimulacion(si) {
+    if (!si) {
+      endPointer();
+      autoMode = false;
+      autoCheck.checked = false;
+      pressing = false; target = 0;
+    }
+    autoCheck.disabled = !si;
+    pad.classList.toggle("disabled", !si);
+  }
+
+  // ---------------------------------------------------------------
+  // Controles
+  // ---------------------------------------------------------------
+  const minDurSlider = document.getElementById("minDur");
+  const maxDurSlider = document.getElementById("maxDur");
+  const opacidadSlider = document.getElementById("opacidad");
+  const techoSlider = document.getElementById("techo");
+  minDurSlider.addEventListener("input", () => {
+    minDurationSec = parseFloat(minDurSlider.value);
+    document.getElementById("minDurVal").textContent = minDurationSec.toFixed(1) + "s";
+  });
+  maxDurSlider.addEventListener("input", () => {
+    maxDurationSec = parseFloat(maxDurSlider.value);
+    document.getElementById("maxDurVal").textContent = maxDurationSec.toFixed(1) + "s";
+  });
+  // La opacidad vale para los cuadrilateros nuevos: los ya estampados
+  // conservan la suya, como capas de pintura ya secas.
+  opacidadSlider.addEventListener("input", () => {
+    opacidadCapa = parseFloat(opacidadSlider.value);
+    document.getElementById("opacidadVal").textContent = Math.round(opacidadCapa * 100) + "%";
+  });
+
+  // Normalizacion de la linea E: (MAV en cuentas del ADC, techo teorico
+  // ~512). El rango real depende de la persona y de los electrodos y
+  // todavia no se midio: por eso es un control y no una constante.
+  let techoCuentas = 100;
+  let rawUltimo = null, rawMax = 0;
+  function setTecho(v) {
+    techoCuentas = Math.max(10, Math.min(512, Math.round(v)));
+    techoSlider.value = techoCuentas;
+    document.getElementById("techoVal").textContent = techoCuentas;
+  }
+  techoSlider.addEventListener("input", () => setTecho(parseFloat(techoSlider.value)));
+  document.getElementById("techoMaxBtn").addEventListener("click", () => {
+    if (rawMax > 0) setTecho(rawMax);
+  });
+
+  document.getElementById("resetBtn").addEventListener("click", () => {
+    cuads.length = 0;
+    ultimoColorIdx = -1;
+    reconstruirCapa();
+    updateCount();
+  });
+
+  // ---------------------------------------------------------------
+  // Render
+  // ---------------------------------------------------------------
+  function renderFrame(timeSec) {
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = BG_COLOR;
+    ctx.fillRect(0, 0, W, H);
+    ctx.drawImage(capa, 0, 0, W, H);
+
+    // Los que todavia aparecen se dibujan en vivo; al terminar su
+    // animacion se estampan en la capa. Como terminan en el orden en
+    // que nacieron, el apilado se respeta.
+    for (const cuad of cuads) {
+      if (cuad.estampado) continue;
+      const t = Math.min(1, (timeSec - cuad.birthTime) / (POP_MS / 1000));
+      if (t >= 1) {
+        cuad.estampado = true;
+        dibujarCuad(ctxCapa, cuad, 1, cuad.alpha);
+        dibujarCuad(ctx, cuad, 1, cuad.alpha);
+        continue;
+      }
+      const eased = 1 - Math.pow(1 - t, 3);
+      dibujarCuad(ctx, cuad, 0.85 + 0.15 * eased, cuad.alpha * eased);
+    }
+  }
+
+  // ---------------------------------------------------------------
+  // Lecturas en vivo
+  // ---------------------------------------------------------------
+  const envValEl = document.getElementById("envVal");
+  const envFillEl = document.getElementById("envFill");
+  const repCountValEl = document.getElementById("repCountVal");
+  const lastValEl = document.getElementById("lastVal");
+  const swatchEl = document.getElementById("swatch");
+  const rawValEl = document.getElementById("rawVal");
+  const rawMaxValEl = document.getElementById("rawMaxVal");
+
+  function updateReadouts() {
+    const pct = Math.round(liveIntensity * 100);
+    envValEl.textContent = pct + "%";
+    envFillEl.style.width = pct + "%";
+    emgFill.style.height = Math.round(clamp01((pressing || autoMode) ? target : liveIntensity) * 100) + "%";
+    rawValEl.textContent = rawUltimo === null ? "—" : String(rawUltimo);
+    rawMaxValEl.textContent = rawMax > 0 ? String(rawMax) : "—";
+  }
+
+  function updateCount() {
+    repCountValEl.textContent = String(cuads.length);
+  }
+
+  function updateLastStats(durationSec, avgIntensity, cuad, theta) {
+    updateCount();
+    swatchEl.style.background = cuad.color;
+    lastValEl.textContent =
+      durationSec.toFixed(1) + "s · " + Math.round(avgIntensity * 100) + "% · rot " +
+      Math.round(theta * 180 / Math.PI) + "°";
+  }
+
+  // ===============================================================
+  // Web Serial: leer las lineas del dispositivo3.
+  // Formatos esperados: "E:<amplitud MAV en cuentas>" cada 20ms y
+  // "L:<0|1>" al cambiar el estado de los electrodos (y cada 3s).
+  // Cualquier otra linea (el diagnostico legible "EMG base = ...") se
+  // ignora en silencio.
+  // ===============================================================
+  const connectBtn = document.getElementById("connectBtn");
+  const statusDot = document.getElementById("statusDot");
+  const statusTextEl = document.getElementById("statusText");
+  const leadsDot = document.getElementById("leadsDot");
+  const leadsTextEl = document.getElementById("leadsText");
+  const unsupportedNote = document.getElementById("unsupportedNote");
+
+  let port = null;
+  let reading = false;
+
+  function setStatus(kind, text) {
+    statusDot.className = kind === "connected" ? "connected" : (kind === "error" ? "error" : "");
+    statusTextEl.textContent = text;
+  }
+
+  function setElectrodos(estado) {
+    if (estado === null) {
+      leadsDot.className = "";
+      leadsTextEl.textContent = "Electrodos: sin datos";
+    } else if (estado) {
+      leadsDot.className = "error";
+      leadsTextEl.textContent = "Electrodos: alguno suelto";
+    } else {
+      leadsDot.className = "connected";
+      leadsTextEl.textContent = "Electrodos: en contacto";
+    }
+  }
+
+  async function connectSerial() {
+    try {
+      port = await navigator.serial.requestPort();
+      await port.open({ baudRate: 9600 });
+      cancelarContraccion();
+      habilitarSimulacion(false);
+      connectBtn.textContent = "Desconectar";
+      connectBtn.classList.add("connected");
+      reading = true;
+      setStatus("connected", "Conectado");
+      readLoop();
+    } catch (err) {
+      port = null;
+      setStatus("error", "No se pudo conectar (" + err.message + ")");
+    }
+  }
+
+  async function disconnectSerial() {
+    reading = false;
+    try {
+      if (port) await port.close();
+    } catch (err) { /* ya se estaba cerrando */ }
+    port = null;
+    cancelarContraccion();
+    habilitarSimulacion(true);
+    setElectrodos(null);
+    connectBtn.textContent = "Conectar dispositivo (USB)";
+    connectBtn.classList.remove("connected");
+    setStatus("idle", "Sin conexión");
+  }
+
+  connectBtn.addEventListener("click", function () {
+    if (port && reading) disconnectSerial(); else connectSerial();
+  });
+
+  function handleLine(line) {
+    line = line.trim();   // println() emite \r\n
+    if (line.length === 0) return;
+
+    // Comparar los dos primeros caracteres, no usar startsWith("E"): la
+    // linea de diagnostico "EMG base = ..." empieza con E y no debe entrar.
+    if (line.charAt(0) === "E" && line.charAt(1) === ":") {
+      const raw = parseInt(line.slice(2), 10);
+      if (!isNaN(raw)) {
+        rawUltimo = raw;
+        if (raw > rawMax) rawMax = raw;
+        window.feedEMG(raw / techoCuentas);
+      }
+      return;
+    }
+
+    if (line.charAt(0) === "L" && line.charAt(1) === ":") {
+      const sueltos = line.slice(2) === "1";
+      // Mientras haya un electrodo suelto el sketch manda E:0; la caida de
+      // la envolvente no es una relajacion, asi que no debe estampar nada.
+      if (sueltos) cancelarContraccion();
+      setElectrodos(sueltos);
+      return;
+    }
+    // El resto (diagnosticos legibles) se ignora.
+  }
+
+  async function readLoop() {
+    const textDecoder = new TextDecoderStream();
+    const readableClosed = port.readable.pipeTo(textDecoder.writable);
+    const reader = textDecoder.readable.getReader();
+    let buffer = "";
+
+    try {
+      while (reading) {
+        const r = await reader.read();
+        if (r.done) break;
+        buffer += r.value;
+        let idx;
+        while ((idx = buffer.indexOf("\n")) >= 0) {
+          const line = buffer.slice(0, idx);
+          buffer = buffer.slice(idx + 1);
+          handleLine(line);
+        }
+      }
+    } catch (err) {
+      setStatus("error", "Conexión perdida (" + err.message + ")");
+    } finally {
+      try { reader.releaseLock(); } catch (e) {}
+      try { await readableClosed; } catch (e) {}
+      if (reading) await disconnectSerial();
+    }
+  }
+
+  if (!("serial" in navigator)) {
+    connectBtn.disabled = true;
+    unsupportedNote.style.display = "block";
+    setStatus("error", "Web Serial no disponible");
+  } else {
+    navigator.serial.addEventListener("disconnect", function (e) {
+      if (port && e.target === port) disconnectSerial();
+    });
+  }
+
+  // ---------------------------------------------------------------
+  // Loop principal
+  // ---------------------------------------------------------------
+  window.addEventListener("resize", resize);
+  resize();
+
+  let lastT = performance.now();
+  function loop(now) {
+    const dt = Math.min(0.05, (now - lastT) / 1000);
+    lastT = now;
+    // Con la placa conectada, la envolvente la alimenta solo el lector serie.
+    if (!port) window.feedEMG(simRawSample(dt));
+    renderFrame(now / 1000);
+    updateReadouts();
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

@@ -85,9 +85,12 @@ emite `E:0`.
 - **Sin probar en hardware.** El sketch compila para la LilyPad USB, pero no se
   subió todavía a la placa.
 - Falta medir la amplitud real en reposo y en contracción máxima para fijar el
-  rango de normalización del lado de la web.
-- Todavía no hay página `_dispositivo` que lo consuma: los candidatos son
-  `entorno-digital/prototipos/prototipo_emg_acumulacion_v2.html` y
-  `prototipo_emg_fractura_v1.html`, que ya exponen `window.feedEMG(v01)`.
+  rango de normalización del lado de la web. Mientras tanto, la página activa
+  tiene un slider de "techo de amplitud" y muestra el máximo visto.
+- La página que lo consume es
+  `entorno-digital/prototipo_emg_acumulacion_v3_dispositivo.html`
+  (cuadriláteros superpuestos; ver
+  `entorno-digital/prototipos/cambios_emg_acumulacion_v3.md`). Todavía no se
+  probó con la placa.
 - **Si se cambia el formato de las líneas `E:` o `L:`, hay que actualizar el
   lector de la página que las consuma.**
