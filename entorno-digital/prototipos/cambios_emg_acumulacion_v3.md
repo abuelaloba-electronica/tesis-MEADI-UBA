@@ -1,6 +1,7 @@
 # Cambios de la acumulación EMG → v3: cuadriláteros superpuestos
 
-Archivo: [`../prototipo_emg_acumulacion_v3_dispositivo.html`](../prototipo_emg_acumulacion_v3_dispositivo.html).
+Archivo: [`prototipo_emg_acumulacion_v3_dispositivo.html`](prototipo_emg_acumulacion_v3_dispositivo.html)
+(archivado; la versión activa es la v4, ver [`cambios_emg_acumulacion_v4.md`](cambios_emg_acumulacion_v4.md)).
 Parte de [`prototipo_emg_acumulacion_v2.html`](prototipo_emg_acumulacion_v2.html)
 (se conserva sin cambios) y es la primera página que lee el `dispositivo3`
 (AD8232 en la pantorrilla) por USB.

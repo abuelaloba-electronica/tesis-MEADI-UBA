@@ -99,8 +99,8 @@ emite `E:0`.
     la descarta; si se quiere resolver acá, re-sembrar con la media de varias
     lecturas o alargar `ASENTAMIENTO_MS`.
 - La página que lo consume es
-  `entorno-digital/prototipo_emg_acumulacion_v3_dispositivo.html`
-  (cuadriláteros superpuestos; ver
+  `entorno-digital/prototipo_emg_acumulacion_v4_dispositivo.html`
+  (cuadriláteros superpuestos; el lector serie es el de la v3, ver
   `entorno-digital/prototipos/cambios_emg_acumulacion_v3.md`, sección
   "Calibración con la primera sesión real"). Se recalibró contra
   `salida.txt` con `entorno-digital/tools/harness_emg.js`; falta volver a
