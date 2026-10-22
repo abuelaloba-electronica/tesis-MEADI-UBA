@@ -107,6 +107,16 @@ No hay suite de tests. Tres técnicas, en orden de costo:
    `entorno-digital/tools/harness_midi.js`, que con un `MIDIAccess` falso
    verifica notas colgadas, retrigger, CC del FSR, pánico y el reparto de la
    intensidad en tramos de la escala.
+
+   Para la acumulación EMG está `entorno-digital/tools/harness_emg.js`, que
+   en vez de inventar la señal **reproduce una captura del Monitor Serial**
+   (las líneas `E:`/`L:` tal cual) por un puerto Web Serial falso, y cuenta
+   los cuadriláteros que se habrían estampado. Cada `E:` avanza 20 ms.
+
+   ```
+   node entorno-digital/tools/harness_emg.js entorno-digital/prototipo_emg_acumulacion_v3_dispositivo.html dispositivo3/salida.txt
+   node entorno-digital/tools/harness_emg.js <archivo.html> <captura.txt> --techo=300 --minDur=0.2 --traza
+   ```
 2. **Captura headless con Firefox** para confirmar que la página renderiza:
    `firefox --headless --profile <dir-nuevo> --window-size=1280,800
    --screenshot <salida>.png "file:///<ruta>"`. Cuidado: dispara antes del

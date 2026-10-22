@@ -35,7 +35,58 @@
     font-size: 12px;
     backdrop-filter: blur(4px);
     box-shadow: 0 4px 16px rgba(0,0,0,0.10);
+    transition: transform 0.32s ease, opacity 0.32s ease;
   }
+  /* Oculto hacia la izquierda: se desliza fuera de pantalla */
+  #panel.hidden {
+    transform: translateX(calc(-100% - 24px));
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  /* Cabecera con título + botón de colapsar/ocultar */
+  #panelHeader {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  /* Anulan el estilo genérico de button (ancho completo, margen arriba) */
+  #panelCollapse, #panelHide, #panelShow {
+    width: auto;
+    margin-top: 0;
+    border: 1px solid #999;
+    background: #fff;
+    cursor: pointer;
+  }
+  #panelCollapse:hover, #panelHide:hover, #panelShow:hover { background: #f2f2f2; }
+  #panelCollapse, #panelHide {
+    flex-shrink: 0;
+    padding: 2px 7px;
+    font-size: 13px;
+    line-height: 1;
+    border-radius: 5px;
+    color: #555;
+  }
+  /* Cuando el panel está colapsado, se esconde todo menos la cabecera */
+  #panel.collapsed #panelBody { display: none; }
+
+  /* Pestaña flotante para volver a mostrar el panel oculto */
+  #panelShow {
+    position: fixed;
+    top: 16px; left: 0;
+    padding: 8px 10px;
+    font-size: 13px;
+    line-height: 1;
+    border-left: none;
+    border-radius: 0 8px 8px 0;
+    background: var(--panel-bg);
+    box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+    backdrop-filter: blur(4px);
+    color: #555;
+    display: none;
+  }
+  #panelShow.visible { display: block; }
   #panel h1 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; margin: 0 0 2px; font-weight: 600; color: #555; }
   #panel .subtitle { font-size: 10.5px; color: #999; margin: 0 0 12px; }
   .section-title { font-size: 11px; font-weight: 600; color: #666; margin: 14px 0 8px; text-transform: uppercase; letter-spacing: 0.05em; }
@@ -99,8 +150,17 @@
 
 <canvas id="canvas"></canvas>
 
+<button id="panelShow" title="Mostrar panel">☰ Panel</button>
+
 <div id="panel">
-  <h1>EMG · Acumulación de cuadriláteros</h1>
+  <div id="panelHeader">
+    <h1>EMG · Acumulación de cuadriláteros</h1>
+    <span style="display:flex;gap:4px;flex-shrink:0;">
+      <button id="panelCollapse" title="Colapsar / expandir">–</button>
+      <button id="panelHide" title="Ocultar hacia la izquierda">‹</button>
+    </span>
+  </div>
+  <div id="panelBody">
   <p class="subtitle">MAEDI — V3 · dispositivo3 (AD8232, pantorrilla)</p>
 
   <div class="section-title">Dispositivo</div>
@@ -109,12 +169,16 @@
   <div class="status-row"><div id="leadsDot"></div><span id="leadsText">Electrodos: sin datos</span></div>
   <div id="unsupportedNote">Este navegador no soporta Web Serial API. Probá con Chrome o Edge de escritorio.</div>
 
-  <div class="raw-row">E: <b id="rawVal">—</b> · máx. visto <b id="rawMaxVal">—</b> cuentas</div>
+  <div class="raw-row">E: <b id="rawVal">—</b> · reposo <b id="pisoVal">—</b> · máx. visto <b id="rawMaxVal">—</b> cuentas</div>
   <div class="row">
-    <label><span>Techo de amplitud</span><span class="val" id="techoVal">100</span></label>
-    <input type="range" id="techo" min="10" max="512" step="1" value="100">
+    <label><span>Techo (cuentas sobre el reposo)</span><span class="val" id="techoVal">300</span></label>
+    <input type="range" id="techo" min="20" max="1023" step="1" value="300">
   </div>
   <button id="techoMaxBtn">Usar el máximo visto como techo</button>
+  <div class="check-row">
+    <input type="checkbox" id="cerrarAlSoltarse" checked>
+    <label for="cerrarAlSoltarse">Electrodo suelto cierra la contracción (no la descarta)</label>
+  </div>
 
   <div class="section-title" style="margin-top:14px">Sensor EMG (simulado, respaldo)</div>
   <div id="emgPad">
@@ -135,8 +199,8 @@
   <hr class="divider">
 
   <div class="row">
-    <label><span>Duración mínima</span><span class="val" id="minDurVal">0.3s</span></label>
-    <input type="range" id="minDur" min="0.1" max="1.5" step="0.1" value="0.3">
+    <label><span>Duración mínima</span><span class="val" id="minDurVal">0.20s</span></label>
+    <input type="range" id="minDur" min="0.05" max="1.5" step="0.05" value="0.2">
   </div>
   <div class="row">
     <label><span>Duración máxima</span><span class="val" id="maxDurVal">3.0s</span></label>
@@ -150,6 +214,7 @@
   <hr class="divider">
   <button id="resetBtn">Limpiar lienzo</button>
   <div class="note">Cada contracción sostenida agrega un cuadrilátero derivado de un rectángulo invisible centrado: rotado al azar alrededor de su centro y con las cuatro esquinas desplazadas al azar. La intensidad de la contracción elige el color. Las capas nunca se borran: se superponen y registran la sesión.</div>
+  </div>
 </div>
 
 <div id="stats">
@@ -160,6 +225,31 @@
 <script>
 (function () {
   "use strict";
+
+  // ---------------------------------------------------------------
+  // Panel: colapsible y ocultable hacia la izquierda
+  // ---------------------------------------------------------------
+  (function setupPanelChrome() {
+    const panel = document.getElementById("panel");
+    const btnCollapse = document.getElementById("panelCollapse");
+    const btnHide = document.getElementById("panelHide");
+    const btnShow = document.getElementById("panelShow");
+
+    btnCollapse.addEventListener("click", function () {
+      const collapsed = panel.classList.toggle("collapsed");
+      btnCollapse.textContent = collapsed ? "+" : "–";
+    });
+
+    btnHide.addEventListener("click", function () {
+      panel.classList.add("hidden");
+      btnShow.classList.add("visible");
+    });
+
+    btnShow.addEventListener("click", function () {
+      panel.classList.remove("hidden");
+      btnShow.classList.remove("visible");
+    });
+  })();
 
   // ---------------------------------------------------------------
   // Canvas setup. Ademas del lienzo visible hay una "capa" offscreen
@@ -207,10 +297,21 @@
   // ---------------------------------------------------------------
   // Config
   // ---------------------------------------------------------------
-  let minDurationSec = 0.3;
+  // Duracion minima bajada de 0.3 a 0.2s con la primera sesion real
+  // (dispositivo3/salida.txt): con el electrodo soltandose a cada rato, las
+  // ventanas con contacto son cortas y la mitad de las contracciones no
+  // llegaba a 0.3s.
+  let minDurationSec = 0.2;
   let maxDurationSec = 3.0;
   let opacidadCapa = 0.22;
-  const PRESS_THRESHOLD = 0.08;
+  // Umbral con histeresis: la contraccion empieza al pasar PRESS_THRESHOLD y
+  // termina al bajar de RELEASE_THRESHOLD. Con un solo umbral, una senal que
+  // ronda el borde abria y cerraba contracciones cortas que se descartaban.
+  // Con el techo en 300, 0.25 son ~75 cuentas sobre el reposo: en la sesion
+  // real el ruido de la pierna quieta deambulaba hasta ~55 por encima, y los
+  // movimientos pasaban de 150.
+  const PRESS_THRESHOLD = 0.25;
+  const RELEASE_THRESHOLD = 0.12;
   const POP_MS = 260;
 
   // Rectangulo original: alto ~75 % del viewport, mas alto que ancho.
@@ -302,10 +403,13 @@
   // repetición se hace sobre la envolvente (no sobre la lectura
   // cruda) para no disparar repeticiones falsas por el ruido propio
   // de la señal EMG. Igual que en V2.
+  // ENV_ALPHA subio de 0.15 (ajustado en v2 para ~60 llamadas/s) a 0.25:
+  // el sketch manda 50/s y las ventanas con contacto son cortas, asi que la
+  // envolvente tiene que llegar antes al umbral.
   // ---------------------------------------------------------------
-  const ENV_ALPHA = 0.15;
+  const ENV_ALPHA = 0.25;
   let envelope = 0;
-  let contracting = false, repStart = 0, sumEnv = 0, sampleCount = 0;
+  let contracting = false, repStart = 0, sumEnv = 0, sampleCount = 0, picoEnv = 0;
   let liveIntensity = 0;
 
   // Punto de enganche público: alimentar con una lectura EMG
@@ -319,11 +423,12 @@
     if (!contracting && envelope > PRESS_THRESHOLD) {
       contracting = true;
       repStart = nowSec();
-      sumEnv = 0; sampleCount = 0;
+      sumEnv = 0; sampleCount = 0; picoEnv = 0;
     }
     if (contracting) {
       sumEnv += envelope; sampleCount += 1;
-      if (envelope <= PRESS_THRESHOLD) {
+      if (envelope > picoEnv) picoEnv = envelope;
+      if (envelope <= RELEASE_THRESHOLD) {
         const elapsed = nowSec() - repStart;
         contracting = false;
         finalizeRep(elapsed);
@@ -340,8 +445,29 @@
     liveIntensity = 0;
   }
 
-  function finalizeRep(elapsedSec) {
-    if (elapsedSec < minDurationSec) {
+  // Como cancelarContraccion(), pero la contraccion en curso se cierra en el
+  // instante en que se solto el electrodo y se estampa si duro lo suficiente.
+  // Con el dispositivo3 tal como esta, el movimiento de la pantorrilla es lo
+  // que despega el electrodo: casi toda contraccion real termina en "L:1" y
+  // descartarlas dejaba el lienzo vacio. Las E:0 que siguen no entran.
+  function cerrarContraccion() {
+    if (contracting) {
+      contracting = false;
+      finalizeRep(nowSec() - repStart, true);
+    }
+    cancelarContraccion();
+  }
+
+  // Una contraccion cortada por el electrodo no es un gesto breve: no se
+  // sabe cuanto iba a durar. En la sesion real, la mayoria de los
+  // movimientos subia durante 60-120ms y ahi se soltaba el electrodo. Para
+  // esas alcanza con que la envolvente haya llegado a PICO_TRUNCADA; la
+  // duracion minima sigue valiendo para las que terminan relajandose.
+  const PICO_TRUNCADA = 0.3;
+
+  function finalizeRep(elapsedSec, truncada) {
+    const valeTruncada = truncada && picoEnv >= PICO_TRUNCADA;
+    if (elapsedSec < minDurationSec && !valeTruncada) {
       flashTooShort();
       return;
     }
@@ -354,7 +480,7 @@
   function flashTooShort() {
     const el = document.getElementById("emgLabel");
     const original = el.innerHTML;
-    el.innerHTML = "Muy breve — descartado<br>(mínimo " + minDurationSec.toFixed(1) + "s)";
+    el.innerHTML = "Muy breve — descartado<br>(mínimo " + minDurationSec.toFixed(2) + "s)";
     setTimeout(() => { el.innerHTML = original; }, 900);
   }
 
@@ -436,7 +562,7 @@
   const techoSlider = document.getElementById("techo");
   minDurSlider.addEventListener("input", () => {
     minDurationSec = parseFloat(minDurSlider.value);
-    document.getElementById("minDurVal").textContent = minDurationSec.toFixed(1) + "s";
+    document.getElementById("minDurVal").textContent = minDurationSec.toFixed(2) + "s";
   });
   maxDurSlider.addEventListener("input", () => {
     maxDurationSec = parseFloat(maxDurSlider.value);
@@ -449,19 +575,28 @@
     document.getElementById("opacidadVal").textContent = Math.round(opacidadCapa * 100) + "%";
   });
 
-  // Normalizacion de la linea E: (MAV en cuentas del ADC, techo teorico
-  // ~512). El rango real depende de la persona y de los electrodos y
-  // todavia no se midio: por eso es un control y no una constante.
-  let techoCuentas = 100;
+  // Normalizacion de la linea E: (MAV en cuentas del ADC). En la primera
+  // sesion real (dispositivo3/salida.txt) el reposo con buen contacto quedo
+  // en ~60 cuentas, no en el digito que esperaba el README, y los picos de
+  // movimiento en 200-850. Con el techo viejo de 100 sin restar el reposo, la
+  // envolvente quedaba arriba del umbral en reposo: ninguna contraccion
+  // terminaba, y todas se descartaban despues al soltarse el electrodo.
+  // Ahora se resta un reposo estimado en vivo y el techo se mide sobre el.
+  let techoCuentas = 300;
   let rawUltimo = null, rawMax = 0;
   function setTecho(v) {
-    techoCuentas = Math.max(10, Math.min(512, Math.round(v)));
+    techoCuentas = Math.max(20, Math.min(1023, Math.round(v)));
     techoSlider.value = techoCuentas;
     document.getElementById("techoVal").textContent = techoCuentas;
   }
   techoSlider.addEventListener("input", () => setTecho(parseFloat(techoSlider.value)));
   document.getElementById("techoMaxBtn").addEventListener("click", () => {
-    if (rawMax > 0) setTecho(rawMax);
+    if (rawMax > 0) setTecho(rawMax - (piso === null ? 0 : piso));
+  });
+
+  let cerrarAlSoltarse = true;
+  document.getElementById("cerrarAlSoltarse").addEventListener("change", (e) => {
+    cerrarAlSoltarse = e.target.checked;
   });
 
   document.getElementById("resetBtn").addEventListener("click", () => {
@@ -569,6 +704,12 @@
       port = await navigator.serial.requestPort();
       await port.open({ baudRate: 9600 });
       cancelarContraccion();
+      // Otra sesion, quiza otra persona o los electrodos recolocados: el
+      // reposo se vuelve a medir.
+      piso = null;
+      pisoValEl.textContent = "—";
+      electrodosSueltos = null;
+      empezarAsentamiento();
       habilitarSimulacion(false);
       connectBtn.textContent = "Desconectar";
       connectBtn.classList.add("connected");
@@ -589,6 +730,7 @@
     port = null;
     cancelarContraccion();
     habilitarSimulacion(true);
+    electrodosSueltos = null;
     setElectrodos(null);
     connectBtn.textContent = "Conectar dispositivo (USB)";
     connectBtn.classList.remove("connected");
@@ -599,6 +741,67 @@
     if (port && reading) disconnectSerial(); else connectSerial();
   });
 
+  // ---------------------------------------------------------------
+  // Reposo estimado y asentamiento, del lado del navegador.
+  //
+  // Reposo ("piso"): la MAV que da la pierna quieta, en cuentas. Baja rapido
+  // hacia las lecturas mas bajas y sube lento, y solo con lecturas cercanas
+  // a el (por debajo del umbral de inicio): asi sigue la deriva del contacto
+  // sin subirse encima de las contracciones. Con el electrodo soltandose,
+  // casi todas las lecturas validas son de actividad y, sin esa compuerta,
+  // el reposo trepaba de ~60 a ~95 en medio minuto. Las lecturas altas lo
+  // suben igual, pero muy despacio: si el reposo real pegara un salto, la
+  // envolvente no quedaria trabada arriba para siempre.
+  //
+  // Asentamiento: al reconectar un electrodo, el sketch manda 500ms de E:0 y
+  // despues todavia llega una cola que cae en exponencial (p.ej. 99, 91, 84,
+  // 78... hasta ~20): es su pasaaltos re-sembrado volviendo del riel, no
+  // actividad. Esa cola es monotona; el ruido de reposo y las contracciones
+  // no. Se descarta hasta la primera lectura que no baja (o ASENT_MAX
+  // lecturas, por las dudas), y recien ahi alimenta al reposo y a feedEMG.
+  // ---------------------------------------------------------------
+  const PISO_BAJA = 0.1;      // por lectura: ~0.2s para bajar
+  const PISO_SUBE = 0.004;    // por lectura: ~5s para subir
+  const PISO_SUBE_ALTA = 0.0005;  // por lectura, si es actividad: ~40s
+  const ASENT_MAX = 75;       // 1.5s de lecturas como mucho
+  let piso = null;
+  let electrodosSueltos = null;
+  let asentando = true, asentPrevio = 0, asentCuenta = 0;
+  const pisoValEl = document.getElementById("pisoVal");
+
+  function empezarAsentamiento() {
+    asentando = true; asentPrevio = 0; asentCuenta = 0;
+  }
+
+  function procesarAmplitud(raw) {
+    rawUltimo = raw;
+    if (raw > rawMax) rawMax = raw;
+
+    // Electrodo suelto: el sketch ya manda 0 y la contraccion ya se cerro.
+    if (electrodosSueltos) { window.feedEMG(0); return; }
+
+    if (asentando) {
+      const sigueCayendo = asentPrevio === 0 || raw < asentPrevio;
+      asentCuenta += 1;
+      if (sigueCayendo && asentCuenta < ASENT_MAX) {
+        if (raw > 0) asentPrevio = raw;
+        window.feedEMG(0);
+        return;
+      }
+      asentando = false;
+    }
+
+    if (piso === null) piso = raw;
+    else if (raw < piso) piso += (raw - piso) * PISO_BAJA;
+    else {
+      const cerca = (raw - piso) / techoCuentas < PRESS_THRESHOLD;
+      piso += (raw - piso) * (cerca ? PISO_SUBE : PISO_SUBE_ALTA);
+    }
+    pisoValEl.textContent = String(Math.round(piso));
+
+    window.feedEMG((raw - piso) / techoCuentas);
+  }
+
   function handleLine(line) {
     line = line.trim();   // println() emite \r\n
     if (line.length === 0) return;
@@ -607,11 +810,7 @@
     // linea de diagnostico "EMG base = ..." empieza con E y no debe entrar.
     if (line.charAt(0) === "E" && line.charAt(1) === ":") {
       const raw = parseInt(line.slice(2), 10);
-      if (!isNaN(raw)) {
-        rawUltimo = raw;
-        if (raw > rawMax) rawMax = raw;
-        window.feedEMG(raw / techoCuentas);
-      }
+      if (!isNaN(raw)) procesarAmplitud(raw);
       return;
     }
 
@@ -619,8 +818,18 @@
       const sueltos = line.slice(2) === "1";
       // Mientras haya un electrodo suelto el sketch manda E:0; la caida de
       // la envolvente no es una relajacion, asi que no debe estampar nada.
-      if (sueltos) cancelarContraccion();
-      setElectrodos(sueltos);
+      // Lo que si se puede estampar es la contraccion que venia antes de
+      // soltarse (ver cerrarContraccion()).
+      if (sueltos) {
+        if (cerrarAlSoltarse) cerrarContraccion(); else cancelarContraccion();
+      } else if (electrodosSueltos) {
+        empezarAsentamiento();
+      }
+      // El sketch repite "L:" cada 3s: solo los cambios mueven el estado.
+      if (sueltos !== electrodosSueltos) {
+        electrodosSueltos = sueltos;
+        setElectrodos(sueltos);
+      }
       return;
     }
     // El resto (diagnosticos legibles) se ignora.

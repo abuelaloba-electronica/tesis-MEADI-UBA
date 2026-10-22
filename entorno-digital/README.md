@@ -226,6 +226,14 @@ explica cómo leer la salida y qué patrones delatan un problema.
   de coordenadas envueltas—; `arrastre` es el desplazamiento medio sin
   envolver, o sea cuánto empujó el gesto al campo entero.
 
+Para la acumulación EMG, [`tools/harness_emg.js`](tools/harness_emg.js)
+reproduce una captura del Monitor Serial del `dispositivo3` contra la página y
+cuenta los cuadriláteros que se habrían estampado:
+
+```
+node entorno-digital/tools/harness_emg.js entorno-digital/prototipo_emg_acumulacion_v3_dispositivo.html dispositivo3/salida.txt
+```
+
 ## Estado
 
 Validada con el harness (arranque inmóvil con 1 g, pantalla llena en todo

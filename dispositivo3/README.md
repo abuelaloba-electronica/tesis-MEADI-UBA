@@ -82,15 +82,28 @@ emite `E:0`.
 
 ## Estado actual / pendiente
 
-- **Sin probar en hardware.** El sketch compila para la LilyPad USB, pero no se
-  subió todavía a la placa.
-- Falta medir la amplitud real en reposo y en contracción máxima para fijar el
-  rango de normalización del lado de la web. Mientras tanto, la página activa
-  tiene un slider de "techo de amplitud" y muestra el máximo visto.
+- **Primera sesión en hardware**, capturada del Monitor Serial en
+  [`salida.txt`](salida.txt) (~30 s). Lo que mostró:
+  - **El contacto es el problema principal.** Un tercio del tiempo hay algún
+    electrodo suelto (`L:1`), y casi cada movimiento termina soltándolo: la
+    `E:` sube 3-6 lecturas hacia el riel y llega `L:1`. Además `L:` alterna
+    0/1 decenas de veces seguidas (electrodo rozando). Es lo primero a
+    mejorar: electrodos de gel, cable fijado a la prenda cerca de los
+    electrodos, referencia sobre hueso.
+  - **Reposo en ~60 cuentas** con contacto, no en un dígito: confirma un
+    contacto pobre (ver la trampa de `LO+`/`LO-` arriba). Los movimientos van
+    de ~150 a ~850.
+  - **Tras reconectar, el asentamiento de 500 ms no alcanza**: después de las
+    `E:0` llega una cola que cae en exponencial (~100 → ~20 en ~0,5 s), que es
+    el pasaaltos re-sembrado con una lectura todavía fuera de lugar. La página
+    la descarta; si se quiere resolver acá, re-sembrar con la media de varias
+    lecturas o alargar `ASENTAMIENTO_MS`.
 - La página que lo consume es
   `entorno-digital/prototipo_emg_acumulacion_v3_dispositivo.html`
   (cuadriláteros superpuestos; ver
-  `entorno-digital/prototipos/cambios_emg_acumulacion_v3.md`). Todavía no se
-  probó con la placa.
+  `entorno-digital/prototipos/cambios_emg_acumulacion_v3.md`, sección
+  "Calibración con la primera sesión real"). Se recalibró contra
+  `salida.txt` con `entorno-digital/tools/harness_emg.js`; falta volver a
+  probarla con la placa.
 - **Si se cambia el formato de las líneas `E:` o `L:`, hay que actualizar el
   lector de la página que las consuma.**

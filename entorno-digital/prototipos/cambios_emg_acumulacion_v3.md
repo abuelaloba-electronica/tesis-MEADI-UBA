@@ -110,3 +110,66 @@ igual hasta probar con la pierna.
   cargar: el abanico queda centrado, alrededor del 75 % del alto.
 - **Pendiente:** probar con la placa en Chrome/Edge y fijar el techo por
   defecto con la amplitud real de contracción.
+
+## Calibración con la primera sesión real
+
+Con la placa puesta, la página casi no dibujaba: reproduciendo la captura del
+Monitor Serial ([`dispositivo3/salida.txt`](../../dispositivo3/salida.txt),
+~30 s de movimientos) contra la v3 tal como se había commiteado,
+**0 cuadriláteros**. Se ajustó en el lugar y no por copia: es la calibración
+que la sección Validación dejaba pendiente, no una variante nueva. Con la
+misma captura ahora salen **13**, uno por movimiento.
+
+La captura mostró tres cosas que la v3 no esperaba:
+
+1. **El reposo no es ~0 sino ~60 cuentas**, y deambula hasta ~115. Con el
+   techo en 100 y sin restar nada, la pierna quieta ya daba una envolvente
+   de 0,6-1,0, siempre por encima del umbral (0,08): **ninguna contracción
+   terminaba**. Ahora la página estima el reposo en vivo (panel: "reposo") y
+   normaliza `(E − reposo) / techo`. El reposo baja rápido hacia las
+   lecturas más bajas (~0,2 s) y sube lento (~5 s), y sólo con lecturas
+   cercanas a él: sin esa compuerta, como casi todas las lecturas válidas de
+   la sesión eran de actividad, trepaba de ~60 a ~95 y se comía los
+   movimientos de la segunda mitad. Las lecturas altas igual lo suben, muy
+   despacio (~40 s), para que un salto real del reposo no deje la envolvente
+   trabada arriba. Se vuelve a medir al conectar.
+2. **Casi cada movimiento termina con `L:1`.** El movimiento de la
+   pantorrilla despega el electrodo: la `E:` sube 3-6 lecturas hacia el riel
+   y llega `L:1`. La v3 *cancelaba* la contracción en curso, así que aun con
+   el reposo bien resuelto se descartaba todo. Ahora `L:1` la **cierra** en
+   ese instante (las `E:0` que siguen no entran) y la estampa si duró la
+   duración mínima **o** si la envolvente llegó a `PICO_TRUNCADA` (0,3): una
+   contracción cortada por el electrodo no es un gesto breve, no se sabe
+   cuánto iba a durar. La casilla "Electrodo suelto cierra la contracción"
+   vuelve al comportamiento anterior (con ella destildada, la misma captura
+   da 4), para cuando el contacto esté resuelto.
+3. **Tras reconectar llega una cola falsa.** Después de los 500 ms de `E:0`
+   del sketch, la `E:` arranca en ~100-150 y cae en exponencial hasta ~20 en
+   ~0,5 s: es el pasaaltos del sketch re-sembrado con una lectura todavía
+   fuera de lugar. Esa cola es monótona y ni el ruido de reposo ni una
+   contracción lo son, así que la página la descarta hasta la primera lectura
+   que no baja (con un tope de 1,5 s). Sin esto, la cola bajaba el reposo a
+   ~15 y la pierna quieta pasaba a leerse como contracción.
+
+Constantes que cambiaron, todas medidas contra la captura con
+`tools/harness_emg.js`:
+
+| | antes | ahora | por qué |
+|---|---|---|---|
+| techo por defecto | 100 (sobre 0) | 300 (sobre el reposo) | movimientos de ~150 a ~850; slider hasta 1023, porque la MAV pasó de 512 cerca del riel |
+| umbral | 0,08 | inicio 0,25 / fin 0,12 | con histéresis. 0,25 × 300 ≈ 75 cuentas sobre el reposo, por encima de lo que deambula la pierna quieta (~55); con 0,10 el ruido de reposo estampaba cuadriláteros falsos, y con 0,20 dos movimientos seguidos se fundían en uno |
+| `ENV_ALPHA` | 0,15 | 0,25 | el sketch manda 50/s y no ~60/s, y las ventanas con contacto son cortas |
+| duración mínima | 0,3 s | 0,2 s (slider desde 0,05) | las contracciones completas de la sesión duraron 0,3-0,7 s; con 0,3 se perdía una que quedaba justo por debajo |
+
+Control contra falsos positivos con una captura sintética (reposo uniforme
+55-115, como el real): 20 s de pierna quieta → 0 cuadriláteros; 10 ráfagas de
+1 s a 250-400 → 10; 5 picos de 40 ms sin `L:1` → descartados por breves.
+
+**Lo que la página no puede arreglar:** un tercio de la sesión transcurre con
+un electrodo suelto, y en la segunda mitad las ventanas con contacto duran
+0,1-0,5 s. Ahí lo único que se ve de cada movimiento es la subida al riel que
+precede a `L:1`, y eso es lo que estampa los cuadriláteros de 0,0-0,1 s.
+Con el contacto resuelto (ver `dispositivo3/README.md`), probablemente haya
+que subir de nuevo el umbral de inicio y volver a la duración mínima de
+0,3 s. Volver a capturar una sesión y pasarla por el harness antes de tocar
+constantes.
