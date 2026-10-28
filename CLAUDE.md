@@ -33,6 +33,13 @@ Las páginas ignoran en silencio cualquier línea que no reconozcan, así que lo
 sketches pueden seguir imprimiendo diagnósticos legibles para el Monitor Serial
 sin romper nada.
 
+**La experiencia completa** vive en `entorno-digital/experiencia/`:
+`experiencia.html` son las pantallas de texto (0–6 y 10, ← →), y las pantallas
+7, 8 y 9 son copias `_experiencia` de las tres páginas activas, con aviso de
+instrucciones, Retroceso para borrar, barra espaciadora para capturar
+(definitiva, PNG en IndexedDB) y → para seguir. Las copias no cambian la
+física: un ajuste en una página activa hay que portarlo a mano a su copia.
+
 ## Convenciones
 
 **Páginas web autocontenidas.** Un solo archivo `.html` con su `<style>` y su
@@ -167,4 +174,5 @@ Verificación de sintaxis rápida: extraer el `<script>` a un `.js` y correr
 | el guante con Helm por MIDI | `entorno-digital/prototipos/cambios_percusion_guante_midi.md` (y `..._midi_v2.md`, el FSR como disco) |
 | la acumulación EMG v3 (cuadriláteros, lector del dispositivo3) | `entorno-digital/prototipos/cambios_emg_acumulacion_v3.md` |
 | la acumulación EMG v4 (centro que se muda, familias de color) | `entorno-digital/prototipos/cambios_emg_acumulacion_v4.md` |
+| la experiencia completa (pantallas, captura, navegación) | el borrador `entorno-digital/experiencia intercativa.md` |
 | visualizaciones sin hardware todavía (EMG, estiramiento) | `entorno-digital/prototipos/propuesta_*.md` |

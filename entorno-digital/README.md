@@ -19,6 +19,20 @@ están en [`prototipos/`](prototipos/).
 | [`prototipo_percusion_guante_a_midi_v2_dispositivo.html`](prototipo_percusion_guante_a_midi_v2_dispositivo.html) | 2 piezos + FSR (escala por intensidad, sonido en Helm por MIDI, el FSR como disco azul) | [`dispositivo2`](../dispositivo2/) | [`documentacion_percusion_guante.md`](documentacion_percusion_guante.md) |
 | [`prototipo_emg_acumulacion_v4_dispositivo.html`](prototipo_emg_acumulacion_v4_dispositivo.html) | EMG (cuadriláteros superpuestos derivados de un rectángulo invisible; cada 1-5 el centro se muda a cualquier punto y cambia la familia de color; la intensidad elige el tono) | [`dispositivo3`](../dispositivo3/) | [`cambios_emg_acumulacion_v4.md`](prototipos/cambios_emg_acumulacion_v4.md) (y [`..._v3.md`](prototipos/cambios_emg_acumulacion_v3.md)) |
 
+### La experiencia completa: `experiencia/`
+
+[`experiencia/experiencia.html`](experiencia/experiencia.html) encadena las
+tres visualizaciones en un recorrido de pantallas (0–10) a partir del borrador
+[`experiencia intercativa.md`](experiencia%20intercativa.md). Las pantallas 0–6
+y 10 son texto y se recorren con ← →; la 7, la 8 y la 9 son copias
+`_experiencia` de las tres páginas activas, que muestran sus instrucciones en
+un aviso cerrable, borran con Retroceso, capturan el lienzo con la barra
+espaciadora (sin vuelta atrás, guardado en IndexedDB) y recién entonces pasan a
+la siguiente con →. En la 10, Inicio borra las capturas y vuelve a la 0.
+
+Las copias no cambian la física: si se ajusta una visualización activa, el
+cambio hay que portarlo a mano a su copia `_experiencia`.
+
 ### Archivadas en `prototipos/`
 
 Versiones anteriores, que se conservan para comparar, y propuestas cuyo

@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Experiencia interactiva (MAEDI)</title>
+<style>
+  :root {
+    --ink: #111;
+    --suave: #888;
+  }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: #fff;
+    color: var(--ink);
+    font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+  }
+  body { display: flex; align-items: center; justify-content: center; }
+
+  #pantalla {
+    box-sizing: border-box;
+    width: min(880px, 100vw);
+    padding: 48px 32px;
+    font-size: clamp(20px, 2.4vw, 30px);
+    line-height: 1.45;
+    text-align: center;
+  }
+  #pantalla p { margin: 0 0 0.9em; }
+  #pantalla .cita { font-style: italic; }
+  #pantalla .autoria { font-size: 0.7em; color: var(--suave); font-style: normal; }
+  #pantalla .nota { font-size: 0.6em; color: var(--suave); margin-top: 2em; }
+  #pantalla .logo { font-size: 0.6em; letter-spacing: 0.2em; margin-top: 2.5em; }
+  #pantalla .conteo { font-size: 4em; font-variant-numeric: tabular-nums; }
+
+  #pie {
+    position: fixed;
+    bottom: 14px; right: 18px;
+    font-size: 11px;
+    color: #aaa;
+    font-variant-numeric: tabular-nums;
+  }
+</style>
+</head>
+<body>
+<section id="pantalla"></section>
+<div id="pie"></div>
+
+<script>
+(function () {
+  "use strict";
+
+  // ---------------------------------------------------------------
+  // Recorrido de la experiencia. Las pantallas de texto viven acá; la 7,
+  // la 8 y la 9 son páginas propias (las visualizaciones de cada
+  // dispositivo) que capturan su lienzo con la barra espaciadora y
+  // avanzan con → hasta volver a experiencia.html#10. Desde acá sólo se
+  // entra a la 7: a los dispositivos no se vuelve hacia atrás.
+  //
+  // Por ahora todo es texto negro sobre blanco; el texto sale del
+  // borrador "experiencia intercativa.md". Cada pantalla es una lista de
+  // párrafos { texto, clase }.
+  // ---------------------------------------------------------------
+  const PANTALLAS = {
+    0: [
+      { texto: "Bienvenid@ a esta exploración interactiva a través de tu cuerpo, textiles electrónicos y un ambiente digital." },
+      { texto: "Esta investigación se enmarca en mi proyecto de tesis para culminar la Maestría en Diseño Interactivo." },
+      { texto: "¡Gracias por participar!" },
+      // Hasta tener el logotipo como imagen.
+      { texto: "FADU · UBA · MAEDI", clase: "logo" },
+    ],
+    1: [
+      { texto: "“Un ciborg es un organismo cibernético, un híbrido de máquina y organismo, una criatura de realidad social y también de ficción”", clase: "cita" },
+      { texto: "Donna Haraway (1984)", clase: "autoria" },
+      { texto: "“Simpoiesis es una palabra sencilla, significa “generar-con”. Nada se hace a sí mismo, nada es realmente autopoiético o autoorganizado.”", clase: "cita" },
+      { texto: "Donna Haraway (2019)", clase: "autoria" },
+    ],
+    // La 2 es el conteo: ver mostrarConteo().
+    2: [],
+    3: [
+      { texto: "la frontera entre humano y máquina se desdibuja." },
+    ],
+    4: [
+      { texto: "Surge una nueva identidad." },
+      { texto: "Hibridación Humano - Máquina." },
+    ],
+    5: [
+      { texto: "cuerpo físico, cuerpo virtual, piel, segunda piel, textil electrónico, sensores, actuadores, microcontrolador, datos, vibración, mano, pecho, pierna, pulsar, tocar, contraer, relajar, todo se entrelaza." },
+    ],
+    6: [
+      { texto: "Los datos de tu cuerpo a través de tu actividad fisiológica y motriz darán lugar a una composición gráfica en el ambiente digital a través del textil electrónico." },
+      { texto: "Tomate el tiempo que creas necesario, contempla el momento y disfruta de la experiencia :)" },
+      { texto: "Colocar dispositivo uno", clase: "nota" },
+    ],
+    10: [
+      { texto: "Llegaste casi al final de la experiencia, tu cuerpo generó datos para una composición gráfica." },
+      { texto: "Para finalizar selecciona las zonas de las composiciones que creas que son las más ricas en cuanto a tus gustos personales para generar tu obra y la máquina las capturará. Al finalizar podrías cambiar la colorimetría si lo deseas." },
+      { texto: "¡Gracias nuevamente por ser parte de esta investigación!" },
+    ],
+  };
+  const ULTIMA_DE_TEXTO = 6;
+  const PRIMER_DISPOSITIVO = "bandada_prototipo_v5a_experiencia.html";
+  const CIERRE = 10;
+  const PANTALLA_CONTEO = 2;
+
+  const pantallaEl = document.getElementById("pantalla");
+  const pieEl = document.getElementById("pie");
+  let actual = 0;
+  let conteo = null;
+
+  function parrafo(texto, clase) {
+    const p = document.createElement("p");
+    p.textContent = texto;
+    if (clase) p.className = clase;
+    return p;
+  }
+
+  function mostrar(n) {
+    actual = n;
+    clearInterval(conteo);
+    pantallaEl.textContent = "";
+    (PANTALLAS[n] || []).forEach(function (par) {
+      pantallaEl.appendChild(parrafo(par.texto, par.clase));
+    });
+    if (n === PANTALLA_CONTEO) mostrarConteo();
+    pieEl.textContent = n === CIERRE
+      ? n + " / " + CIERRE
+      : n + " / " + CIERRE + "  ·  ← →";
+  }
+
+  // Pantalla 2: por ahora sólo el conteo 10 → 0, sin las imágenes. Se
+  // queda en 0; no avanza sola.
+  function mostrarConteo() {
+    let n = 10;
+    const el = parrafo(String(n), "conteo");
+    pantallaEl.appendChild(el);
+    conteo = setInterval(function () {
+      n--;
+      el.textContent = String(n);
+      if (n <= 0) clearInterval(conteo);
+    }, 1000);
+  }
+
+  // El número de pantalla vive en el hash: recargar no pierde el lugar, y
+  // la última visualización vuelve con experiencia.html#10.
+  function desdeHash() {
+    const n = parseInt(location.hash.slice(1), 10);
+    if (n === CIERRE || (n >= 0 && n <= ULTIMA_DE_TEXTO)) return n;
+    return 0;
+  }
+  function ir(n) {
+    if (location.hash === "#" + n) mostrar(n);
+    else location.hash = "#" + n;     // hashchange llama a mostrar()
+  }
+  window.addEventListener("hashchange", function () { mostrar(desdeHash()); });
+
+  // Para la próxima persona: borra las capturas guardadas por las páginas
+  // de los dispositivos (IndexedDB "experiencia", almacén "capturas").
+  function borrarCapturas() {
+    return new Promise(function (ok) {
+      if (typeof indexedDB === "undefined") return ok();
+      const pedido = indexedDB.open("experiencia", 1);
+      pedido.onupgradeneeded = function () { pedido.result.createObjectStore("capturas"); };
+      pedido.onerror = function () { ok(); };
+      pedido.onsuccess = function () {
+        const db = pedido.result;
+        const tx = db.transaction("capturas", "readwrite");
+        tx.objectStore("capturas").clear();
+        tx.oncomplete = tx.onerror = function () { db.close(); ok(); };
+      };
+    });
+  }
+
+  window.addEventListener("keydown", function (e) {
+    if (actual === CIERRE) {
+      // Tecla del operador para reiniciar el recorrido.
+      if (e.key === "Home") borrarCapturas().then(function () { ir(0); });
+      return;
+    }
+    if (e.key === "ArrowRight") {
+      if (actual < ULTIMA_DE_TEXTO) ir(actual + 1);
+      else location.href = PRIMER_DISPOSITIVO;
+    } else if (e.key === "ArrowLeft") {
+      if (actual > 0) ir(actual - 1);
+    }
+  });
+
+  mostrar(desdeHash());
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,1410 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Experiencia · 8 · Guante de percusión (MAEDI)</title>
+<style>
+  :root {
+    --panel-bg: rgba(255,255,255,0.94);
+    --ink: #222;
+    --line: #ddd;
+    --accent: #e63986;
+    --ok: #2f9e44;
+    --bad: #d9480f;
+  }
+  html, body {
+    margin: 0; padding: 0; overflow: hidden;
+    background: #faf6f0;
+    font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+    color: var(--ink);
+  }
+  canvas { display: block; position: fixed; top: 0; left: 0; }
+  #acum { z-index: 0; }
+  /* multiply tambien en el overlay: el disco vivo del FSR se ve igual que
+     cuando queda estampado en #acum, sin salto al soltar */
+  #over { z-index: 1; pointer-events: none; mix-blend-mode: multiply; }
+
+  #panel {
+    position: fixed;
+    z-index: 2;
+    top: 16px; left: 16px;
+    width: 300px;
+    max-height: calc(100vh - 32px);
+    overflow-y: auto;
+    background: var(--panel-bg);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 16px 18px 12px;
+    font-size: 12px;
+    backdrop-filter: blur(4px);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.10);
+    transition: transform 0.32s ease, opacity 0.32s ease;
+  }
+  /* Oculto hacia la izquierda: se desliza fuera de pantalla */
+  #panel.hidden {
+    transform: translateX(calc(-100% - 24px));
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  /* Cabecera con título + botón de colapsar/ocultar */
+  #panelHeader {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  #panelCollapse, #panelHide, #panelShow {
+    border: 1px solid #999;
+    background: #fff;
+    cursor: pointer;
+  }
+  #panelCollapse:hover, #panelHide:hover, #panelShow:hover { background: #f2f2f2; }
+  #panelCollapse, #panelHide {
+    flex-shrink: 0;
+    padding: 2px 7px;
+    font-size: 13px;
+    line-height: 1;
+    border-radius: 5px;
+    color: #555;
+  }
+  /* Cuando el panel está colapsado, se esconde todo menos la cabecera */
+  #panel.collapsed #panelBody { display: none; }
+
+  /* Pestaña flotante para volver a mostrar el panel oculto */
+  #panelShow {
+    position: fixed;
+    z-index: 2;
+    top: 16px; left: 0;
+    padding: 8px 10px;
+    font-size: 13px;
+    line-height: 1;
+    border-left: none;
+    border-radius: 0 8px 8px 0;
+    background: var(--panel-bg);
+    box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+    backdrop-filter: blur(4px);
+    color: #555;
+    display: none;
+  }
+  #panelShow.visible { display: block; }
+  #panel h1 {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin: 0 0 2px;
+    font-weight: 600;
+    color: #555;
+  }
+  #panel .subtitle {
+    font-size: 10.5px;
+    color: #999;
+    margin: 0 0 12px;
+  }
+  .section-title {
+    font-size: 11px;
+    font-weight: 600;
+    color: #666;
+    margin: 14px 0 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .section-title:first-of-type { margin-top: 0; }
+
+  #connectBtn, #midiBtn {
+    width: 100%;
+    padding: 9px 8px;
+    font-size: 12px;
+    font-weight: 600;
+    border: 1px solid var(--accent);
+    background: var(--accent);
+    color: #fff;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  #connectBtn:hover, #midiBtn:hover { filter: brightness(1.05); }
+  #connectBtn:disabled, #midiBtn:disabled { cursor: default; filter: none; }
+  #connectBtn.connected, #midiBtn.connected {
+    background: #fff;
+    color: var(--ok);
+    border-color: var(--ok);
+  }
+
+  .status-row {
+    display: flex; align-items: center; gap: 6px;
+    margin-top: 8px;
+    font-size: 11px;
+    color: #777;
+  }
+  #statusDot, #midiDot {
+    width: 9px; height: 9px;
+    border-radius: 50%;
+    background: #bbb;
+    flex-shrink: 0;
+  }
+  #statusDot.connected, #midiDot.connected { background: var(--ok); }
+  #statusDot.error, #midiDot.error { background: var(--bad); }
+
+  #unsupportedNote, #midiUnsupportedNote {
+    display: none;
+    margin-top: 8px;
+    font-size: 10.5px;
+    color: var(--bad);
+    line-height: 1.4;
+  }
+
+  .bar-row { margin: 8px 0; }
+  .bar-row label {
+    display: flex; justify-content: space-between;
+    font-size: 10.5px; color: #777; margin-bottom: 3px;
+  }
+  .bar-track {
+    width: 100%; height: 6px;
+    background: #ececec; border-radius: 3px;
+    overflow: hidden;
+  }
+  .bar-fill {
+    height: 100%; width: 0%;
+    border-radius: 3px;
+    background: #999;
+  }
+  #forceFillBar { background: #0000FF; }
+  #hit0Fill { background: #FFDE21; }
+  #hit1Fill { background: #FF8C1A; }
+
+  #midiSelect { width: 100%; margin-top: 8px; }
+  #escalaSelect { width: 100%; }
+  #tablaRangos {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 8px;
+    font-size: 10.5px;
+    font-variant-numeric: tabular-nums;
+  }
+  #tablaRangos th {
+    text-align: left; font-weight: 600; color: #777;
+    border-bottom: 1px solid var(--line); padding: 2px 4px;
+  }
+  #tablaRangos td { padding: 1px 4px; color: #555; }
+  #tablaRangos tr.ultima td { background: #fdeaf3; color: var(--ink); font-weight: 600; }
+  .color-row { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+  #colorSelect, #midiSelect, #escalaSelect {
+    flex: 1;
+    padding: 6px 8px;
+    font-size: 11.5px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    background: #fff;
+    color: var(--ink);
+  }
+  .swatch-pair { display: flex; gap: 3px; flex-shrink: 0; }
+  .swatch-pair div {
+    width: 16px; height: 22px;
+    border: 1px solid rgba(0,0,0,0.15);
+    border-radius: 3px;
+  }
+  .note { font-size: 10.5px; color: #999; line-height: 1.4; margin-top: 6px; }
+
+  .row { margin-bottom: 10px; }
+  .row label {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 3px;
+    font-size: 11.5px;
+  }
+  .row label span.val {
+    font-variant-numeric: tabular-nums;
+    color: #666;
+  }
+  input[type=range] { width: 100%; }
+  .divider { border: none; border-top: 1px solid var(--line); margin: 12px 0; }
+
+  button.plain {
+    width: 100%;
+    padding: 7px 8px;
+    font-size: 11.5px;
+    border: 1px solid #999;
+    background: #fff;
+    border-radius: 6px;
+    cursor: pointer;
+    margin-top: 4px;
+  }
+  button.plain:hover { background: #f2f2f2; }
+
+  #stats {
+    position: fixed;
+    z-index: 2;
+    bottom: 16px; left: 16px;
+    background: var(--panel-bg);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 10px 14px;
+    font-size: 11px;
+    color: #666;
+    line-height: 1.6;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+  }
+  #stats b { color: #333; }
+  #swatch {
+    display: inline-block;
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    vertical-align: middle;
+    margin-right: 4px;
+    border: 1px solid rgba(0,0,0,0.15);
+  }
+  #hint {
+    margin-top: 10px;
+    font-size: 10.5px;
+    color: #999;
+    line-height: 1.4;
+  }
+
+  /* ---------------------------------------------------------------
+     Experiencia: aviso sobre el lienzo. Copia la anatomía y los tokens
+     del Alert de Ant Design (ícono, título, descripción, X), escrito a
+     mano para no depender de un CDN en la sala.
+     --------------------------------------------------------------- */
+  .aviso {
+    position: fixed;
+    top: 24px; left: 50%;
+    transform: translate(-50%, -8px);
+    width: min(560px, calc(100vw - 32px));
+    box-sizing: border-box;
+    display: flex; gap: 12px; align-items: flex-start;
+    padding: 16px 20px 16px 16px;
+    border: 1px solid #91caff;
+    border-radius: 8px;
+    background: #e6f4ff;
+    color: rgba(0,0,0,0.88);
+    box-shadow: 0 6px 16px rgba(0,0,0,0.08), 0 3px 6px -4px rgba(0,0,0,0.12);
+    font-size: 14px; line-height: 1.57;
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.25s ease, transform 0.25s ease;
+    z-index: 20;
+  }
+  .aviso.visible { opacity: 1; pointer-events: auto; transform: translate(-50%, 0); }
+  .aviso.exito { border-color: #b7eb8f; background: #f6ffed; }
+  .aviso-icono {
+    flex-shrink: 0;
+    width: 22px; height: 22px; margin-top: 1px;
+    border-radius: 50%;
+    background: #1677ff; color: #fff;
+    font: bold 14px/22px Georgia, serif; text-align: center;
+  }
+  .aviso.exito .aviso-icono { background: #52c41a; }
+  .aviso-cuerpo { flex: 1; }
+  .aviso-titulo { font-size: 16px; line-height: 1.5; margin-bottom: 4px; }
+  .aviso-texto { white-space: pre-line; }
+  .aviso-cerrar {
+    flex-shrink: 0;
+    width: auto; margin: 0;    /* las páginas tienen un button { width: 100% } global */
+    border: none; background: transparent; cursor: pointer;
+    font-size: 20px; line-height: 1; padding: 0 2px;
+    color: rgba(0,0,0,0.45);
+  }
+  .aviso-cerrar:hover { color: rgba(0,0,0,0.88); }
+</style>
+</head>
+<body>
+
+<canvas id="acum"></canvas>
+<canvas id="over"></canvas>
+
+<div id="aviso" class="aviso" role="status">
+  <span id="avisoIcono" class="aviso-icono">i</span>
+  <div class="aviso-cuerpo">
+    <div id="avisoTitulo" class="aviso-titulo"></div>
+    <div id="avisoTexto" class="aviso-texto"></div>
+  </div>
+  <button id="avisoCerrar" class="aviso-cerrar" title="Cerrar" aria-label="Cerrar">×</button>
+</div>
+
+<button id="panelShow" class="visible" title="Mostrar panel">☰ Panel</button>
+
+<div id="panel" class="hidden">
+  <div id="panelHeader">
+    <h1>Percusión · Guante (a)</h1>
+    <span style="display:flex;gap:4px;flex-shrink:0;">
+      <button id="panelCollapse" title="Colapsar / expandir">–</button>
+      <button id="panelHide" title="Ocultar hacia la izquierda">‹</button>
+    </span>
+  </div>
+  <div id="panelBody">
+  <p class="subtitle">MAEDI — cada golpe deja un anillo amarillo o naranja y cada presión del FSR un disco azul, leyendo el dispositivo real por USB; el sonido lo genera Helm por MIDI</p>
+
+  <div class="section-title">Conexión con el dispositivo</div>
+  <button id="connectBtn">Conectar dispositivo (USB)</button>
+  <div class="status-row"><div id="statusDot"></div><span id="statusText">Sin conexión</span></div>
+  <div id="unsupportedNote">Este navegador no soporta Web Serial API. Probá con Chrome o Edge de escritorio.</div>
+
+  <div class="bar-row">
+    <label><span>Fuerza (cruda)</span><span id="forceRawVal">— / 1023</span></label>
+    <div class="bar-track"><div class="bar-fill" id="forceFillBar"></div></div>
+  </div>
+  <div class="bar-row">
+    <label><span>Último golpe dedo 0</span><span id="hit0Val">—</span></label>
+    <div class="bar-track"><div class="bar-fill" id="hit0Fill"></div></div>
+  </div>
+  <div class="bar-row">
+    <label><span>Último golpe dedo 1</span><span id="hit1Val">—</span></label>
+    <div class="bar-track"><div class="bar-fill" id="hit1Fill"></div></div>
+  </div>
+
+  <hr class="divider">
+
+  <div class="section-title">Calibración de intensidad</div>
+  <div class="row">
+    <label><span>Pico mínimo (golpe suave, nota más grave)</span><span class="val" id="picoMinVal">30</span></label>
+    <input type="range" id="picoMin" min="0" max="400" step="5" value="30">
+  </div>
+  <div class="row">
+    <label><span>Pico máximo (golpe fuerte, nota más aguda)</span><span class="val" id="picoMaxVal">600</span></label>
+    <input type="range" id="picoMax" min="100" max="1023" step="10" value="600">
+  </div>
+  <div class="note">El sketch manda el pico crudo del piezo (0–1023). Este rango se parte en tantos tramos iguales como notas tenga la escala: cada tramo es una nota. El mismo rango se estira a 0–1 para el tamaño y la opacidad del círculo. Ajustarlo tocando.</div>
+
+  <hr class="divider">
+
+  <div class="section-title">Escala: cuántas notas y cuáles</div>
+  <select id="escalaSelect">
+    <option value="pentaMenor6" selected>Pentatónica menor · 6 notas (1 octava)</option>
+    <option value="pentaMenor11">Pentatónica menor · 11 notas (2 octavas)</option>
+    <option value="pentaMayor6">Pentatónica mayor · 6 notas (1 octava)</option>
+    <option value="mayor8">Mayor (do-re-mi) · 8 notas (1 octava)</option>
+    <option value="cromatica13">Cromática · 13 notas (todas, más disonante)</option>
+  </select>
+  <table id="tablaRangos"><thead><tr><th>Pico</th><th>Dedo 0</th><th>Dedo 1</th></tr></thead><tbody id="tablaRangosBody"></tbody></table>
+  <div class="note">Cada fila es un tramo del rango de calibración y la nota que dispara en cada dedo. Se resalta la del último golpe. Para cambiar de nota hay que pasar el borde del tramo por un 15 %: así un golpe que cae justo en el borde no alterna entre dos notas.</div>
+
+  <hr class="divider">
+
+  <div class="section-title">Color de los anillos (dedos 0 y 1)</div>
+  <div class="color-row">
+    <select id="colorSelect">
+      <option value="#FFDE21,#FF8C1A" selected>Amarillo + Naranja</option>
+      <option value="#FFDE21,#FF4A1C">Amarillo + Rojo anaranjado</option>
+      <option value="#ECFD18,#FFA500">Amarillo fluo + Naranja</option>
+    </select>
+    <div class="swatch-pair"><div id="sw0"></div><div id="sw1"></div><div id="sw2"></div></div>
+  </div>
+  <div class="note">Los dos dedos se dibujan como anillos y se distinguen por el tono. El disco relleno azul es siempre el FSR: aparece al empezar a apretar, crece hasta la presión máxima alcanzada y queda estampado al soltar.</div>
+
+  <hr class="divider">
+
+  <div class="section-title">Sonido: Helm por MIDI</div>
+  <button id="midiBtn">Habilitar salida MIDI</button>
+  <div class="status-row"><div id="midiDot"></div><span id="midiStatusText">Sin MIDI</span></div>
+  <select id="midiSelect" disabled><option value="">— sin puertos —</option></select>
+  <div id="midiUnsupportedNote">Este navegador no soporta Web MIDI API. Probá con Chrome o Edge de escritorio.</div>
+  <div class="row" style="margin-top:8px;">
+    <label><span>Notas enviadas</span><span class="val" id="midiCountVal">0</span></label>
+  </div>
+  <div class="row">
+    <label><span>Fuerza → CC1 (rueda de modulación)</span><span class="val" id="ccVal">—</span></label>
+  </div>
+  <button class="plain" id="panicBtn">Silenciar todo (pánico)</button>
+  <div class="note">La página no produce sonido: manda la nota del tramo donde cayó el golpe por el canal 1, y la presión del FSR como CC1. En Linux, elegir <b>Midi Through</b> acá y la misma entrada en Helm. El volumen y la latencia de audio se ajustan en Helm.</div>
+
+  <hr class="divider">
+  <button class="plain" id="resetBtn">Limpiar lienzo</button>
+  <div id="hint">Teclas <b>A</b> y <b>L</b> disparan los dedos 0 y 1 sin la placa (intensidad al azar, o sea nota al azar), y <b>F</b> mantenida simula una presión del FSR que sube de a poco hasta el máximo: cuanto más tiempo se mantiene, más grande el disco y más alto el CC1. Sirve para diseñar el patch de Helm sin el guante.</div>
+  </div>
+</div>
+
+<div id="stats">
+  Golpes: <b id="countVal">0</b><br>
+  Último: <span id="swatch"></span><b id="lastVal">—</b>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  // ===============================================================
+  // Panel: colapsible y ocultable hacia la izquierda
+  // ===============================================================
+  (function setupPanelChrome() {
+    const panel = document.getElementById("panel");
+    const btnCollapse = document.getElementById("panelCollapse");
+    const btnHide = document.getElementById("panelHide");
+    const btnShow = document.getElementById("panelShow");
+
+    btnCollapse.addEventListener("click", function () {
+      const collapsed = panel.classList.toggle("collapsed");
+      btnCollapse.textContent = collapsed ? "+" : "–";
+    });
+
+    btnHide.addEventListener("click", function () {
+      panel.classList.add("hidden");
+      btnShow.classList.add("visible");
+    });
+
+    btnShow.addEventListener("click", function () {
+      panel.classList.remove("hidden");
+      btnShow.classList.remove("visible");
+    });
+  })();
+
+  // ===============================================================
+  // Lienzo: dos capas.
+  //   #acum  persistente, nunca se limpia — se le dibuja SOLO el golpe nuevo.
+  //   #over  se limpia en cada frame — anillos de impacto vivos.
+  // El prototipo anterior (circulos fuerza+pulso) redibujaba la lista completa
+  // en cada frame porque el parpadeo por latido lo exigia. Aca eso no sirve: un
+  // guante genera 4-8 golpes por segundo y a los pocos minutos serian cientos de
+  // arcos por frame. Ademas el lector de Web Serial corre en el mismo hilo que el
+  // dibujo, asi que un frame caro retrasa el sonido: el costo por frame constante
+  // es un requisito de latencia, no una optimizacion cosmetica.
+  // ===============================================================
+  const acum = document.getElementById("acum");
+  const over = document.getElementById("over");
+  const ctxA = acum.getContext("2d");
+  const ctxO = over.getContext("2d");
+  let W = 0, H = 0;
+  const DPR = Math.max(1, window.devicePixelRatio || 1);
+  const BG_COLOR = "#faf6f0";
+
+  function pintarFondo() {
+    ctxA.globalCompositeOperation = "source-over";
+    ctxA.globalAlpha = 1;
+    ctxA.fillStyle = BG_COLOR;
+    ctxA.fillRect(0, 0, W, H);
+  }
+
+  function resize() {
+    // El lienzo acumulado no se puede perder al redimensionar: se copia a un
+    // canvas temporal y se vuelve a pegar sobre el lienzo nuevo.
+    const previo = document.createElement("canvas");
+    previo.width = acum.width;
+    previo.height = acum.height;
+    if (acum.width > 0 && acum.height > 0) {
+      previo.getContext("2d").drawImage(acum, 0, 0);
+    }
+    const teniaContenido = acum.width > 0;
+
+    W = window.innerWidth;
+    H = window.innerHeight;
+    [acum, over].forEach(function (c) {
+      c.width = W * DPR;
+      c.height = H * DPR;
+      c.style.width = W + "px";
+      c.style.height = H + "px";
+    });
+    ctxA.setTransform(DPR, 0, 0, DPR, 0, 0);
+    ctxO.setTransform(DPR, 0, 0, DPR, 0, 0);
+
+    pintarFondo();
+    if (teniaContenido) {
+      ctxA.save();
+      ctxA.setTransform(1, 0, 0, 1, 0, 0);
+      ctxA.drawImage(previo, 0, 0);
+      ctxA.restore();
+    }
+  }
+  window.addEventListener("resize", resize);
+  resize();
+
+  // ===============================================================
+  // Configuracion
+  // ===============================================================
+  let picoMin = 30;          // cuentas de ADC: por debajo, el golpe cuenta como el mas suave
+  let picoMax = 600;         // por encima, como el mas fuerte
+
+  const R_MIN_FRAC = 0.08;   // radio minimo, relativo a min(W,H). Cerca del maximo a
+                             // proposito: todos los circulos salen grandes y la
+                             // intensidad solo los hace oscilar un 20 % entre si
+                             // (con 0.012 los golpes suaves eran puntos)
+  const R_MAX_FRAC = 0.10;   // bastante menor que el 0.30 del prototipo anterior:
+                             // con 10-20 veces mas eventos, los tamanos viejos
+                             // saturaban la pantalla en un minuto
+  const AGRUPAR_MS = 250;    // golpes mas seguidos que esto se dibujan cerca del anterior
+  const JITTER_FRAC = 0.12;
+  const ALPHA_MIN = 0.08;    // piso heredado del prototipo anterior: un golpe suave
+                             // nunca queda invisible
+
+  // Escalas: cada una es la lista de distancias, en semitonos, desde la nota
+  // mas grave del dedo (la tonica). Un semitono es el paso mas chico del
+  // piano (de una tecla a la siguiente, blanca o negra) y en MIDI es sumar 1
+  // al numero de nota; 12 semitonos son una octava, la misma nota mas aguda.
+  //
+  // Usar una escala y no notas consecutivas es lo que hace que cualquier
+  // secuencia de golpes suene a musica: las pentatonicas no tienen ningun par
+  // de notas a un semitono de distancia, que es el choque mas aspero. Por eso
+  // la cromatica (todas las notas) queda como contraste, para escuchar la
+  // diferencia.
+  //
+  // Cuantas notas usar es un compromiso con la dispersion del piezo: aun con
+  // el filtro RC, el pico tiene 5-8 % de dispersion entre golpes iguales.
+  // Con mas notas los tramos son mas angostos y es mas facil que un mismo
+  // golpe caiga en dos notas distintas. El harness de golpes midio que la
+  // histeresis sostiene hasta 11 notas con +-8 % de jitter; con la dispersion
+  // real medida en el guante, decidir cual queda.
+  const ESCALAS = {
+    pentaMenor6:  [0, 3, 5, 7, 10, 12],
+    pentaMenor11: [0, 3, 5, 7, 10, 12, 15, 17, 19, 22, 24],
+    pentaMayor6:  [0, 2, 4, 7, 9, 12],
+    mayor8:       [0, 2, 4, 5, 7, 9, 11, 12],
+    cromatica13:  [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+  };
+  let GRADOS = ESCALAS.pentaMenor6;
+  const TONICA = [45, 57];   // dedo 0 desde A2 (registro grave), dedo 1 una octava arriba
+  const NOMBRES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+
+
+  function hexToRgb(hex) {
+    const clean = hex.replace("#", "");
+    const bigint = parseInt(clean, 16);
+    return [(bigint >> 16) & 255, (bigint >> 8) & 255, bigint & 255];
+  }
+  let colorDedo = [hexToRgb("#FFDE21"), hexToRgb("#FF8C1A")];
+  const COLOR_FSR = "#0000FF";
+
+  // Disco del FSR. Radio relativo a min(W,H), con un rango bastante mas
+  // amplio que el de los anillos (0.08-0.10): una presion es un gesto lento y
+  // sostenido, y su tamano es lo unico que la distingue de otra.
+  const R_FSR_MIN = 0.05;
+  const R_FSR_MAX = 0.14;
+  // Umbral con histeresis sobre la lectura cruda normalizada. El FSR en
+  // reposo no marca 0 exacto: sin umbral, el ruido dibujaria discos solos.
+  const FSR_ON = 0.06;
+  const FSR_OFF = 0.03;
+
+  // Pico crudo del piezo -> intensidad 0-1.
+  function picoAIntensidad(pico) {
+    const rango = Math.max(1, picoMax - picoMin);
+    return Math.min(1, Math.max(0, (pico - picoMin) / rango));
+  }
+
+  function intensidadAAlpha(v) {
+    return ALPHA_MIN + Math.min(1, Math.max(0, v)) * (1 - ALPHA_MIN);
+  }
+
+  // Numero de nota MIDI -> nombre en notacion inglesa (A = la, C = do). El
+  // numero final es la octava: A2 es el la grave, A3 el siguiente hacia arriba.
+  function nombreNota(nota) {
+    return NOMBRES[((nota % 12) + 12) % 12] + (Math.floor(nota / 12) - 1);
+  }
+
+  // Cuantizador: parte la intensidad 0-1 en n tramos IGUALES, uno por nota.
+  // La antigua variante (b) con Web Audio redondeaba v*(n-1), lo que deja los dos
+  // tramos de los extremos a la mitad de ancho: la nota mas grave y la mas
+  // aguda eran las mas dificiles de tocar a proposito. Aca x = v*n - 0.5 pone
+  // el centro de cada tramo en un entero, con el mismo ancho para todos.
+  //
+  // Con histeresis: sin ella, una intensidad que cae justo sobre un borde
+  // alterna entre dos notas golpe a golpe y se escucha como temblor. El borde
+  // natural esta a 0.5 de distancia; exigir 0.65 equivale a pedir un 15 % del
+  // tramo de mas para cambiar de nota.
+  const gradoPrevio = [-1, -1];
+  function cuantizar(dedo, v) {
+    const n = GRADOS.length;
+    const x = v * n - 0.5;
+    let g = Math.round(x);
+    const prev = gradoPrevio[dedo];
+    if (prev >= 0 && Math.abs(x - prev) < 0.65) g = prev;
+    g = Math.min(n - 1, Math.max(0, g));
+    gradoPrevio[dedo] = g;
+    return g;
+  }
+
+  // ===============================================================
+  // Estado
+  // ===============================================================
+  let fuerza = 0;            // ultima lectura del FSR, 0-1
+  let fuerzaSuave = 0;       // la misma, filtrada con TAU: es la que dibuja el disco
+  let presion = null;        // presion en curso: { x, y, pico } o null
+  let fuerzaCruda = 0;
+  let golpes = 0;
+  let ultimoGolpeT = -1e9;
+  let ultimoX = 0, ultimoY = 0;
+  const anillos = [];        // impactos transitorios vivos en el overlay
+  const MAX_ANILLOS = 10;
+
+  const ahoraSeg = function () { return performance.now() / 1000; };
+
+  // ===============================================================
+  // Salida MIDI hacia Helm (Web MIDI API, sin dependencias externas)
+  //
+  //   feedGolpe ─→ noteOn(nota del tramo, velocity) ... noteOff a los GATE_MS
+  //   feedForce ─→ CC1 (rueda de modulacion), solo cuando cambia
+  //
+  // La pagina no tiene voz propia: Helm corre en paralelo como aplicacion
+  // standalone y es el unico responsable del sonido. Nada de AudioContext.
+  // El timbre, el volumen, la distorsion y la latencia de audio viven en el
+  // patch y en la configuracion de audio de Helm.
+  // ===============================================================
+  const CANAL = 0;           // canal MIDI 1 (0-15 en el byte de estado)
+  const CC_FUERZA = 1;       // rueda de modulacion: en Helm ademas es una fuente
+                             // de modulacion propia ("mod wheel"), asi que se
+                             // puede arrastrar a varios destinos a la vez, sin
+                             // depender solo de Learn MIDI Assignment
+  const GATE_MS = 80;        // duracion de la nota. En un patch percusivo
+                             // (sustain 0, release ~ decay) no se escucha: solo
+                             // tiene que ser mas corta que el golpe siguiente
+  const VEL_MIN = 58;        // ley PLANA, ver velocity()
+  const TAU = 0.03;          // suavizado de la fuerza visual (ver draw())
+  const CLAVE_PUERTO = "guanteMidiPuerto";
+
+  let midi = null;           // MIDIAccess
+  let salida = null;         // MIDIOutput elegida
+  let notasEnviadas = 0;
+  let ultimoCC = -1;         // ultimo valor de CC enviado; -1 = ninguno todavia
+  const compuertas = {};     // nota -> timer del noteOff pendiente
+
+  // Intensidad -> velocity. Plana: la intensidad ya eligio la nota, asi que si ademas dominara el volumen seria
+  // fisicamente imposible tocar una nota aguda suave y la escala perderia
+  // sentido. Es la misma ley que la amplitud de la antigua (b) con Web Audio
+  // (0.25 + 0.30*v, o sea de 45 % a 100 %), trasladada a 58-127. 0 no se
+  // puede mandar: noteOn con velocity 0 significa noteOff.
+  function velocity(v) {
+    const x = Math.min(1, Math.max(0, v));
+    return Math.max(1, Math.min(127, Math.round(VEL_MIN + (127 - VEL_MIN) * x)));
+  }
+
+  function enviar(bytes) {
+    if (!salida) return false;
+    try { salida.send(bytes); return true; }
+    catch (e) { setMidiStatus("error", "Error al enviar (" + e.message + ")"); return false; }
+  }
+
+  function noteOff(nota) {
+    if (compuertas[nota] !== undefined) {
+      clearTimeout(compuertas[nota]);
+      delete compuertas[nota];
+    }
+    enviar([0x80 | CANAL, nota, 0]);
+  }
+
+  function dispararNota(nota, v) {
+    if (!salida) return;
+    // Retrigger de la misma nota con la anterior todavia abierta: se la cierra
+    // ANTES del noteOn nuevo. Si no, el noteOff atrasado del golpe viejo
+    // llegaria despues y cortaria al nuevo. Cerrarla manda la voz vieja a su
+    // release, que en un patch percusivo es la cola natural del golpe.
+    if (compuertas[nota] !== undefined) noteOff(nota);
+    // Sin timestamp: "lo antes posible". Programar a futuro solo sumaria
+    // latencia, y el noteOff se maneja con setTimeout porque un mensaje con
+    // timestamp ya enviado no se puede cancelar.
+    if (!enviar([0x90 | CANAL, nota, velocity(v)])) return;
+    notasEnviadas++;
+    compuertas[nota] = setTimeout(function () {
+      delete compuertas[nota];
+      enviar([0x80 | CANAL, nota, 0]);
+    }, GATE_MS);
+  }
+
+  // FSR -> CC1. El sensor llega a 50Hz y el CC tiene 128 pasos: se manda solo
+  // si el valor cambio, para no saturar el puerto con repeticiones. El
+  // suavizado entre pasos lo hace Helm, no la pagina.
+  function enviarFuerza(f) {
+    const valor = Math.round(Math.min(1, Math.max(0, f)) * 127);
+    if (valor === ultimoCC || !salida) return;
+    if (enviar([0xB0 | CANAL, CC_FUERZA, valor])) ultimoCC = valor;
+  }
+
+  // Panico: cierra las notas propias y ademas manda All Notes Off (CC123) y
+  // All Sound Off (CC120), por si Helm quedo con algo colgado. Devuelve la
+  // fuerza a 0 para que la distorsion no quede trabada si se corta el cable
+  // con el FSR apretado.
+  function silenciarTodo() {
+    Object.keys(compuertas).forEach(function (n) { noteOff(parseInt(n, 10)); });
+    enviar([0xB0 | CANAL, 123, 0]);
+    enviar([0xB0 | CANAL, 120, 0]);
+    enviar([0xB0 | CANAL, CC_FUERZA, 0]);
+    ultimoCC = 0;
+  }
+
+  // ---------------------------------------------------------------
+  // Eleccion del puerto. Helm no tiene que estar abierto antes que la
+  // pagina: la lista se rearma sola cuando aparece o desaparece un puerto.
+  // ---------------------------------------------------------------
+  const midiBtn = document.getElementById("midiBtn");
+  const midiDot = document.getElementById("midiDot");
+  const midiStatusTextEl = document.getElementById("midiStatusText");
+  const midiSelect = document.getElementById("midiSelect");
+  const midiUnsupportedNote = document.getElementById("midiUnsupportedNote");
+
+  function setMidiStatus(kind, text) {
+    midiDot.className = kind === "connected" ? "connected" : (kind === "error" ? "error" : "");
+    midiStatusTextEl.textContent = text;
+  }
+
+  function leerPuertoGuardado() {
+    try { return localStorage.getItem(CLAVE_PUERTO); } catch (e) { return null; }
+  }
+  function guardarPuerto(nombre) {
+    try { localStorage.setItem(CLAVE_PUERTO, nombre); } catch (e) {}
+  }
+
+  // Preferencia: el ultimo puerto elegido a mano > uno que se llame Helm > un
+  // puerto virtual conocido (Midi Through en Linux, IAC en macOS, loopMIDI en
+  // Windows) > el primero de la lista.
+  function puertoPreferido(lista) {
+    const guardado = leerPuertoGuardado();
+    const porNombre = function (re) {
+      return lista.find(function (o) { return re.test(o.name || ""); });
+    };
+    return (guardado && lista.find(function (o) { return o.name === guardado; })) ||
+      porNombre(/helm/i) ||
+      porNombre(/through|iac|loopmidi|virmidi/i) ||
+      lista[0] || null;
+  }
+
+  function elegirSalida(nueva) {
+    if (salida && salida !== nueva) silenciarTodo();   // no dejar notas en el puerto viejo
+    salida = nueva;
+    ultimoCC = -1;
+    if (salida) {
+      setMidiStatus("connected", "Enviando a «" + salida.name + "»");
+      midiBtn.textContent = "MIDI habilitado";
+      midiBtn.classList.add("connected");
+      midiBtn.disabled = true;
+    } else {
+      setMidiStatus("error", "No hay puertos MIDI de salida");
+    }
+  }
+
+  function rearmarLista() {
+    const lista = [];
+    midi.outputs.forEach(function (o) { if (o.state !== "disconnected") lista.push(o); });
+    midiSelect.innerHTML = "";
+    if (lista.length === 0) {
+      const op = document.createElement("option");
+      op.value = "";
+      op.textContent = "— sin puertos —";
+      midiSelect.appendChild(op);
+      midiSelect.disabled = true;
+      elegirSalida(null);
+      return;
+    }
+    const actual = (salida && lista.indexOf(salida) >= 0) ? salida : puertoPreferido(lista);
+    lista.forEach(function (o) {
+      const op = document.createElement("option");
+      op.value = o.id;
+      op.textContent = o.name;
+      if (o === actual) op.selected = true;
+      midiSelect.appendChild(op);
+    });
+    midiSelect.disabled = false;
+    midiSelect.value = actual.id;
+    if (actual !== salida) elegirSalida(actual);
+  }
+
+  midiSelect.addEventListener("change", function () {
+    const o = midi && midi.outputs.get(midiSelect.value);
+    if (!o) return;
+    guardarPuerto(o.name);
+    elegirSalida(o);
+  });
+
+  async function habilitarMidi() {
+    if (midi) return midi;
+    if (!navigator.requestMIDIAccess) return null;
+    try {
+      midi = await navigator.requestMIDIAccess({ sysex: false });
+    } catch (err) {
+      setMidiStatus("error", "Permiso MIDI denegado (" + err.message + ")");
+      return null;
+    }
+    midi.onstatechange = rearmarLista;
+    rearmarLista();
+    return midi;
+  }
+
+  midiBtn.addEventListener("click", habilitarMidi);
+  document.getElementById("panicBtn").addEventListener("click", silenciarTodo);
+  // Al cerrar o recargar la pagina, que Helm no quede con notas abiertas ni
+  // con la distorsion trabada.
+  window.addEventListener("pagehide", silenciarTodo);
+
+  if (!navigator.requestMIDIAccess) {
+    midiBtn.disabled = true;
+    midiUnsupportedNote.style.display = "block";
+    setMidiStatus("error", "Web MIDI no disponible");
+  } else if (navigator.permissions && navigator.permissions.query) {
+    // Si el permiso ya se concedio en una visita anterior, no hace falta el
+    // clic: se habilita solo al cargar.
+    navigator.permissions.query({ name: "midi" }).then(function (st) {
+      if (st.state === "granted") habilitarMidi();
+    }).catch(function () {});
+  }
+
+  // ===============================================================
+  // Frontera de datos: TODO entra por estas dos funciones — el lector de Web
+  // Serial, el teclado y cualquier prueba desde la consola.
+  // ===============================================================
+
+  // Un golpe de piezo. `pico` es la lectura cruda del sketch (0-1023).
+  window.feedGolpe = function (dedo, pico) {
+    if (congelado) return;
+    const d = (dedo === 1 || dedo === "1") ? 1 : 0;
+    const v = picoAIntensidad(pico);
+    const g = cuantizar(d, v);
+    const nota = TONICA[d] + GRADOS[g];
+    dispararNota(nota, v);
+    dibujarGolpe(d, v);      // el dibujo de (a) sigue usando la intensidad continua
+    registrarGolpe(d, pico, v, nota, g);
+  };
+
+  // Lectura del FSR normalizada a 0-1. El sonido no cambia respecto de la
+  // version anterior: la presion sigue saliendo como CC1 hacia Helm. Lo que
+  // cambia es la imagen: cada presion (de cruzar FSR_ON a bajar de FSR_OFF)
+  // es un evento que dibuja un disco.
+  window.feedForce = function (value01) {
+    if (congelado) return;
+    fuerza =Math.min(1, Math.max(0, value01));
+    enviarFuerza(fuerza);
+    if (!presion && fuerza > FSR_ON) {
+      empezarPresion();
+    } else if (presion && fuerza < FSR_OFF) {
+      terminarPresion();
+    }
+  };
+
+  // ===============================================================
+  // Dibujo de cada golpe sobre el lienzo acumulado
+  // ===============================================================
+  function dibujarGolpe(dedo, v) {
+    const menor = Math.min(W, H);
+    const r = menor * (R_MIN_FRAC + v * (R_MAX_FRAC - R_MIN_FRAC));
+    const alpha = intensidadAAlpha(v);
+    const rgb = colorDedo[dedo];
+
+    // Agrupamiento temporal: un redoble dibuja una constelacion, golpes
+    // espaciados se dispersan. El gesto ritmico se vuelve visible sin ninguna
+    // estructura de datos nueva.
+    const t = ahoraSeg();
+    let x, y;
+    const margen = r + 10;
+    if (t - ultimoGolpeT < AGRUPAR_MS / 1000) {
+      const j = menor * JITTER_FRAC;
+      x = ultimoX + (Math.random() * 2 - 1) * j;
+      y = ultimoY + (Math.random() * 2 - 1) * j;
+    } else {
+      x = margen + Math.random() * Math.max(1, W - margen * 2);
+      y = margen + Math.random() * Math.max(1, H - margen * 2);
+    }
+    x = Math.min(W - margen, Math.max(margen, x));
+    y = Math.min(H - margen, Math.max(margen, y));
+    ultimoGolpeT = t;
+    ultimoX = x;
+    ultimoY = y;
+
+    ctxA.globalCompositeOperation = "multiply";
+    ctxA.globalAlpha = alpha;
+    ctxA.beginPath();
+    ctxA.arc(x, y, r, 0, Math.PI * 2);
+    // Los dos dedos son anillos y se distinguen por el tono. El disco relleno
+    // quedo reservado para el FSR (ver discoFsr).
+    ctxA.strokeStyle = "rgb(" + rgb[0] + "," + rgb[1] + "," + rgb[2] + ")";
+    ctxA.lineWidth = Math.max(1, r * 0.35);
+    ctxA.stroke();
+    ctxA.globalCompositeOperation = "source-over";
+    ctxA.globalAlpha = 1;
+
+    if (anillos.length < MAX_ANILLOS) {
+      anillos.push({ x: x, y: y, r: r, rgb: rgb, nacio: t });
+    }
+  }
+
+  // ===============================================================
+  // Disco del FSR
+  //   empezar  -> elige posicion al azar; el disco vive en el overlay
+  //   mientras -> su radio y opacidad siguen el PICO de la presion suavizada,
+  //               o sea crece y nunca se achica: al aflojar no "se desinfla"
+  //   terminar -> se estampa en #acum con ese pico, en la misma posicion
+  // Como el overlay tambien compone con multiply, el disco estampado se ve
+  // igual que el vivo y no hay salto al soltar.
+  // ===============================================================
+  function radioFsr(v) {
+    return Math.min(W, H) * (R_FSR_MIN + v * (R_FSR_MAX - R_FSR_MIN));
+  }
+
+  function empezarPresion() {
+    const margen = radioFsr(1) + 10;
+    presion = {
+      x: margen + Math.random() * Math.max(1, W - margen * 2),
+      y: margen + Math.random() * Math.max(1, H - margen * 2),
+      pico: 0
+    };
+  }
+
+  function discoFsr(ctx, p) {
+    ctx.globalAlpha = intensidadAAlpha(p.pico);
+    ctx.fillStyle = COLOR_FSR;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, radioFsr(p.pico), 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+
+  function terminarPresion() {
+    const p = presion;
+    presion = null;
+    // Una presion tan breve que el suavizado no llego a registrarla no deja
+    // marca: seria un punto invisible.
+    if (p.pico <= 0) return;
+    ctxA.globalCompositeOperation = "multiply";
+    discoFsr(ctxA, p);
+    ctxA.globalCompositeOperation = "source-over";
+  }
+
+  // ===============================================================
+  // Bucle de dibujo. Costo constante: limpiar el overlay + a lo sumo 11 arcos
+  // (10 anillos de impacto + el disco vivo del FSR).
+  // ===============================================================
+  const ANILLO_DUR = 0.2;
+  const FSR_RAMPA = 1.5;     // segundos de F mantenida hasta la presion maxima
+  let ultimoFrame = ahoraSeg();
+
+  function draw() {
+    // Capturado: el overlay (anillos, disco vivo) es efimero y no forma parte
+    // de la composicion; se borra y se corta la cadena de rAF.
+    if (congelado) { ctxO.clearRect(0, 0, W, H); return; }
+    const t = ahoraSeg();
+    const dt = Math.min(0.1, t - ultimoFrame);
+    ultimoFrame = t;
+
+    // Simulacion por teclado: con F mantenida la presion sube sola hasta el
+    // maximo en FSR_RAMPA segundos. Entra por la misma frontera que el serie.
+    if (fsrTecla) {
+      window.feedForce(Math.min(1, fuerza + dt / FSR_RAMPA));
+      fuerzaCruda = Math.round(fuerza * 1023);
+    }
+
+    // La fuerza visual se suaviza con la misma constante que usaba la voz de Web
+    // Audio. Helm suaviza el CC por su cuenta con otra constante que no
+    // controlamos: si se nota desincronia, ajustar TAU a oido.
+    fuerzaSuave += (fuerza - fuerzaSuave) * (1 - Math.exp(-dt / TAU));
+    if (presion) presion.pico = Math.max(presion.pico, fuerzaSuave);
+
+    // La version anterior aplicaba aca un efecto global del FSR (filtro CSS
+    // blur/contrast/saturate y una tinta violeta acumulada sobre todo el
+    // lienzo). Se quito: ahora el FSR tiene su propia marca, el disco azul, y
+    // el desenfoque global la borronearia junto con todo lo demas.
+
+    ctxO.clearRect(0, 0, W, H);
+    if (presion && presion.pico > 0) discoFsr(ctxO, presion);
+    for (let i = anillos.length - 1; i >= 0; i--) {
+      const a = anillos[i];
+      const edad = (t - a.nacio) / ANILLO_DUR;
+      if (edad >= 1) { anillos.splice(i, 1); continue; }
+      ctxO.globalAlpha = (1 - edad) * 0.55;
+      ctxO.strokeStyle = "rgb(" + a.rgb[0] + "," + a.rgb[1] + "," + a.rgb[2] + ")";
+      ctxO.lineWidth = 2;
+      ctxO.beginPath();
+      ctxO.arc(a.x, a.y, a.r * (1 + 1.2 * edad), 0, Math.PI * 2);
+      ctxO.stroke();
+    }
+    ctxO.globalAlpha = 1;
+
+    actualizarLecturas();
+    requestAnimationFrame(draw);
+  }
+
+  // ===============================================================
+  // Web Serial: leer las lineas del guante.
+  // Formatos esperados: "G:<dedo>,<pico>" por golpe y "F:<0-1023>" cada 20ms.
+  // Cualquier otra linea (los diagnosticos legibles del Monitor Serial) se
+  // ignora en silencio.
+  // ===============================================================
+  const connectBtn = document.getElementById("connectBtn");
+  const statusDot = document.getElementById("statusDot");
+  const statusTextEl = document.getElementById("statusText");
+  const unsupportedNote = document.getElementById("unsupportedNote");
+
+  let port = null;
+  let reading = false;
+
+  function setStatus(kind, text) {
+    statusDot.className = kind === "connected" ? "connected" : (kind === "error" ? "error" : "");
+    statusTextEl.textContent = text;
+  }
+
+  async function connectSerial() {
+    try {
+      port = await navigator.serial.requestPort();
+      await port.open({ baudRate: 9600 });
+      // De paso pide el permiso MIDI, por si todavia no se habilito con su
+      // boton. Recien despues de elegir el puerto serie: pedirlo antes
+      // superpondria el aviso de permiso con el selector de puertos.
+      habilitarMidi();
+      connectBtn.textContent = "Desconectar";
+      connectBtn.classList.add("connected");
+      reading = true;
+      setStatus("connected", "Conectado");
+      readLoop();
+    } catch (err) {
+      setStatus("error", "No se pudo conectar (" + err.message + ")");
+    }
+  }
+
+  async function disconnectSerial() {
+    reading = false;
+    silenciarTodo();     // si se corto con el FSR apretado, Helm no queda distorsionado
+    // Y la imagen tampoco queda con un disco vivo para siempre: soltar el FSR
+    // a mano estampa la presion en curso. silenciarTodo ya dejo el CC en 0,
+    // asi que esto no manda un CC repetido.
+    fuerzaCruda = 0;
+    window.feedForce(0);
+    try {
+      if (port) await port.close();
+    } catch (err) { /* ya se estaba cerrando */ }
+    port = null;
+    connectBtn.textContent = "Conectar dispositivo (USB)";
+    connectBtn.classList.remove("connected");
+    setStatus("idle", "Sin conexión");
+  }
+
+  connectBtn.addEventListener("click", function () {
+    if (port && reading) disconnectSerial(); else connectSerial();
+  });
+
+  function handleLine(line) {
+    line = line.trim();   // println() emite \r\n
+    if (line.length === 0) return;
+
+    // Comparar los dos primeros caracteres, no usar startsWith("F"): la linea
+    // de diagnostico "FSR reading = ..." empieza con F y no debe entrar aca.
+    if (line.charAt(0) === "F" && line.charAt(1) === ":") {
+      const raw = parseInt(line.slice(2), 10);
+      if (!isNaN(raw)) {
+        fuerzaCruda = raw;
+        window.feedForce(raw / 1023);
+      }
+      return;
+    }
+
+    if (line.charAt(0) === "G" && line.charAt(1) === ":") {
+      const partes = line.slice(2).split(",");
+      const dedo = parseInt(partes[0], 10);
+      const pico = parseInt(partes[1], 10);
+      if (!isNaN(dedo) && !isNaN(pico)) window.feedGolpe(dedo, pico);
+      return;
+    }
+    // El resto (diagnosticos legibles) se ignora.
+  }
+
+  async function readLoop() {
+    const textDecoder = new TextDecoderStream();
+    const readableClosed = port.readable.pipeTo(textDecoder.writable);
+    const reader = textDecoder.readable.getReader();
+    let buffer = "";
+
+    try {
+      while (reading) {
+        const r = await reader.read();
+        if (r.done) break;
+        buffer += r.value;
+        let idx;
+        while ((idx = buffer.indexOf("\n")) >= 0) {
+          const line = buffer.slice(0, idx);
+          buffer = buffer.slice(idx + 1);
+          handleLine(line);
+        }
+      }
+    } catch (err) {
+      setStatus("error", "Conexión perdida (" + err.message + ")");
+    } finally {
+      try { reader.releaseLock(); } catch (e) {}
+      try { await readableClosed; } catch (e) {}
+      if (reading) await disconnectSerial();
+    }
+  }
+
+  if (!("serial" in navigator)) {
+    connectBtn.disabled = true;
+    unsupportedNote.style.display = "block";
+    setStatus("error", "Web Serial no disponible");
+  } else {
+    navigator.serial.addEventListener("disconnect", function (e) {
+      if (port && e.target === port) disconnectSerial();
+    });
+  }
+
+  // ===============================================================
+  // Disparo por teclado: la unica forma de escuchar Helm y disenar el patch sin
+  // el guante. Entra por la misma frontera que el lector serial. F no fija un
+  // valor: arranca la rampa que sigue en draw(), para que sin la placa se
+  // puedan ver discos de distinto tamano y escuchar el barrido del CC1.
+  // ===============================================================
+  let fsrTecla = false;
+  window.addEventListener("keydown", function (e) {
+    if (e.repeat) return;
+    const k = e.key.toLowerCase();
+    if (k === "a" || k === "l") {
+      const pico = picoMin + Math.random() * (picoMax - picoMin);
+      window.feedGolpe(k === "a" ? 0 : 1, Math.round(pico));
+    } else if (k === "f") {
+      fsrTecla = true;
+    }
+  });
+  window.addEventListener("keyup", function (e) {
+    if (e.key.toLowerCase() === "f" && fsrTecla) {
+      fsrTecla = false;
+      fuerzaCruda = 0;
+      window.feedForce(0);
+    }
+  });
+
+  // ===============================================================
+  // Controles del panel
+  // ===============================================================
+  const colorSelect = document.getElementById("colorSelect");
+  const sw0 = document.getElementById("sw0");
+  const sw1 = document.getElementById("sw1");
+  document.getElementById("sw2").style.background = COLOR_FSR;
+  function aplicarColores(valor) {
+    const par = valor.split(",");
+    colorDedo = [hexToRgb(par[0]), hexToRgb(par[1])];
+    sw0.style.background = par[0];
+    sw1.style.background = par[1];
+  }
+  colorSelect.addEventListener("change", function () { aplicarColores(colorSelect.value); });
+  aplicarColores(colorSelect.value);
+
+  const picoMinSlider = document.getElementById("picoMin");
+  const picoMaxSlider = document.getElementById("picoMax");
+  const picoMinValEl = document.getElementById("picoMinVal");
+  const picoMaxValEl = document.getElementById("picoMaxVal");
+  picoMinSlider.addEventListener("input", function () {
+    picoMin = parseInt(picoMinSlider.value, 10);
+    picoMinValEl.textContent = String(picoMin);
+    armarTablaRangos();
+  });
+  picoMaxSlider.addEventListener("input", function () {
+    picoMax = parseInt(picoMaxSlider.value, 10);
+    picoMaxValEl.textContent = String(picoMax);
+    armarTablaRangos();
+  });
+
+  // Tabla de tramos: que pico crudo dispara que nota. Es la respuesta
+  // explicita a "en que rango cayo el golpe", y se rearma al mover la
+  // calibracion o cambiar de escala. Los bordes son los nominales; la
+  // histeresis los corre un 15 % hacia afuera de la nota que viene sonando.
+  const tablaRangosBody = document.getElementById("tablaRangosBody");
+  let filasRangos = [];
+  function armarTablaRangos() {
+    const n = GRADOS.length;
+    const rango = picoMax - picoMin;
+    tablaRangosBody.innerHTML = "";
+    filasRangos = [];
+    // De la nota mas aguda a la mas grave.
+    for (let g = n - 1; g >= 0; g--) {
+      const desde = Math.round(picoMin + rango * g / n);
+      const hasta = Math.round(picoMin + rango * (g + 1) / n);
+      const textoPico = (g === 0 ? "≤ " + hasta : g === n - 1 ? "≥ " + desde : desde + "–" + hasta);
+      const tr = document.createElement("tr");
+      [textoPico, nombreNota(TONICA[0] + GRADOS[g]), nombreNota(TONICA[1] + GRADOS[g])]
+        .forEach(function (txt) {
+          const td = document.createElement("td");
+          td.textContent = txt;
+          tr.appendChild(td);
+        });
+      tablaRangosBody.appendChild(tr);
+      filasRangos[g] = tr;
+    }
+  }
+
+  const escalaSelect = document.getElementById("escalaSelect");
+  escalaSelect.addEventListener("change", function () {
+    const nueva = ESCALAS[escalaSelect.value];
+    if (!nueva) return;
+    GRADOS = nueva;
+    gradoPrevio[0] = gradoPrevio[1] = -1;   // la histeresis no se arrastra entre escalas
+    armarTablaRangos();
+  });
+  armarTablaRangos();
+
+  function limpiarLienzo() {
+    pintarFondo();
+    anillos.length = 0;
+    golpes = 0;
+    countValEl.textContent = "0";
+    lastValEl.textContent = "—";
+  }
+  document.getElementById("resetBtn").addEventListener("click", limpiarLienzo);
+
+  // ===============================================================
+  // Fin de la interaccion: lo dispara la barra espaciadora desde
+  // montarExperiencia(). Como en la bandada, no es una pausa: suelta el
+  // puerto, silencia Helm y deja las fronteras de datos sordas. La presion
+  // del FSR en curso se estampa antes de cerrar (feedForce(0)), para que la
+  // captura no pierda el ultimo disco.
+  // ===============================================================
+  let congelado = false;
+
+  function congelar() {
+    if (congelado) return;
+    fsrTecla = false;
+    if (port && reading) {
+      disconnectSerial();   // ya llama a silenciarTodo() y a feedForce(0)
+    } else {
+      silenciarTodo();
+      fuerzaCruda = 0;
+      window.feedForce(0);
+    }
+    congelado = true;
+    ["connectBtn", "resetBtn", "picoMin", "picoMax", "escalaSelect", "colorSelect"]
+      .forEach(function (id) { document.getElementById(id).disabled = true; });
+  }
+
+  // ===============================================================
+  // Lecturas en vivo
+  // ===============================================================
+  const forceRawValEl = document.getElementById("forceRawVal");
+  const forceFillBarEl = document.getElementById("forceFillBar");
+  const hitVal = [document.getElementById("hit0Val"), document.getElementById("hit1Val")];
+  const hitFill = [document.getElementById("hit0Fill"), document.getElementById("hit1Fill")];
+  const countValEl = document.getElementById("countVal");
+  const lastValEl = document.getElementById("lastVal");
+  const swatchEl = document.getElementById("swatch");
+  const midiCountValEl = document.getElementById("midiCountVal");
+  const ccValEl = document.getElementById("ccVal");
+
+  function registrarGolpe(dedo, pico, v, nota, g) {
+    golpes++;
+    countValEl.textContent = String(golpes);
+    hitVal[dedo].textContent = pico + " · " + nombreNota(nota);
+    hitFill[dedo].style.width = Math.round(v * 100) + "%";
+    const rgb = colorDedo[dedo];
+    swatchEl.style.background =
+      "rgba(" + rgb[0] + "," + rgb[1] + "," + rgb[2] + "," + intensidadAAlpha(v).toFixed(2) + ")";
+    lastValEl.textContent =
+      "dedo " + dedo + " · " + nombreNota(nota) + " · vel " + velocity(v);
+    filasRangos.forEach(function (tr, i) { tr.className = (i === g) ? "ultima" : ""; });
+  }
+
+  function actualizarLecturas() {
+    forceRawValEl.textContent = fuerzaCruda + " / 1023";
+    forceFillBarEl.style.width = Math.round(fuerza * 100) + "%";
+    midiCountValEl.textContent = String(notasEnviadas);
+    ccValEl.textContent = ultimoCC < 0 ? "—" : String(ultimoCC);
+  }
+
+  requestAnimationFrame(draw);
+
+  montarExperiencia({
+    clave: "guante",
+    siguiente: "prototipo_emg_acumulacion_v4_experiencia.html",
+    titulo: "Dispositivo dos",
+    instrucciones:
+      "Con tus dedos índice y medio de la mano izquierda golpea sobre la mesa con diferentes intensidades. " +
+      "Al mismo tiempo, con el dedo índice de la mano derecha pulsa el sensor ubicado en tu pecho.\n" +
+      "Juega y observa lo que ocurre en la pantalla.\n\n" +
+      "Captura la composición gráfica pulsando la barra espaciadora.\n" +
+      "Para borrar todo e iniciar nuevamente pulsa la tecla Retroceso.",
+    capturada: "Colocar dispositivo tres y pulsar → para continuar.",
+    congelar: congelar,
+    limpiar: limpiarLienzo,
+    lienzos: function () { return [acum]; }
+  });
+
+  // ===============================================================
+  // Experiencia: esta página es una pantalla del recorrido de
+  // experiencia/experiencia.html. Instrucciones en un aviso cerrable,
+  // Retroceso borra, la barra espaciadora captura (sin vuelta atrás) y
+  // recién entonces → lleva a la pantalla siguiente. La captura se guarda
+  // como PNG en IndexedDB para que la pantalla 10 pueda combinarlas más
+  // adelante. Todo pasa por teclado: ni la física ni la frontera de datos
+  // se enteran.
+  // ===============================================================
+  function montarExperiencia(op) {
+    const aviso = document.getElementById("aviso");
+    const avisoIcono = document.getElementById("avisoIcono");
+    const avisoTitulo = document.getElementById("avisoTitulo");
+    const avisoTexto = document.getElementById("avisoTexto");
+    document.getElementById("avisoCerrar").addEventListener("click", function () {
+      aviso.classList.remove("visible");
+    });
+
+    function mostrarAviso(tipo, titulo, texto) {
+      aviso.className = "aviso visible" + (tipo === "exito" ? " exito" : "");
+      avisoIcono.textContent = tipo === "exito" ? "✓" : "i";
+      avisoTitulo.textContent = titulo;
+      avisoTexto.textContent = texto;
+    }
+    mostrarAviso("info", op.titulo, op.instrucciones);
+
+    // "libre" → "guardando" → "lista". → sólo funciona en "lista": si se
+    // navegara mientras toBlob o la transacción siguen en curso, la captura
+    // se perdería.
+    let etapa = "libre";
+
+    function capturar() {
+      etapa = "guardando";
+      op.congelar();
+      mostrarAviso("info", "Capturando la composición…", "");
+      // Un frame de gracia para que el último cuadro congelado esté pintado.
+      requestAnimationFrame(function () {
+        componerCaptura(op.lienzos())
+          .then(function (blob) { return guardarCaptura(op.clave, blob); })
+          .then(function () { return ""; },
+                function (err) { return "\n\n(No se pudo guardar la imagen: " + (err && err.message || err) + ")"; })
+          .then(function (nota) {
+            etapa = "lista";
+            mostrarAviso("exito", "Composición capturada", op.capturada + nota);
+          });
+      });
+    }
+
+    window.addEventListener("keydown", function (e) {
+      if (e.code === "Space" || e.key === " ") {
+        e.preventDefault();          // sin esto la barra scrollea o pulsa el botón con foco
+        if (etapa === "libre") capturar();
+        return;
+      }
+      // Las flechas y el Retroceso son de los sliders y selects mientras
+      // tengan el foco.
+      const tag = e.target && e.target.tagName;
+      if (tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA") return;
+      if (e.key === "Backspace") {
+        e.preventDefault();
+        if (etapa === "libre" && !e.repeat) op.limpiar();
+      } else if (e.key === "ArrowRight") {
+        if (etapa === "lista") location.href = op.siguiente;
+      }
+    });
+  }
+
+  // Funde los lienzos visibles, en orden, sobre blanco y a su resolución
+  // real (width/height del canvas, no el tamaño CSS).
+  function componerCaptura(lienzos) {
+    const base = lienzos[0];
+    const c = document.createElement("canvas");
+    c.width = base.width;
+    c.height = base.height;
+    const g = c.getContext("2d");
+    g.fillStyle = "#fff";
+    g.fillRect(0, 0, c.width, c.height);
+    lienzos.forEach(function (l) { g.drawImage(l, 0, 0, c.width, c.height); });
+    return new Promise(function (ok, mal) {
+      c.toBlob(function (blob) { blob ? ok(blob) : mal(new Error("toBlob vacío")); }, "image/png");
+    });
+  }
+
+  // IndexedDB y no localStorage: tres PNG de pantalla completa pasan los
+  // ~5 MB de localStorage. En Chrome todas las páginas file:// comparten
+  // origen, así que experiencia.html lee lo mismo que escriben estas.
+  function guardarCaptura(clave, blob) {
+    return new Promise(function (ok, mal) {
+      if (typeof indexedDB === "undefined") return mal(new Error("IndexedDB no disponible"));
+      const pedido = indexedDB.open("experiencia", 1);
+      pedido.onupgradeneeded = function () { pedido.result.createObjectStore("capturas"); };
+      pedido.onerror = function () { mal(pedido.error); };
+      pedido.onsuccess = function () {
+        const db = pedido.result;
+        const tx = db.transaction("capturas", "readwrite");
+        tx.objectStore("capturas").put({ imagen: blob, fecha: Date.now() }, clave);
+        tx.oncomplete = function () { db.close(); ok(); };
+        tx.onerror = function () { db.close(); mal(tx.error); };
+      };
+    });
+  }
+
+})();
+</script>
+</body>
+</html>
