@@ -5,6 +5,15 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Experiencia · 8 · Guante de percusión (MAEDI)</title>
 <style>
+  /* Roboto Light, local en fuentes/ (sin CDN: la página se abre por file://). */
+  @font-face {
+    font-family: "Roboto"; font-style: normal; font-weight: 300;
+    src: local("Roboto Light"), local("Roboto-Light"), url("fuentes/roboto-latin-300-normal.woff2") format("woff2");
+  }
+  @font-face {
+    font-family: "Roboto"; font-style: italic; font-weight: 300;
+    src: local("Roboto Light Italic"), local("Roboto-LightItalic"), url("fuentes/roboto-latin-300-italic.woff2") format("woff2");
+  }
   :root {
     --panel-bg: rgba(255,255,255,0.94);
     --ink: #222;
@@ -16,9 +25,12 @@
   html, body {
     margin: 0; padding: 0; overflow: hidden;
     background: #faf6f0;
-    font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+    font-family: "Roboto", -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+    font-weight: 300;
     color: var(--ink);
   }
+  /* Los controles de formulario no heredan la tipografía por defecto. */
+  button, input, select, textarea { font-family: inherit; font-weight: inherit; }
   canvas { display: block; position: fixed; top: 0; left: 0; }
   #acum { z-index: 0; }
   /* multiply tambien en el overlay: el disco vivo del FSR se ve igual que

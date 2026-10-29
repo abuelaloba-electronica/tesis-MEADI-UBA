@@ -5,6 +5,15 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Experiencia interactiva (MAEDI)</title>
 <style>
+  /* Roboto Light, local en fuentes/ (sin CDN: la página se abre por file://). */
+  @font-face {
+    font-family: "Roboto"; font-style: normal; font-weight: 300;
+    src: local("Roboto Light"), local("Roboto-Light"), url("fuentes/roboto-latin-300-normal.woff2") format("woff2");
+  }
+  @font-face {
+    font-family: "Roboto"; font-style: italic; font-weight: 300;
+    src: local("Roboto Light Italic"), local("Roboto-LightItalic"), url("fuentes/roboto-latin-300-italic.woff2") format("woff2");
+  }
   :root {
     --ink: #111;
     --suave: #888;
@@ -13,8 +22,11 @@
     margin: 0; padding: 0; height: 100%;
     background: #fff;
     color: var(--ink);
-    font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+    font-family: "Roboto", -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+    font-weight: 300;
   }
+  /* Los controles de formulario no heredan la tipografía por defecto. */
+  button, input, select, textarea { font-family: inherit; font-weight: inherit; }
   body { display: flex; align-items: center; justify-content: center; }
 
   #pantalla {
