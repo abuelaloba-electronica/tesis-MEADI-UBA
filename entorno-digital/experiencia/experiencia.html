@@ -50,14 +50,14 @@
   "use strict";
 
   // ---------------------------------------------------------------
-  // Recorrido de la experiencia. Las pantallas de texto viven acá; la 7,
-  // la 8 y la 9 son páginas propias (las visualizaciones de cada
+  // Recorrido de la experiencia. Las pantallas de texto viven acá; la 6,
+  // la 7 y la 8 son páginas propias (las visualizaciones de cada
   // dispositivo) que capturan su lienzo con la barra espaciadora y
-  // avanzan con → hasta volver a experiencia.html#10. Desde acá sólo se
-  // entra a la 7: a los dispositivos no se vuelve hacia atrás.
+  // avanzan con → hasta volver a experiencia.html#9. Desde acá sólo se
+  // entra a la 6: a los dispositivos no se vuelve hacia atrás.
   //
   // Por ahora todo es texto negro sobre blanco; el texto sale del
-  // borrador "experiencia intercativa.md". Cada pantalla es una lista de
+  // guion "experiencia-interactiva-guion.md". Cada pantalla es una lista de
   // párrafos { texto, clase }.
   // ---------------------------------------------------------------
   const PANTALLAS = {
@@ -69,38 +69,36 @@
       { texto: "FADU · UBA · MAEDI", clase: "logo" },
     ],
     1: [
+      { texto: "Los datos de tu actividad fisiológica y motriz darán lugar a una composición gráfica en el ambiente digital, a través de textiles electrónicos portados en tu cuerpo." },
+      { texto: "Durante la experiencia, tomate el tiempo que creas necesario, contempla el momento y disfruta" },
+      { texto: ":)" },
+    ],
+    2: [
       { texto: "“Un ciborg es un organismo cibernético, un híbrido de máquina y organismo, una criatura de realidad social y también de ficción”", clase: "cita" },
       { texto: "Donna Haraway (1984)", clase: "autoria" },
       { texto: "“Simpoiesis es una palabra sencilla, significa “generar-con”. Nada se hace a sí mismo, nada es realmente autopoiético o autoorganizado.”", clase: "cita" },
       { texto: "Donna Haraway (2019)", clase: "autoria" },
     ],
-    // La 2 es el conteo: ver mostrarConteo().
-    2: [],
+    // La 3 es el conteo, con estas palabras debajo: ver mostrarConteo().
     3: [
-      { texto: "la frontera entre humano y máquina se desdibuja." },
+      { texto: "cuerpo físico, cuerpo virtual, piel, segunda piel, textil electrónico, sensores, actuadores, microcontrolador, datos, vibración, mano, pecho, pierna, pulsar, tocar, contraer, relajar" },
     ],
     4: [
-      { texto: "Surge una nueva identidad." },
-      { texto: "Hibridación Humano - Máquina." },
+      { texto: "frontera entre humano y máquina se desdibuja" },
     ],
     5: [
-      { texto: "cuerpo físico, cuerpo virtual, piel, segunda piel, textil electrónico, sensores, actuadores, microcontrolador, datos, vibración, mano, pecho, pierna, pulsar, tocar, contraer, relajar, todo se entrelaza." },
+      { texto: "Porta sobre tu antebrazo y tu mano derecha el dispositivo uno" },
     ],
-    6: [
-      { texto: "Los datos de tu cuerpo a través de tu actividad fisiológica y motriz darán lugar a una composición gráfica en el ambiente digital a través del textil electrónico." },
-      { texto: "Tomate el tiempo que creas necesario, contempla el momento y disfruta de la experiencia :)" },
-      { texto: "Colocar dispositivo uno", clase: "nota" },
-    ],
-    10: [
+    9: [
       { texto: "Llegaste casi al final de la experiencia, tu cuerpo generó datos para una composición gráfica." },
       { texto: "Para finalizar selecciona las zonas de las composiciones que creas que son las más ricas en cuanto a tus gustos personales para generar tu obra y la máquina las capturará. Al finalizar podrías cambiar la colorimetría si lo deseas." },
       { texto: "¡Gracias nuevamente por ser parte de esta investigación!" },
     ],
   };
-  const ULTIMA_DE_TEXTO = 6;
+  const ULTIMA_DE_TEXTO = 5;
   const PRIMER_DISPOSITIVO = "bandada_prototipo_v5a_experiencia.html";
-  const CIERRE = 10;
-  const PANTALLA_CONTEO = 2;
+  const CIERRE = 9;
+  const PANTALLA_CONTEO = 3;
 
   const pantallaEl = document.getElementById("pantalla");
   const pieEl = document.getElementById("pie");
@@ -118,17 +116,17 @@
     actual = n;
     clearInterval(conteo);
     pantallaEl.textContent = "";
+    if (n === PANTALLA_CONTEO) mostrarConteo();
     (PANTALLAS[n] || []).forEach(function (par) {
       pantallaEl.appendChild(parrafo(par.texto, par.clase));
     });
-    if (n === PANTALLA_CONTEO) mostrarConteo();
     pieEl.textContent = n === CIERRE
       ? n + " / " + CIERRE
       : n + " / " + CIERRE + "  ·  ← →";
   }
 
-  // Pantalla 2: por ahora sólo el conteo 10 → 0, sin las imágenes. Se
-  // queda en 0; no avanza sola.
+  // Pantalla 3: por ahora sólo el conteo 10 → 0, sin las imágenes, arriba
+  // de las palabras. Se queda en 0; no avanza sola.
   function mostrarConteo() {
     let n = 10;
     const el = parrafo(String(n), "conteo");
@@ -141,7 +139,7 @@
   }
 
   // El número de pantalla vive en el hash: recargar no pierde el lugar, y
-  // la última visualización vuelve con experiencia.html#10.
+  // la última visualización vuelve con experiencia.html#9.
   function desdeHash() {
     const n = parseInt(location.hash.slice(1), 10);
     if (n === CIERRE || (n >= 0 && n <= ULTIMA_DE_TEXTO)) return n;

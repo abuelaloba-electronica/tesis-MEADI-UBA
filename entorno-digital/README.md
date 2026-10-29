@@ -22,13 +22,13 @@ están en [`prototipos/`](prototipos/).
 ### La experiencia completa: `experiencia/`
 
 [`experiencia/experiencia.html`](experiencia/experiencia.html) encadena las
-tres visualizaciones en un recorrido de pantallas (0–10) a partir del borrador
-[`experiencia intercativa.md`](experiencia%20intercativa.md). Las pantallas 0–6
-y 10 son texto y se recorren con ← →; la 7, la 8 y la 9 son copias
+tres visualizaciones en un recorrido de pantallas (0–9) a partir del guion
+[`experiencia-interactiva-guion.md`](experiencia-interactiva-guion.md). Las pantallas 0–5
+y 9 son texto y se recorren con ← →; la 6, la 7 y la 8 son copias
 `_experiencia` de las tres páginas activas, que muestran sus instrucciones en
 un aviso cerrable, borran con Retroceso, capturan el lienzo con la barra
 espaciadora (sin vuelta atrás, guardado en IndexedDB) y recién entonces pasan a
-la siguiente con →. En la 10, Inicio borra las capturas y vuelve a la 0.
+la siguiente con →. En la 9, Inicio borra las capturas y vuelve a la 0.
 
 Las copias no cambian la física: si se ajusta una visualización activa, el
 cambio hay que portarlo a mano a su copia `_experiencia`.
