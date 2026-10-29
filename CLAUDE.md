@@ -40,6 +40,16 @@ instrucciones, Retroceso para borrar, barra espaciadora para capturar
 (definitiva, PNG en IndexedDB) y → para seguir. Las copias no cambian la
 física: un ajuste en una página activa hay que portarlo a mano a su copia.
 
+**El guion manda sobre el contenido.** `entorno-digital/experiencia-interactiva-guion.md`
+es la fuente del texto y del orden de las pantallas, y tiene que quedar siempre
+sincronizado con la experiencia: todo cambio de contenido en el guion se porta
+a mano a `experiencia.html` (el objeto `PANTALLAS`) y, para las pantallas 6–8,
+a los textos de aviso de cada copia `_experiencia`. Si cambia la numeración,
+actualizar también `ULTIMA_DE_TEXTO`, `CIERRE` y `PANTALLA_CONTEO`, el
+`experiencia.html#N` al que vuelve la última copia, y los rangos de pantallas
+de este archivo y de `entorno-digital/README.md`. Al revés también: un cambio
+de texto pedido sobre el HTML se refleja en el guion.
+
 ## Convenciones
 
 **Páginas web autocontenidas.** Un solo archivo `.html` con su `<style>` y su
