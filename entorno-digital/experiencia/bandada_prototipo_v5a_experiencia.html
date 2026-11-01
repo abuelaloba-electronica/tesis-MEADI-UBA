@@ -540,9 +540,16 @@
   let despertarT = 0;
   let despertarRampa = 0;
 
+  // Hasta que no llega el primer dato el lienzo queda en blanco: los puntos
+  // aparecen con la primera lectura (del dispositivo, de los sliders o del
+  // modo demo) o con cualquier otro toque del panel. La física no se entera,
+  // esto sólo decide si draw() los pinta.
+  let puntosVisibles = false;
+
   const AXES = ["x", "y", "z"];
 
   window.updateAccel = function (x, y, z) {
+    puntosVisibles = true;
     accelRaw.x = clamp(x, -ACCEL_LIMIT, ACCEL_LIMIT);
     accelRaw.y = clamp(y, -ACCEL_LIMIT, ACCEL_LIMIT);
     accelRaw.z = clamp(z, -ACCEL_LIMIT, ACCEL_LIMIT);
@@ -700,6 +707,13 @@
   });
 
   zeroBtn.addEventListener("click", zeroBaseline);
+
+  // Los ejes y el modo demo ya pasan por updateAccel; esto cubre el resto del
+  // panel. "input" lo disparan sliders y casillas, y los botones se agregan a
+  // mano porque un click en "Conectar" todavía no es un dato.
+  const mostrarPuntos = () => { puntosVisibles = true; };
+  document.getElementById("panelBody").addEventListener("input", mostrarPuntos);
+  [resetBtn, zeroBtn].forEach((b) => b.addEventListener("click", mostrarPuntos));
 
   // ---------------------------------------------------------------
   // Web Serial: conexión con dispositivo1 (Flora V3 + acelerómetro
@@ -1545,7 +1559,7 @@
 
     const baseR = Math.max(0.6, BASE_RADIUS * sizeMul);
     ctx.fillStyle = "#0a0a0a";
-    for (let i = 0; i < drawOrder.length; i++) {
+    for (let i = 0; puntosVisibles && i < drawOrder.length; i++) {
       const b = drawOrder[i];
       const s = depthScale(b.z);
       // VARIANTE a — perspectiva: la posición también se escala desde el
@@ -1574,7 +1588,8 @@
     fps = Math.round(fpsSmoothed);
     const estado = congelado
       ? " · capturado (→ para seguir)"
-      : (despierto ? "" : " · en reposo, esperando movimiento");
+      : (!puntosVisibles ? " · esperando datos"
+        : (despierto ? "" : " · en reposo, esperando movimiento"));
     stats.textContent =
       birds.length + " puntos · " + fps + " fps · profundidad " +
       (flockDepth >= 0 ? "+" : "") + flockDepth.toFixed(2) +
@@ -1625,7 +1640,7 @@
       "Para borrar todo e iniciar nuevamente pulsa la tecla Retroceso.",
     capturada: "Colocar dispositivo dos y pulsar → para continuar.",
     congelar: congelar,
-    limpiar: () => initBirds(birds.length),
+    limpiar: () => { initBirds(birds.length); puntosVisibles = false; },
     lienzos: () => [canvas],
   });
 
