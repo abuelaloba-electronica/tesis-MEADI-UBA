@@ -24,7 +24,7 @@
   :root {
     --ink: #111;
     --suave: #888;
-    --conteo: #ddfc2c;
+    --acento: #ECFC2B;
   }
   html, body {
     margin: 0; padding: 0; height: 100%;
@@ -45,17 +45,25 @@
     line-height: 1.45;
     text-align: center;
   }
-  #pantalla p { margin: 0 0 0.9em; }
-  #pantalla .cita { font-style: italic; }
-  #pantalla .autoria { font-size: 0.7em; color: var(--suave); font-style: normal; }
+  #pantalla p { margin: 0 0 0.9em; font-size: 24px; font-style: italic; }
+  #pantalla .cita { margin-bottom: 0.25em; }
+  /* Resaltador: cubre todo el alto de la tipografía. */
+  #pantalla mark {
+    color: inherit;
+    padding: 0 0.1em;
+    background: var(--acento);
+    -webkit-box-decoration-break: clone; box-decoration-break: clone;
+  }
+  #pantalla .autoria + .cita { margin-top: 2.2em; }
+  #pantalla .autoria { font-size: 18px; font-style: normal; }
   #pantalla .nota { font-size: 0.6em; color: var(--suave); margin-top: 2em; }
-  #pantalla .logo { font-size: 0.6em; letter-spacing: 0.2em; margin-top: 2.5em; }
+  #pantalla .logo { display: block; width: min(456px, 100%); margin: 3.5em auto 0; }
   #pantalla .conteo {
     display: flex; align-items: center; justify-content: center;
     width: 1.8em; height: 1.8em; margin: 0 auto;
     border-radius: 50%;
-    background: var(--conteo);
-    font-size: 4em; line-height: 1; font-variant-numeric: tabular-nums;
+    background: var(--acento);
+    font-size: 4em; font-style: normal; line-height: 1; font-variant-numeric: tabular-nums;
   }
 
   /* Pantalla 3: las palabras ocupan toda la ventana, cada una en su lugar. */
@@ -98,25 +106,25 @@
   //
   // Por ahora todo es texto negro sobre blanco; el texto sale del
   // guion "experiencia-interactiva-guion.md". Cada pantalla es una lista de
-  // párrafos { texto, clase }.
+  // párrafos { texto, clase }; con `imagen`, el texto es su descripción, y
+  // `resaltar` lista fragmentos del texto a marcar, en orden de aparición.
   // ---------------------------------------------------------------
   const PANTALLAS = {
     0: [
-      { texto: "Bienvenid@ a esta exploración interactiva a través de tu cuerpo, textiles electrónicos y un ambiente digital." },
+      { texto: "Bienvenid@ a esta exploración interactiva a través de tu cuerpo, textiles electrónicos y un ambiente digital.", resaltar: ["exploración interactiva"] },
       { texto: "Esta investigación se enmarca en mi proyecto de tesis para culminar la Maestría en Diseño Interactivo." },
       { texto: "¡Gracias por participar!" },
-      // Hasta tener el logotipo como imagen.
-      { texto: "FADU · UBA · MAEDI", clase: "logo" },
+      { imagen: "Logo_MAEDI+UBA.jpg", texto: "Maestría en Diseño Interactivo, FADU, UBA", clase: "logo" },
     ],
     1: [
-      { texto: "Los datos de tu actividad fisiológica y motriz darán lugar a una composición gráfica en el ambiente digital, a través de textiles electrónicos portados en tu cuerpo." },
-      { texto: "Durante la experiencia, tomate el tiempo que creas necesario, contempla el momento y disfruta" },
+      { texto: "Los datos de tu actividad fisiológica y motriz darán lugar a una composición gráfica en el ambiente digital, a través de textiles electrónicos portados en tu cuerpo.", resaltar: ["ambiente digital", "textiles electrónicos", "cuerpo"] },
+      { texto: "Durante la experiencia, tomate el tiempo que creas necesario, contempla el momento y disfruta." },
       { texto: ":)" },
     ],
     2: [
-      { texto: "“Un ciborg es un organismo cibernético, un híbrido de máquina y organismo, una criatura de realidad social y también de ficción”", clase: "cita" },
+      { texto: "“Un ciborg es un organismo cibernético, un híbrido de máquina y organismo, una criatura de realidad social y también de ficción”", clase: "cita", resaltar: ["híbrido de máquina y organismo"] },
       { texto: "Donna Haraway (1984)", clase: "autoria" },
-      { texto: "“Simpoiesis es una palabra sencilla, significa “generar-con”. Nada se hace a sí mismo, nada es realmente autopoiético o autoorganizado.”", clase: "cita" },
+      { texto: "“Simpoiesis es una palabra sencilla, significa “generar-con”. Nada se hace a sí mismo, nada es realmente autopoiético o autoorganizado.”", clase: "cita", resaltar: ["Simpoiesis"] },
       { texto: "Donna Haraway (2019)", clase: "autoria" },
     ],
     // La 3 es el conteo y después estas palabras, separadas por comas, de a
@@ -147,11 +155,28 @@
   let temporizador = null;     // el conteo o la aparición de palabras
   let capaPalabras = null;
 
-  function parrafo(texto, clase) {
+  function parrafo(texto, clase, resaltar) {
     const p = document.createElement("p");
-    p.textContent = texto;
+    let desde = 0;
+    (resaltar || []).forEach(function (fragmento) {
+      const i = texto.indexOf(fragmento, desde);
+      if (i < 0) return;
+      const marca = document.createElement("mark");
+      marca.textContent = fragmento;
+      p.append(texto.slice(desde, i), marca);
+      desde = i + fragmento.length;
+    });
+    p.append(texto.slice(desde));
     if (clase) p.className = clase;
     return p;
+  }
+
+  function imagen(src, alt, clase) {
+    const img = document.createElement("img");
+    img.src = src;
+    img.alt = alt;
+    if (clase) img.className = clase;
+    return img;
   }
 
   function mostrar(n) {
@@ -168,7 +193,9 @@
 
   function mostrarTexto(n) {
     (PANTALLAS[n] || []).forEach(function (par) {
-      pantallaEl.appendChild(parrafo(par.texto, par.clase));
+      pantallaEl.appendChild(par.imagen
+        ? imagen(par.imagen, par.texto, par.clase)
+        : parrafo(par.texto, par.clase, par.resaltar));
     });
   }
 

@@ -14,7 +14,7 @@ Logotipo de fadu UBA MAEDI
 
 Los datos de tu actividad fisiológica y motriz darán lugar a una composición gráfica en el ambiente digital, a través de textiles electrónicos portados en tu cuerpo.
 
-Durante la experiencia, tomate el tiempo que creas necesario, contempla el momento y disfruta
+Durante la experiencia, tomate el tiempo que creas necesario, contempla el momento y disfruta.
 
 :)
 
@@ -22,7 +22,7 @@ Durante la experiencia, tomate el tiempo que creas necesario, contempla el momen
 
 “Un ciborg es un organismo cibernético, un híbrido de máquina y organismo, una criatura de realidad social y también de ficción” Donna Haraway (1984)
 
-“Simpoiesis es una palabra sencilla, significa “generar-con”. Nada se hace a sí mismo, nada es realmente autopoiético o autoorganizado.” (Donna Haraway, 2019\)
+“Simpoiesis es una palabra sencilla, significa “generar-con”. Nada se hace a sí mismo, nada es realmente autopoiético o autoorganizado.” Donna Haraway (2019)
 
 **Pantalla 3:** 
 
