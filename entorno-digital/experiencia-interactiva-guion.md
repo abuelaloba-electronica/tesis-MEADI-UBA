@@ -22,39 +22,35 @@ Durante la experiencia, tomate el tiempo que creas necesario, contempla el momen
 
 “Un ciborg es un organismo cibernético, un híbrido de máquina y organismo, una criatura de realidad social y también de ficción” Donna Haraway (1984)
 
-“Simpoiesis es una palabra sencilla, significa “generar-con”. Nada se hace a sí mismo, nada es realmente autopoiético o autoorganizado.” Donna Haraway (2019)
+“Simpoiesis es una palabra sencilla, significa generar-con. Nada se hace a sí mismo, nada es realmente autopoiético o autoorganizado.” Donna Haraway (2019)
 
-**Pantalla 3:** 
+**Pantalla 3:**
 
-**Imágenes corren rápido**
+Frontera entre humano y máquina se desdibuja 
 
-**tiempo 5, 4, 3, 2, 1, en el centro, dentro de un círculo relleno color #ddfc2c**
+**A los 3 segundos el texto se desdibuja (desenfoque gradual) y queda así** 		
 
-**Al terminar el conteo el número desaparece y aparecen estas palabras, que no se ven durante el conteo: cada palabra o frase (separadas por comas) aparece de a una, cada 2 segundos, en distintas ubicaciones agrupadas hacia el centro de la pantalla sin superponerse, con distintos tamaños y variantes livianas de Roboto Flex, intercalando orientación horizontal y vertical (palabras que aparecen en negro y luego quedan en blanco de fondo)**
+**Pantalla 4\.**
 
-cuerpo físico, cuerpo virtual, piel, segunda piel, textil electrónico, sensores, actuadores, microcontrolador, datos, vibración, mano, pecho, pierna, pulsar, tocar, contraer, relajar 
+**“# Paso 1” en negrita y resaltado; debajo, cada línea con viñeta y todo alineado a la izquierda**
 
-**Pantalla 4:**
+Porta sobre tu antebrazo y tu mano derecha el dispositivo uno.
 
-frontera entre humano y máquina se desdibuja 		
+Mueve tu mano derecha en diferentes direcciones.
 
-**Pantalla 5\.**
-
-Porta sobre tu antebrazo y tu mano derecha el dispositivo uno 			
-
-**Pantalla 6\.**
-
-Mueve tu mano derecha, con movimientos suaves en diferentes direcciones.
-
-Al observar la traducción en la pantalla, contempla el momento.
+Explora los movimientos de tu mano y lo que traduce la pantalla.
 
 Captura la composición gráfica pulsando la barra espaciadora.
 
 Para borrar todo e iniciar nuevamente pulsa la tecla Retroceso.
 
+**Pantalla 5\.**
+
+**Visualización del dispositivo uno, sin instrucciones en pantalla**
+
 **Colocar dispositivo dos.**
 
-**Pantalla 7\.**
+**Pantalla 6\.**
 
 Con tus dedos índice y medio de la mano izquierda golpea sobre la mesa con diferentes intensidades. Al mismo tiempo, con el dedo índice de la mano derecha pulsa el sensor ubicado en tu pecho. 
 
@@ -66,7 +62,7 @@ Para borrar todo e iniciar nuevamente pulsa la tecla Retroceso.
 
 **Colocar dispositivo tres.**
 
-**Pantalla 8\.**
+**Pantalla 7\.**
 
 Contrae los músculos gemelos de la pantorrilla las veces que sea necesario.
 
@@ -76,7 +72,7 @@ Captura la composición gráfica pulsando la barra espaciadora.
 
 Para borrar todo e iniciar nuevamente pulsa la tecla Retroceso.
 
-**Pantalla 9\.**
+**Pantalla 8\.**
 
 Llegaste casi al final de la experiencia, tu cuerpo generó datos para una composición gráfica.
 

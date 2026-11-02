@@ -5,7 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Experiencia interactiva (MAEDI)</title>
 <style>
-  /* Roboto Light, local en fuentes/ (sin CDN: la página se abre por file://). */
+  /* Roboto Light (y Bold para el "Paso N"), local en fuentes/ (sin CDN: la
+     página se abre por file://). */
+  @font-face {
+    font-family: "Roboto"; font-style: normal; font-weight: 700;
+    src: local("Roboto Bold"), local("Roboto-Bold"), url("fuentes/roboto-latin-700-normal.woff2") format("woff2");
+  }
   @font-face {
     font-family: "Roboto"; font-style: normal; font-weight: 300;
     src: local("Roboto Light"), local("Roboto-Light"), url("fuentes/roboto-latin-300-normal.woff2") format("woff2");
@@ -13,13 +18,6 @@
   @font-face {
     font-family: "Roboto"; font-style: italic; font-weight: 300;
     src: local("Roboto Light Italic"), local("Roboto-LightItalic"), url("fuentes/roboto-latin-300-italic.woff2") format("woff2");
-  }
-  /* Roboto Flex variable, con todos sus ejes: sólo para las palabras de la
-     pantalla 3, que varían peso, ancho, tamaño óptico, grado e inclinación. */
-  @font-face {
-    font-family: "Roboto Flex"; font-style: oblique 0deg 10deg;
-    font-weight: 100 1000; font-stretch: 25% 151%;
-    src: url("fuentes/roboto-flex-latin-full-normal.woff2") format("woff2");
   }
   :root {
     --ink: #111;
@@ -54,32 +52,25 @@
     background: var(--acento);
     -webkit-box-decoration-break: clone; box-decoration-break: clone;
   }
-  #pantalla .autoria + .cita { margin-top: 2.2em; }
+  #pantalla .autoria + .cita { margin-top: 3.5em; }
   #pantalla .autoria { font-size: 18px; font-style: normal; }
+  /* Pantalla 3: a los 3 s el texto se desenfoca y queda así. */
+  #pantalla .desdibuja { animation: desdibujar 3s ease-in 3s forwards; }
+  @keyframes desdibujar { to { filter: blur(6px); opacity: 0.6; } }
+  /* Pantalla 4: rótulo "Paso N" y debajo una lista con viñetas, todo
+     alineado a la izquierda. El bloque se ajusta al ancho de la línea más
+     larga y va centrado. Las viñetas caen en el borde izquierdo del rótulo
+     y el texto que da vuelta queda alineado con el de su línea. */
+  #pantalla .con-paso { width: fit-content; margin: 0 auto; text-align: left; }
+  #pantalla .paso { font-weight: 700; font-style: normal; margin-bottom: 0.6em; }
+  #pantalla .con-paso ul { list-style: none; margin: 0; padding: 0; }
+  #pantalla .con-paso li {
+    position: relative; padding-left: 1.1em; margin-bottom: 0.5em;
+    font-size: 24px; font-style: italic;
+  }
+  #pantalla .con-paso li::before { content: "•"; position: absolute; left: 0; font-style: normal; }
   #pantalla .nota { font-size: 0.6em; color: var(--suave); margin-top: 2em; }
   #pantalla .logo { display: block; width: min(456px, 100%); margin: 3.5em auto 0; }
-  #pantalla .conteo {
-    display: flex; align-items: center; justify-content: center;
-    width: 1.8em; height: 1.8em; margin: 0 auto;
-    border-radius: 50%;
-    background: var(--acento);
-    font-size: 4em; font-style: normal; line-height: 1; font-variant-numeric: tabular-nums;
-  }
-
-  /* Pantalla 3: las palabras se agrupan en el centro, cada una en su lugar. */
-  #palabras { position: fixed; inset: 0; pointer-events: none; }
-  #palabras span {
-    position: absolute;
-    font-family: "Roboto Flex", "Roboto", sans-serif;
-    line-height: 1;
-    padding: 0.12em 0.15em;   /* que la caja medida incluya inclinación y descendentes */
-    white-space: nowrap;
-    opacity: 0;
-    transition: opacity 0.8s ease;
-  }
-  #palabras span.visible { opacity: 1; }
-  #palabras span.vertical { writing-mode: vertical-rl; }
-
   #pie {
     position: fixed;
     bottom: 14px; right: 18px;
@@ -98,16 +89,18 @@
   "use strict";
 
   // ---------------------------------------------------------------
-  // Recorrido de la experiencia. Las pantallas de texto viven acá; la 6,
-  // la 7 y la 8 son páginas propias (las visualizaciones de cada
+  // Recorrido de la experiencia. Las pantallas de texto viven acá; la 5,
+  // la 6 y la 7 son páginas propias (las visualizaciones de cada
   // dispositivo) que capturan su lienzo con la barra espaciadora y
-  // avanzan con → hasta volver a experiencia.html#9. Desde acá sólo se
-  // entra a la 6: a los dispositivos no se vuelve hacia atrás.
+  // avanzan con → hasta volver a experiencia.html#8. Desde acá sólo se
+  // entra a la 5: a los dispositivos no se vuelve hacia atrás.
   //
   // Por ahora todo es texto negro sobre blanco; el texto sale del
   // guion "experiencia-interactiva-guion.md". Cada pantalla es una lista de
   // párrafos { texto, clase }; con `imagen`, el texto es su descripción, y
-  // `resaltar` lista fragmentos del texto a marcar, en orden de aparición.
+  // `resaltar` lista fragmentos del texto a marcar, en orden de aparición;
+  // `paso` pone ese rótulo, en negrita y resaltado, arriba de `lista`, que
+  // va con viñetas.
   // ---------------------------------------------------------------
   const PANTALLAS = {
     0: [
@@ -124,36 +117,34 @@
     2: [
       { texto: "“Un ciborg es un organismo cibernético, un híbrido de máquina y organismo, una criatura de realidad social y también de ficción”", clase: "cita", resaltar: ["híbrido de máquina y organismo"] },
       { texto: "Donna Haraway (1984)", clase: "autoria" },
-      { texto: "“Simpoiesis es una palabra sencilla, significa “generar-con”. Nada se hace a sí mismo, nada es realmente autopoiético o autoorganizado.”", clase: "cita", resaltar: ["Simpoiesis"] },
+      { texto: "“Simpoiesis es una palabra sencilla, significa generar-con. Nada se hace a sí mismo, nada es realmente autopoiético o autoorganizado.”", clase: "cita", resaltar: ["Simpoiesis", "generar-con"] },
       { texto: "Donna Haraway (2019)", clase: "autoria" },
     ],
-    // La 3 es el conteo y después estas palabras, separadas por comas, de a
-    // una: ver mostrarConteo() y mostrarPalabras().
     3: [
-      { texto: "cuerpo físico, cuerpo virtual, piel, segunda piel, textil electrónico, sensores, actuadores, microcontrolador, datos, vibración, mano, pecho, pierna, pulsar, tocar, contraer, relajar" },
+      { texto: "Frontera entre humano y máquina se desdibuja", clase: "desdibuja" },
     ],
     4: [
-      { texto: "frontera entre humano y máquina se desdibuja" },
+      { paso: "# Paso 1", lista: [
+        "Porta sobre tu antebrazo y tu mano derecha el dispositivo uno.",
+        "Mueve tu mano derecha en diferentes direcciones.",
+        "Explora los movimientos de tu mano y lo que traduce la pantalla.",
+        "Captura la composición gráfica pulsando la barra espaciadora.",
+        "Para borrar todo e iniciar nuevamente pulsa la tecla Retroceso.",
+      ] },
     ],
-    5: [
-      { texto: "Porta sobre tu antebrazo y tu mano derecha el dispositivo uno" },
-    ],
-    9: [
+    8: [
       { texto: "Llegaste casi al final de la experiencia, tu cuerpo generó datos para una composición gráfica." },
       { texto: "Para finalizar selecciona las zonas de las composiciones que creas que son las más ricas en cuanto a tus gustos personales para generar tu obra y la máquina las capturará. Al finalizar podrías cambiar la colorimetría si lo deseas." },
       { texto: "¡Gracias nuevamente por ser parte de esta investigación!" },
     ],
   };
-  const ULTIMA_DE_TEXTO = 5;
+  const ULTIMA_DE_TEXTO = 4;
   const PRIMER_DISPOSITIVO = "bandada_prototipo_v5a_experiencia.html";
-  const CIERRE = 9;
-  const PANTALLA_CONTEO = 3;
+  const CIERRE = 8;
 
   const pantallaEl = document.getElementById("pantalla");
   const pieEl = document.getElementById("pie");
   let actual = 0;
-  let temporizador = null;     // el conteo o la aparición de palabras
-  let capaPalabras = null;
 
   function parrafo(texto, clase, resaltar) {
     const p = document.createElement("p");
@@ -181,11 +172,8 @@
 
   function mostrar(n) {
     actual = n;
-    clearInterval(temporizador);
-    if (capaPalabras) { capaPalabras.remove(); capaPalabras = null; }
     pantallaEl.textContent = "";
-    if (n === PANTALLA_CONTEO) mostrarConteo(function () { mostrarPalabras(PANTALLAS[n][0].texto); });
-    else mostrarTexto(n);
+    mostrarTexto(n);
     pieEl.textContent = n === CIERRE
       ? n + " / " + CIERRE
       : n + " / " + CIERRE + "  ·  ← →";
@@ -193,123 +181,27 @@
 
   function mostrarTexto(n) {
     (PANTALLAS[n] || []).forEach(function (par) {
-      pantallaEl.appendChild(par.imagen
-        ? imagen(par.imagen, par.texto, par.clase)
-        : parrafo(par.texto, par.clase, par.resaltar));
+      if (par.imagen) pantallaEl.appendChild(imagen(par.imagen, par.texto, par.clase));
+      else if (par.paso) pantallaEl.appendChild(conPaso(par));
+      else pantallaEl.appendChild(parrafo(par.texto, par.clase, par.resaltar));
     });
   }
 
-  // Pantalla 3: conteo 5 → 1 solo, en un círculo en el centro (todavía sin
-  // las imágenes). Al terminar el número se va y empiezan las palabras; la
-  // pantalla no avanza sola.
-  function mostrarConteo(alTerminar) {
-    let n = 5;
-    const el = parrafo(String(n), "conteo");
-    pantallaEl.appendChild(el);
-    temporizador = setInterval(function () {
-      n--;
-      if (n >= 1) { el.textContent = String(n); return; }
-      clearInterval(temporizador);
-      el.remove();
-      alTerminar();
-    }, 1000);
-  }
-
-  // Pantalla 3, después del conteo: cada palabra o frase entre comas aparece
-  // sola cada SEG_PALABRA segundos, en un lugar libre del centro de la
-  // ventana, con su propio tamaño y su propia combinación de ejes de Roboto
-  // Flex, siempre en los pesos livianos. Se
-  // intercalan horizontales y verticales (las verticales alternan entre leer
-  // hacia abajo y hacia arriba).
-  const SEG_PALABRA = 2;
-  const SEPARACION = 16;            // px libres entre palabras y con el borde
-  const ZONA = 0.6;                 // fracción de la ventana, centrada, donde caen las palabras
-
-  function azar(min, max) { return min + Math.random() * (max - min); }
-
-  function estiloFlex() {
-    return [
-      '"wght" ' + Math.round(azar(100, 350)),
-      '"wdth" ' + Math.round(azar(25, 151)),
-      '"opsz" ' + Math.round(azar(8, 144)),
-      '"GRAD" ' + Math.round(azar(-60, 0)),
-      '"slnt" ' + (Math.random() < 0.3 ? -10 : 0),
-    ].join(", ");
-  }
-
-  function seSuperponen(a, b) {
-    return a.x < b.x + b.w + SEPARACION && b.x < a.x + a.w + SEPARACION &&
-           a.y < b.y + b.h + SEPARACION && b.y < a.y + a.h + SEPARACION;
-  }
-
-  // Busca un lugar al azar dentro de la zona central que no pise a las
-  // anteriores; si no hay, achica la palabra, abre un poco la zona y vuelve a
-  // probar. Una palabra más larga que la zona queda centrada en ese eje. La rotación de 180° de las verticales que leen
-  // hacia arriba es sobre su centro, así que no cambia la caja que se mide.
-  function colocar(el, ocupados) {
-    const W = window.innerWidth, H = window.innerHeight;
-    let tam = Math.min(W, H) * azar(0.035, 0.11);
-    let caja = null;
-    for (let intento = 0; intento < 12 && !caja; intento++, tam *= 0.85) {
-      el.style.fontSize = tam + "px";
-      const w = el.offsetWidth, h = el.offsetHeight;
-      if (w + 2 * SEPARACION > W || h + 2 * SEPARACION > H) continue;
-      const zona = Math.min(1, ZONA + intento * 0.05);
-      const margenX = Math.max(SEPARACION, (W - Math.max(W * zona, w)) / 2);
-      const margenY = Math.max(SEPARACION, (H - Math.max(H * zona, h)) / 2);
-      for (let i = 0; i < 200; i++) {
-        const c = {
-          x: azar(margenX, W - w - margenX),
-          y: azar(margenY, H - h - margenY),
-          w: w, h: h,
-        };
-        if (!ocupados.some(function (o) { return seSuperponen(c, o); })) { caja = c; break; }
-      }
-    }
-    if (!caja) return false;
-    el.style.left = caja.x + "px";
-    el.style.top = caja.y + "px";
-    ocupados.push(caja);
-    return true;
-  }
-
-  function mostrarPalabras(texto) {
-    const palabras = texto.split(",").map(function (p) { return p.trim(); }).filter(Boolean);
-    // El pie (n / 9) también ocupa lugar.
-    const pie = pieEl.getBoundingClientRect();
-    const ocupados = [{ x: pie.left, y: pie.top, w: pie.width, h: pie.height }];
-    const capa = capaPalabras = document.createElement("div");
-    capa.id = "palabras";
-    document.body.appendChild(capa);
-    let i = 0;
-
-    function siguiente() {
-      if (i >= palabras.length) { clearInterval(temporizador); return; }
-      const el = document.createElement("span");
-      el.textContent = palabras[i];
-      el.style.fontVariationSettings = estiloFlex();
-      if (i % 2 === 1) el.className = "vertical";
-      if (i % 4 === 3) el.style.transform = "rotate(180deg)";
-      capa.appendChild(el);
-      if (colocar(el, ocupados)) {
-        void el.offsetWidth;          // para que la transición de opacidad arranque
-        el.classList.add("visible");
-      } else {
-        el.remove();                  // no entra sin pisar a otra: se omite
-      }
-      i++;
-    }
-
-    // Medir antes de que cargue Roboto Flex daría cajas equivocadas.
-    document.fonts.load('16px "Roboto Flex"').then(function () {
-      if (capa !== capaPalabras) return;          // ya se cambió de pantalla
-      siguiente();
-      temporizador = setInterval(siguiente, SEG_PALABRA * 1000);
+  function conPaso(par) {
+    const bloque = document.createElement("div");
+    bloque.className = "con-paso";
+    const lista = document.createElement("ul");
+    par.lista.forEach(function (linea) {
+      const li = document.createElement("li");
+      li.textContent = linea;
+      lista.appendChild(li);
     });
+    bloque.append(parrafo(par.paso, "paso", [par.paso]), lista);
+    return bloque;
   }
 
   // El número de pantalla vive en el hash: recargar no pierde el lugar, y
-  // la última visualización vuelve con experiencia.html#9.
+  // la última visualización vuelve con experiencia.html#8.
   function desdeHash() {
     const n = parseInt(location.hash.slice(1), 10);
     if (n === CIERRE || (n >= 0 && n <= ULTIMA_DE_TEXTO)) return n;

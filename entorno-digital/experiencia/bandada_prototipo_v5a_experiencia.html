@@ -1632,12 +1632,6 @@
   montarExperiencia({
     clave: "bandada",
     siguiente: "prototipo_percusion_guante_a_midi_v2_experiencia.html",
-    titulo: "Dispositivo uno",
-    instrucciones:
-      "Mueve tu mano derecha, con movimientos suaves en diferentes direcciones.\n" +
-      "Al observar la traducción en la pantalla, contempla el momento.\n\n" +
-      "Captura la composición gráfica pulsando la barra espaciadora.\n" +
-      "Para borrar todo e iniciar nuevamente pulsa la tecla Retroceso.",
     capturada: "Colocar dispositivo dos y pulsar → para continuar.",
     congelar: congelar,
     limpiar: () => { initBirds(birds.length); puntosVisibles = false; },
@@ -1646,10 +1640,11 @@
 
   // ===============================================================
   // Experiencia: esta página es una pantalla del recorrido de
-  // experiencia/experiencia.html. Instrucciones en un aviso cerrable,
-  // Retroceso borra, la barra espaciadora captura (sin vuelta atrás) y
+  // experiencia/experiencia.html. Las instrucciones están en la pantalla
+  // de texto anterior (experiencia.html#4); el aviso sólo aparece al
+  // capturar. Retroceso borra, la barra espaciadora captura (sin vuelta atrás) y
   // recién entonces → lleva a la pantalla siguiente. La captura se guarda
-  // como PNG en IndexedDB para que la pantalla 9 pueda combinarlas más
+  // como PNG en IndexedDB para que la pantalla 8 pueda combinarlas más
   // adelante. Todo pasa por teclado: ni la física ni la frontera de datos
   // se enteran.
   // ===============================================================
@@ -1668,7 +1663,6 @@
       avisoTitulo.textContent = titulo;
       avisoTexto.textContent = texto;
     }
-    mostrarAviso("info", op.titulo, op.instrucciones);
 
     // "libre" → "guardando" → "lista". → sólo funciona en "lista": si se
     // navegara mientras toBlob o la transacción siguen en curso, la captura
