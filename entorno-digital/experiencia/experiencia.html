@@ -66,7 +66,7 @@
     font-size: 4em; font-style: normal; line-height: 1; font-variant-numeric: tabular-nums;
   }
 
-  /* Pantalla 3: las palabras ocupan toda la ventana, cada una en su lugar. */
+  /* Pantalla 3: las palabras se agrupan en el centro, cada una en su lugar. */
   #palabras { position: fixed; inset: 0; pointer-events: none; }
   #palabras span {
     position: absolute;
@@ -216,21 +216,23 @@
   }
 
   // Pantalla 3, después del conteo: cada palabra o frase entre comas aparece
-  // sola cada SEG_PALABRA segundos, en un lugar libre de la ventana, con su
-  // propio tamaño y su propia combinación de ejes de Roboto Flex. Se
+  // sola cada SEG_PALABRA segundos, en un lugar libre del centro de la
+  // ventana, con su propio tamaño y su propia combinación de ejes de Roboto
+  // Flex, siempre en los pesos livianos. Se
   // intercalan horizontales y verticales (las verticales alternan entre leer
   // hacia abajo y hacia arriba).
   const SEG_PALABRA = 2;
   const SEPARACION = 16;            // px libres entre palabras y con el borde
+  const ZONA = 0.6;                 // fracción de la ventana, centrada, donde caen las palabras
 
   function azar(min, max) { return min + Math.random() * (max - min); }
 
   function estiloFlex() {
     return [
-      '"wght" ' + Math.round(azar(100, 1000)),
+      '"wght" ' + Math.round(azar(100, 350)),
       '"wdth" ' + Math.round(azar(25, 151)),
       '"opsz" ' + Math.round(azar(8, 144)),
-      '"GRAD" ' + Math.round(azar(-200, 150)),
+      '"GRAD" ' + Math.round(azar(-60, 0)),
       '"slnt" ' + (Math.random() < 0.3 ? -10 : 0),
     ].join(", ");
   }
@@ -240,8 +242,9 @@
            a.y < b.y + b.h + SEPARACION && b.y < a.y + a.h + SEPARACION;
   }
 
-  // Busca un lugar al azar que no pise a las anteriores; si no hay, achica la
-  // palabra y vuelve a probar. La rotación de 180° de las verticales que leen
+  // Busca un lugar al azar dentro de la zona central que no pise a las
+  // anteriores; si no hay, achica la palabra, abre un poco la zona y vuelve a
+  // probar. Una palabra más larga que la zona queda centrada en ese eje. La rotación de 180° de las verticales que leen
   // hacia arriba es sobre su centro, así que no cambia la caja que se mide.
   function colocar(el, ocupados) {
     const W = window.innerWidth, H = window.innerHeight;
@@ -251,10 +254,13 @@
       el.style.fontSize = tam + "px";
       const w = el.offsetWidth, h = el.offsetHeight;
       if (w + 2 * SEPARACION > W || h + 2 * SEPARACION > H) continue;
+      const zona = Math.min(1, ZONA + intento * 0.05);
+      const margenX = Math.max(SEPARACION, (W - Math.max(W * zona, w)) / 2);
+      const margenY = Math.max(SEPARACION, (H - Math.max(H * zona, h)) / 2);
       for (let i = 0; i < 200; i++) {
         const c = {
-          x: azar(SEPARACION, W - w - SEPARACION),
-          y: azar(SEPARACION, H - h - SEPARACION),
+          x: azar(margenX, W - w - margenX),
+          y: azar(margenY, H - h - margenY),
           w: w, h: h,
         };
         if (!ocupados.some(function (o) { return seSuperponen(c, o); })) { caja = c; break; }

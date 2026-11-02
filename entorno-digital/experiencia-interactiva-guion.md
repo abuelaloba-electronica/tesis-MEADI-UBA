@@ -30,7 +30,7 @@ Durante la experiencia, tomate el tiempo que creas necesario, contempla el momen
 
 **tiempo 5, 4, 3, 2, 1, en el centro, dentro de un círculo relleno color #ddfc2c**
 
-**Al terminar el conteo el número desaparece y aparecen estas palabras, que no se ven durante el conteo: cada palabra o frase (separadas por comas) aparece de a una, cada 2 segundos, en distintas ubicaciones sin superponerse, con distintos tamaños y variantes de Roboto Flex, intercalando orientación horizontal y vertical (palabras que aparecen en negro y luego quedan en blanco de fondo)**
+**Al terminar el conteo el número desaparece y aparecen estas palabras, que no se ven durante el conteo: cada palabra o frase (separadas por comas) aparece de a una, cada 2 segundos, en distintas ubicaciones agrupadas hacia el centro de la pantalla sin superponerse, con distintos tamaños y variantes livianas de Roboto Flex, intercalando orientación horizontal y vertical (palabras que aparecen en negro y luego quedan en blanco de fondo)**
 
 cuerpo físico, cuerpo virtual, piel, segunda piel, textil electrónico, sensores, actuadores, microcontrolador, datos, vibración, mano, pecho, pierna, pulsar, tocar, contraer, relajar 
 
