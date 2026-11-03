@@ -1300,14 +1300,7 @@
 
   montarExperiencia({
     clave: "guante",
-    siguiente: "prototipo_emg_acumulacion_v4_experiencia.html",
-    titulo: "Dispositivo dos",
-    instrucciones:
-      "Con tus dedos índice y medio de la mano izquierda golpea sobre la mesa con diferentes intensidades. " +
-      "Al mismo tiempo, con el dedo índice de la mano derecha pulsa el sensor ubicado en tu pecho.\n" +
-      "Juega y observa lo que ocurre en la pantalla.\n\n" +
-      "Captura la composición gráfica pulsando la barra espaciadora.\n" +
-      "Para borrar todo e iniciar nuevamente pulsa la tecla Retroceso.",
+    siguiente: "experiencia.html#8",
     capturada: "Colocar dispositivo tres y pulsar → para continuar.",
     congelar: congelar,
     limpiar: limpiarLienzo,
@@ -1316,10 +1309,11 @@
 
   // ===============================================================
   // Experiencia: esta página es una pantalla del recorrido de
-  // experiencia/experiencia.html. Instrucciones en un aviso cerrable,
-  // Retroceso borra, la barra espaciadora captura (sin vuelta atrás) y
+  // experiencia/experiencia.html. Las instrucciones están en la pantalla
+  // de texto anterior (experiencia.html#6); el aviso sólo aparece al
+  // capturar. Retroceso borra, la barra espaciadora captura (sin vuelta atrás) y
   // recién entonces → lleva a la pantalla siguiente. La captura se guarda
-  // como PNG en IndexedDB para que la pantalla 8 pueda combinarlas más
+  // como PNG en IndexedDB para que la pantalla 10 pueda combinarlas más
   // adelante. Todo pasa por teclado: ni la física ni la frontera de datos
   // se enteran.
   // ===============================================================
@@ -1338,7 +1332,6 @@
       avisoTitulo.textContent = titulo;
       avisoTexto.textContent = texto;
     }
-    mostrarAviso("info", op.titulo, op.instrucciones);
 
     // "libre" → "guardando" → "lista". → sólo funciona en "lista": si se
     // navegara mientras toBlob o la transacción siguen en curso, la captura

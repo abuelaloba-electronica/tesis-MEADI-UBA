@@ -52,27 +52,45 @@ Para borrar todo e iniciar nuevamente pulsa la tecla Retroceso.
 
 **Pantalla 6\.**
 
-Con tus dedos índice y medio de la mano izquierda golpea sobre la mesa con diferentes intensidades. Al mismo tiempo, con el dedo índice de la mano derecha pulsa el sensor ubicado en tu pecho. 
+**“# Paso 2” en negrita y resaltado; debajo, cada línea con viñeta y todo alineado a la izquierda**
 
-Juega y observa lo que ocurre en la pantalla. 
+Porta sobre tu pecho, brazo y mano izquierda el dispositivo dos.
+
+Con tus dedos índice y medio de la mano izquierda, golpea sobre la superficie de la mesa.
+
+Presiona con tu dedo índice de la mano derecha el sensor ubicado en tu pecho.
+
+Explora las huellas de tus dedos, los colores, el sonido.
 
 Captura la composición gráfica pulsando la barra espaciadora.
 
 Para borrar todo e iniciar nuevamente pulsa la tecla Retroceso.
-
-**Colocar dispositivo tres.**
 
 **Pantalla 7\.**
 
-Contrae los músculos gemelos de la pantorrilla las veces que sea necesario.
+**Visualización del dispositivo dos, sin instrucciones en pantalla**
 
-Juega y observa lo que ocurre en la pantalla. 
+**Colocar dispositivo tres.**
+
+**Pantalla 8\.**
+
+**“# Paso 3” en negrita y resaltado; debajo, cada línea con viñeta y todo alineado a la izquierda**
+
+Porta sobre tu pierna el dispositivo tres.
+
+Realiza movimientos que involucren el músculo de la pantorrilla.
+
+Explora tu esfuerzo muscular a través de la traducción que ves en la pantalla.
 
 Captura la composición gráfica pulsando la barra espaciadora.
 
 Para borrar todo e iniciar nuevamente pulsa la tecla Retroceso.
 
-**Pantalla 8\.**
+**Pantalla 9\.**
+
+**Visualización del dispositivo tres, sin instrucciones en pantalla**
+
+**Pantalla 10\.**
 
 Llegaste casi al final de la experiencia, tu cuerpo generó datos para una composición gráfica.
 

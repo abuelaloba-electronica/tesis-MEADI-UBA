@@ -57,7 +57,7 @@
   /* Pantalla 3: a los 3 s el texto se desenfoca y queda así. */
   #pantalla .desdibuja { animation: desdibujar 3s ease-in 3s forwards; }
   @keyframes desdibujar { to { filter: blur(6px); opacity: 0.6; } }
-  /* Pantalla 4: rótulo "Paso N" y debajo una lista con viñetas, todo
+  /* Pantallas 4, 6 y 8: rótulo "Paso N" y debajo una lista con viñetas, todo
      alineado a la izquierda. El bloque se ajusta al ancho de la línea más
      larga y va centrado. Las viñetas caen en el borde izquierdo del rótulo
      y el texto que da vuelta queda alineado con el de su línea. */
@@ -90,10 +90,12 @@
 
   // ---------------------------------------------------------------
   // Recorrido de la experiencia. Las pantallas de texto viven acá; la 5,
-  // la 6 y la 7 son páginas propias (las visualizaciones de cada
+  // la 7 y la 9 son páginas propias (las visualizaciones de cada
   // dispositivo) que capturan su lienzo con la barra espaciadora y
-  // avanzan con → hasta volver a experiencia.html#8. Desde acá sólo se
-  // entra a la 5: a los dispositivos no se vuelve hacia atrás.
+  // avanzan con →: la 5 vuelve a experiencia.html#6 (instrucciones del
+  // dispositivo dos), la 7 a experiencia.html#8 (instrucciones del
+  // dispositivo tres) y la 9 a experiencia.html#10. Desde acá sólo se
+  // entra a la 5, la 7 y la 9: a los dispositivos no se vuelve hacia atrás.
   //
   // Por ahora todo es texto negro sobre blanco; el texto sale del
   // guion "experiencia-interactiva-guion.md". Cada pantalla es una lista de
@@ -132,15 +134,38 @@
         "Para borrar todo e iniciar nuevamente pulsa la tecla Retroceso.",
       ] },
     ],
+    6: [
+      { paso: "# Paso 2", lista: [
+        "Porta sobre tu pecho, brazo y mano izquierda el dispositivo dos.",
+        "Con tus dedos índice y medio de la mano izquierda, golpea sobre la superficie de la mesa.",
+        "Presiona con tu dedo índice de la mano derecha el sensor ubicado en tu pecho.",
+        "Explora las huellas de tus dedos, los colores, el sonido.",
+        "Captura la composición gráfica pulsando la barra espaciadora.",
+        "Para borrar todo e iniciar nuevamente pulsa la tecla Retroceso.",
+      ] },
+    ],
     8: [
+      { paso: "# Paso 3", lista: [
+        "Porta sobre tu pierna el dispositivo tres.",
+        "Realiza movimientos que involucren el músculo de la pantorrilla.",
+        "Explora tu esfuerzo muscular a través de la traducción que ves en la pantalla.",
+        "Captura la composición gráfica pulsando la barra espaciadora.",
+        "Para borrar todo e iniciar nuevamente pulsa la tecla Retroceso.",
+      ] },
+    ],
+    10: [
       { texto: "Llegaste casi al final de la experiencia, tu cuerpo generó datos para una composición gráfica." },
       { texto: "Para finalizar selecciona las zonas de las composiciones que creas que son las más ricas en cuanto a tus gustos personales para generar tu obra y la máquina las capturará. Al finalizar podrías cambiar la colorimetría si lo deseas." },
       { texto: "¡Gracias nuevamente por ser parte de esta investigación!" },
     ],
   };
-  const ULTIMA_DE_TEXTO = 4;
-  const PRIMER_DISPOSITIVO = "bandada_prototipo_v5a_experiencia.html";
-  const CIERRE = 8;
+  // Pantallas de texto desde las que → sale a una visualización.
+  const DISPOSITIVO_SIGUIENTE = {
+    4: "bandada_prototipo_v5a_experiencia.html",
+    6: "prototipo_percusion_guante_a_midi_v2_experiencia.html",
+    8: "prototipo_emg_acumulacion_v4_experiencia.html",
+  };
+  const CIERRE = 10;
 
   const pantallaEl = document.getElementById("pantalla");
   const pieEl = document.getElementById("pie");
@@ -201,11 +226,10 @@
   }
 
   // El número de pantalla vive en el hash: recargar no pierde el lugar, y
-  // la última visualización vuelve con experiencia.html#8.
+  // las visualizaciones vuelven con experiencia.html#6, #8 y #10.
   function desdeHash() {
     const n = parseInt(location.hash.slice(1), 10);
-    if (n === CIERRE || (n >= 0 && n <= ULTIMA_DE_TEXTO)) return n;
-    return 0;
+    return PANTALLAS[n] ? n : 0;
   }
   function ir(n) {
     if (location.hash === "#" + n) mostrar(n);
@@ -237,10 +261,12 @@
       return;
     }
     if (e.key === "ArrowRight") {
-      if (actual < ULTIMA_DE_TEXTO) ir(actual + 1);
-      else location.href = PRIMER_DISPOSITIVO;
+      if (DISPOSITIVO_SIGUIENTE[actual]) location.href = DISPOSITIVO_SIGUIENTE[actual];
+      else ir(actual + 1);
     } else if (e.key === "ArrowLeft") {
-      if (actual > 0) ir(actual - 1);
+      // Sólo entre pantallas de texto contiguas: de la 6 o la 8 no se vuelve
+      // a una visualización.
+      if (PANTALLAS[actual - 1]) ir(actual - 1);
     }
   });
 
