@@ -98,3 +98,7 @@ Para finalizar selecciona las zonas de las composiciones que creas que son las m
 
 **¡Gracias nuevamente por ser parte de esta investigación\!**
 
+**Pantalla 11\.**
+
+**Composición: las tres capturas superpuestas, cada una con fondo transparente. De abajo hacia arriba: dispositivo tres (EMG), dispositivo dos (guante) y dispositivo uno (bandada). Sin texto.**
+

@@ -31,7 +31,9 @@
   }
   /* Los controles de formulario no heredan la tipografía por defecto. */
   button, input, select, textarea { font-family: inherit; font-weight: inherit; }
-  canvas { display: block; background: #fff; }
+  /* Sin fondo propio: el blanco lo pone el body y el canvas queda
+     transparente, para que la captura se pueda superponer (composicion.html). */
+  canvas { display: block; }
 
   #panel {
     position: fixed;
@@ -1546,8 +1548,8 @@
     const w = canvas.width, h = canvas.height;
     const cx = w / 2, cy = h / 2;
 
-    ctx.fillStyle = "#fff";
-    ctx.fillRect(0, 0, w, h);
+    // Transparente y no blanco: el fondo lo pinta el CSS (ver montarExperiencia).
+    ctx.clearRect(0, 0, w, h);
 
     // Se dibuja de atrás hacia adelante para que los puntos cercanos tapen
     // a los lejanos. Con ≤250 puntos, ordenar y hacer un fill() por punto no
@@ -1599,10 +1601,29 @@
       (predators.length ? " · depredador activo (" + predators.length + ")" : "");
   }
 
+  // Si `registro` es un arreglo, cada punto dibujado se anota en él: así la
+  // lista de elementos de la captura sale de la misma proyección que el
+  // dibujo, sin repetir la cuenta (ver elementosCaptura).
+  let registro = null;
   function punto(x, y, r) {
     ctx.beginPath();
     ctx.arc(x, y, r, 0, TWO_PI);
     ctx.fill();
+    if (registro) {
+      registro.push({ tipo: "punto", x: x, y: y, r: r,
+                      alpha: ctx.globalAlpha, color: ctx.fillStyle });
+    }
+  }
+
+  // Elementos del último cuadro, en px CSS (el canvas de la bandada no usa
+  // devicePixelRatio), en orden de dibujo. Incluye las copias fantasma del
+  // campo continuo: son parte de lo que se ve.
+  function elementosCaptura() {
+    registro = [];
+    draw();
+    const e = registro;
+    registro = null;
+    return e;
   }
 
   // Enganche de diagnóstico para el harness de Node (tools/harness.js). La
@@ -1636,6 +1657,7 @@
     congelar: congelar,
     limpiar: () => { initBirds(birds.length); puntosVisibles = false; },
     lienzos: () => [canvas],
+    elementos: elementosCaptura,
   });
 
   // ===============================================================
@@ -1644,9 +1666,12 @@
   // de texto anterior (experiencia.html#4); el aviso sólo aparece al
   // capturar. Retroceso borra, la barra espaciadora captura (sin vuelta atrás) y
   // recién entonces → lleva a la pantalla siguiente. La captura se guarda
-  // como PNG en IndexedDB para que la pantalla 10 pueda combinarlas más
-  // adelante. Todo pasa por teclado: ni la física ni la frontera de datos
-  // se enteran.
+  // en IndexedDB como PNG con fondo transparente, más la lista de elementos
+  // dibujados (para editarlos en una etapa futura): composicion.html, la
+  // pantalla 11, superpone las tres. Por eso esta copia, a diferencia de la
+  // página activa, no pinta el fondo dentro del canvas sino en el CSS: en
+  // pantalla se ve igual. Todo pasa por teclado: ni la física ni la frontera
+  // de datos se enteran.
   // ===============================================================
   function montarExperiencia(op) {
     const aviso = document.getElementById("aviso");
@@ -1675,8 +1700,22 @@
       mostrarAviso("info", "Capturando la composición…", "");
       // Un frame de gracia para que el último cuadro congelado esté pintado.
       requestAnimationFrame(function () {
-        componerCaptura(op.lienzos())
-          .then(function (blob) { return guardarCaptura(op.clave, blob); })
+        const lienzos = op.lienzos();
+        componerCaptura(lienzos)
+          .then(function (blob) {
+            return guardarCaptura(op.clave, {
+              imagen: blob,
+              // Medidas en px CSS y densidad del canvas: la bandada no usa
+              // devicePixelRatio y las otras dos sí, así que los PNG pueden
+              // tener resoluciones distintas para la misma pantalla.
+              ancho: window.innerWidth,
+              alto: window.innerHeight,
+              dpr: lienzos[0].width / window.innerWidth,
+              elementos: op.elementos(),
+              version: 1,
+              fecha: Date.now()
+            });
+          })
           .then(function () { return ""; },
                 function (err) { return "\n\n(No se pudo guardar la imagen: " + (err && err.message || err) + ")"; })
           .then(function (nota) {
@@ -1705,16 +1744,15 @@
     });
   }
 
-  // Funde los lienzos visibles, en orden, sobre blanco y a su resolución
-  // real (width/height del canvas, no el tamaño CSS).
+  // Funde los lienzos visibles, en orden, a su resolución real (width/height
+  // del canvas, no el tamaño CSS). Sin fondo: el PNG conserva la
+  // transparencia para que composicion.html pueda apilar las capturas.
   function componerCaptura(lienzos) {
     const base = lienzos[0];
     const c = document.createElement("canvas");
     c.width = base.width;
     c.height = base.height;
     const g = c.getContext("2d");
-    g.fillStyle = "#fff";
-    g.fillRect(0, 0, c.width, c.height);
     lienzos.forEach(function (l) { g.drawImage(l, 0, 0, c.width, c.height); });
     return new Promise(function (ok, mal) {
       c.toBlob(function (blob) { blob ? ok(blob) : mal(new Error("toBlob vacío")); }, "image/png");
@@ -1723,8 +1761,8 @@
 
   // IndexedDB y no localStorage: tres PNG de pantalla completa pasan los
   // ~5 MB de localStorage. En Chrome todas las páginas file:// comparten
-  // origen, así que experiencia.html lee lo mismo que escriben estas.
-  function guardarCaptura(clave, blob) {
+  // origen, así que composicion.html lee lo mismo que escriben estas.
+  function guardarCaptura(clave, registro) {
     return new Promise(function (ok, mal) {
       if (typeof indexedDB === "undefined") return mal(new Error("IndexedDB no disponible"));
       const pedido = indexedDB.open("experiencia", 1);
@@ -1733,7 +1771,7 @@
       pedido.onsuccess = function () {
         const db = pedido.result;
         const tx = db.transaction("capturas", "readwrite");
-        tx.objectStore("capturas").put({ imagen: blob, fecha: Date.now() }, clave);
+        tx.objectStore("capturas").put(registro, clave);
         tx.oncomplete = function () { db.close(); ok(); };
         tx.onerror = function () { db.close(); mal(tx.error); };
       };

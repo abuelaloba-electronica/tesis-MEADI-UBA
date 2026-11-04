@@ -96,6 +96,9 @@
   // dispositivo dos), la 7 a experiencia.html#8 (instrucciones del
   // dispositivo tres) y la 9 a experiencia.html#10. Desde acá sólo se
   // entra a la 5, la 7 y la 9: a los dispositivos no se vuelve hacia atrás.
+  // La 11, el cierre, también es una página propia (composicion.html): las
+  // tres capturas superpuestas. Se llega con → desde la 10, y es ella la que
+  // tiene la tecla Inicio del operador para reiniciar el recorrido.
   //
   // Por ahora todo es texto negro sobre blanco; el texto sale del
   // guion "experiencia-interactiva-guion.md". Cada pantalla es una lista de
@@ -159,13 +162,15 @@
       { texto: "¡Gracias nuevamente por ser parte de esta investigación!" },
     ],
   };
-  // Pantallas de texto desde las que → sale a una visualización.
-  const DISPOSITIVO_SIGUIENTE = {
+  // Pantallas de texto desde las que → sale a otra página: una
+  // visualización o, desde la 10, la composición final.
+  const SALIDA = {
     4: "bandada_prototipo_v5a_experiencia.html",
     6: "prototipo_percusion_guante_a_midi_v2_experiencia.html",
     8: "prototipo_emg_acumulacion_v4_experiencia.html",
+    10: "composicion.html",
   };
-  const CIERRE = 10;
+  const CIERRE = 11;    // la última pantalla, sólo para el pie "n / 11"
 
   const pantallaEl = document.getElementById("pantalla");
   const pieEl = document.getElementById("pie");
@@ -199,9 +204,7 @@
     actual = n;
     pantallaEl.textContent = "";
     mostrarTexto(n);
-    pieEl.textContent = n === CIERRE
-      ? n + " / " + CIERRE
-      : n + " / " + CIERRE + "  ·  ← →";
+    pieEl.textContent = n + " / " + CIERRE + "  ·  ← →";
   }
 
   function mostrarTexto(n) {
@@ -226,7 +229,7 @@
   }
 
   // El número de pantalla vive en el hash: recargar no pierde el lugar, y
-  // las visualizaciones vuelven con experiencia.html#6, #8 y #10.
+  // las visualizaciones y la composición vuelven con experiencia.html#6, #8 y #10.
   function desdeHash() {
     const n = parseInt(location.hash.slice(1), 10);
     return PANTALLAS[n] ? n : 0;
@@ -237,31 +240,9 @@
   }
   window.addEventListener("hashchange", function () { mostrar(desdeHash()); });
 
-  // Para la próxima persona: borra las capturas guardadas por las páginas
-  // de los dispositivos (IndexedDB "experiencia", almacén "capturas").
-  function borrarCapturas() {
-    return new Promise(function (ok) {
-      if (typeof indexedDB === "undefined") return ok();
-      const pedido = indexedDB.open("experiencia", 1);
-      pedido.onupgradeneeded = function () { pedido.result.createObjectStore("capturas"); };
-      pedido.onerror = function () { ok(); };
-      pedido.onsuccess = function () {
-        const db = pedido.result;
-        const tx = db.transaction("capturas", "readwrite");
-        tx.objectStore("capturas").clear();
-        tx.oncomplete = tx.onerror = function () { db.close(); ok(); };
-      };
-    });
-  }
-
   window.addEventListener("keydown", function (e) {
-    if (actual === CIERRE) {
-      // Tecla del operador para reiniciar el recorrido.
-      if (e.key === "Home") borrarCapturas().then(function () { ir(0); });
-      return;
-    }
     if (e.key === "ArrowRight") {
-      if (DISPOSITIVO_SIGUIENTE[actual]) location.href = DISPOSITIVO_SIGUIENTE[actual];
+      if (SALIDA[actual]) location.href = SALIDA[actual];
       else ir(actual + 1);
     } else if (e.key === "ArrowLeft") {
       // Sólo entre pantallas de texto contiguas: de la 6 o la 8 no se vuelve

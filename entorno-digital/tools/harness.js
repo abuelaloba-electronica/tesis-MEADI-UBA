@@ -149,6 +149,7 @@ const ctx2d = {
   fillStyle: "",
   globalAlpha: 1,
   fillRect() {},
+  clearRect() {},   // la copia _experiencia limpia en vez de pintar el fondo
   beginPath() {},
   moveTo() {},
   fill() {},

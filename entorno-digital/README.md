@@ -22,13 +22,24 @@ están en [`prototipos/`](prototipos/).
 ### La experiencia completa: `experiencia/`
 
 [`experiencia/experiencia.html`](experiencia/experiencia.html) encadena las
-tres visualizaciones en un recorrido de pantallas (0–10) a partir del guion
+tres visualizaciones en un recorrido de pantallas (0–11) a partir del guion
 [`experiencia-interactiva-guion.md`](experiencia-interactiva-guion.md). Las pantallas 0–4,
 6, 8 y 10 son texto y se recorren con ← →; la 5, la 7 y la 9 son copias
 `_experiencia` de las tres páginas activas; sus instrucciones están en la
 pantalla de texto anterior a cada una (4, 6 y 8). Borran con Retroceso, capturan el lienzo con la barra
 espaciadora (sin vuelta atrás, guardado en IndexedDB) y recién entonces pasan a
-la siguiente con →. En la 10, Inicio borra las capturas y vuelve a la 0.
+la siguiente con →. Desde la 10, → lleva a la 11,
+[`experiencia/composicion.html`](experiencia/composicion.html): las tres
+capturas superpuestas sobre blanco, de abajo hacia arriba EMG, guante y
+bandada. Ahí Inicio borra las capturas y vuelve a la 0.
+
+Cada captura es un registro `{ imagen, ancho, alto, dpr, elementos, version,
+fecha }` en IndexedDB (`experiencia` / `capturas`, claves `bandada`, `guante` y
+`emg`): un PNG con fondo transparente y la lista de lo dibujado (puntos,
+anillos y discos, cuadriláteros) en px CSS, pensada para poder editar los
+elementos más adelante. Para que el PNG salga transparente, las copias pintan
+el fondo en el CSS y no en el canvas; ver
+[`cambios_experiencia_composicion.md`](prototipos/cambios_experiencia_composicion.md).
 
 Las copias no cambian la física: si se ajusta una visualización activa, el
 cambio hay que portarlo a mano a su copia `_experiencia`.

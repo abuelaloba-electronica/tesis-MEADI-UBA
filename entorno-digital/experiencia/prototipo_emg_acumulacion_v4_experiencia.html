@@ -1082,17 +1082,41 @@
     capturada: "Pulsar → para continuar.",
     congelar: congelar,
     limpiar: limpiarLienzo,
-    lienzos: () => [canvas],
+    // La capa offscreen y no el canvas visible: tiene todos los
+    // cuadriláteros estampados (congelar() estampa los que estaban
+    // apareciendo) y nunca se le pinta el fondo, así que ya es transparente.
+    // El canvas visible y su BG_COLOR no cambian.
+    lienzos: () => [capa],
+    elementos: elementosCaptura,
   });
+
+  // Cuadriláteros en px CSS, con la misma cuenta que dibujarCuad() a escala
+  // 1, en orden de dibujo. Se conservan también los datos normalizados
+  // (v, cu, cv), que son los que permiten rehacer la figura a otro tamaño.
+  function elementosCaptura() {
+    return cuads.map((cuad) => {
+      const cx = W / 2 + cuad.cu * zonaDx;
+      const cy = H / 2 + cuad.cv * zonaDy;
+      return {
+        tipo: "cuadrilatero",
+        puntos: cuad.v.map((p) => [cx + p[0] * rectSemiAlto, cy + p[1] * rectSemiAlto]),
+        color: cuad.color, alpha: cuad.alpha, familia: cuad.familia,
+        v: cuad.v, cu: cuad.cu, cv: cuad.cv, semiAlto: rectSemiAlto,
+      };
+    });
+  }
   // ===============================================================
   // Experiencia: esta página es una pantalla del recorrido de
   // experiencia/experiencia.html. Las instrucciones están en la pantalla
   // de texto anterior (experiencia.html#8); el aviso sólo aparece al
   // capturar. Retroceso borra, la barra espaciadora captura (sin vuelta atrás) y
   // recién entonces → lleva a la pantalla siguiente. La captura se guarda
-  // como PNG en IndexedDB para que la pantalla 10 pueda combinarlas más
-  // adelante. Todo pasa por teclado: ni la física ni la frontera de datos
-  // se enteran.
+  // en IndexedDB como PNG con fondo transparente, más la lista de elementos
+  // dibujados (para editarlos en una etapa futura): composicion.html, la
+  // pantalla 11, superpone las tres. Por eso esta copia, a diferencia de la
+  // página activa, no pinta el fondo dentro del canvas sino en el CSS: en
+  // pantalla se ve igual. Todo pasa por teclado: ni la física ni la frontera
+  // de datos se enteran.
   // ===============================================================
   function montarExperiencia(op) {
     const aviso = document.getElementById("aviso");
@@ -1121,8 +1145,22 @@
       mostrarAviso("info", "Capturando la composición…", "");
       // Un frame de gracia para que el último cuadro congelado esté pintado.
       requestAnimationFrame(function () {
-        componerCaptura(op.lienzos())
-          .then(function (blob) { return guardarCaptura(op.clave, blob); })
+        const lienzos = op.lienzos();
+        componerCaptura(lienzos)
+          .then(function (blob) {
+            return guardarCaptura(op.clave, {
+              imagen: blob,
+              // Medidas en px CSS y densidad del canvas: la bandada no usa
+              // devicePixelRatio y las otras dos sí, así que los PNG pueden
+              // tener resoluciones distintas para la misma pantalla.
+              ancho: window.innerWidth,
+              alto: window.innerHeight,
+              dpr: lienzos[0].width / window.innerWidth,
+              elementos: op.elementos(),
+              version: 1,
+              fecha: Date.now()
+            });
+          })
           .then(function () { return ""; },
                 function (err) { return "\n\n(No se pudo guardar la imagen: " + (err && err.message || err) + ")"; })
           .then(function (nota) {
@@ -1151,16 +1189,15 @@
     });
   }
 
-  // Funde los lienzos visibles, en orden, sobre blanco y a su resolución
-  // real (width/height del canvas, no el tamaño CSS).
+  // Funde los lienzos visibles, en orden, a su resolución real (width/height
+  // del canvas, no el tamaño CSS). Sin fondo: el PNG conserva la
+  // transparencia para que composicion.html pueda apilar las capturas.
   function componerCaptura(lienzos) {
     const base = lienzos[0];
     const c = document.createElement("canvas");
     c.width = base.width;
     c.height = base.height;
     const g = c.getContext("2d");
-    g.fillStyle = "#fff";
-    g.fillRect(0, 0, c.width, c.height);
     lienzos.forEach(function (l) { g.drawImage(l, 0, 0, c.width, c.height); });
     return new Promise(function (ok, mal) {
       c.toBlob(function (blob) { blob ? ok(blob) : mal(new Error("toBlob vacío")); }, "image/png");
@@ -1169,8 +1206,8 @@
 
   // IndexedDB y no localStorage: tres PNG de pantalla completa pasan los
   // ~5 MB de localStorage. En Chrome todas las páginas file:// comparten
-  // origen, así que experiencia.html lee lo mismo que escriben estas.
-  function guardarCaptura(clave, blob) {
+  // origen, así que composicion.html lee lo mismo que escriben estas.
+  function guardarCaptura(clave, registro) {
     return new Promise(function (ok, mal) {
       if (typeof indexedDB === "undefined") return mal(new Error("IndexedDB no disponible"));
       const pedido = indexedDB.open("experiencia", 1);
@@ -1179,7 +1216,7 @@
       pedido.onsuccess = function () {
         const db = pedido.result;
         const tx = db.transaction("capturas", "readwrite");
-        tx.objectStore("capturas").put({ imagen: blob, fecha: Date.now() }, clave);
+        tx.objectStore("capturas").put(registro, clave);
         tx.oncomplete = function () { db.close(); ok(); };
         tx.onerror = function () { db.close(); mal(tx.error); };
       };

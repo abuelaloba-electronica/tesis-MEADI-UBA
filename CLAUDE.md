@@ -37,15 +37,19 @@ sin romper nada.
 `experiencia.html` son las pantallas de texto (0–4, 6, 8 y 10, ← →), y las pantallas
 5, 7 y 9 son copias `_experiencia` de las tres páginas activas (sus
 instrucciones están en la pantalla de texto anterior: 4, 6 y 8), con Retroceso para borrar, barra espaciadora para capturar
-(definitiva, PNG en IndexedDB) y → para seguir. Las copias no cambian la
+(definitiva: PNG transparente + lista de `elementos` en IndexedDB) y → para seguir.
+La pantalla 11, `composicion.html`, superpone las tres capturas (EMG abajo,
+guante, bandada arriba); ahí Inicio borra las capturas y vuelve a la 0. Las copias no cambian la
 física: un ajuste en una página activa hay que portarlo a mano a su copia.
+La única diferencia buscada es el fondo: en las copias lo pinta el CSS y no el
+canvas, para que la captura salga transparente.
 
 **El guion manda sobre el contenido.** `entorno-digital/experiencia-interactiva-guion.md`
 es la fuente del texto y del orden de las pantallas, y tiene que quedar siempre
 sincronizado con la experiencia: todo cambio de contenido en el guion se porta
 a mano a `experiencia.html` (el objeto `PANTALLAS`). Si cambia la numeración,
-actualizar también `DISPOSITIVO_SIGUIENTE` y `CIERRE`, los
-`experiencia.html#N` a los que vuelven las copias, y los rangos de pantallas
+actualizar también `SALIDA` y `CIERRE`, los
+`experiencia.html#N` a los que vuelven las copias y `composicion.html`, y los rangos de pantallas
 de este archivo y de `entorno-digital/README.md`. Al revés también: un cambio
 de texto pedido sobre el HTML se refleja en el guion.
 
@@ -184,4 +188,5 @@ Verificación de sintaxis rápida: extraer el `<script>` a un `.js` y correr
 | la acumulación EMG v3 (cuadriláteros, lector del dispositivo3) | `entorno-digital/prototipos/cambios_emg_acumulacion_v3.md` |
 | la acumulación EMG v4 (centro que se muda, familias de color) | `entorno-digital/prototipos/cambios_emg_acumulacion_v4.md` |
 | la experiencia completa (pantallas, captura, navegación) | el guion `entorno-digital/experiencia-interactiva-guion.md` |
+| la composición final (capturas transparentes, `elementos`) | `entorno-digital/prototipos/cambios_experiencia_composicion.md` |
 | visualizaciones sin hardware todavía (EMG, estiramiento) | `entorno-digital/prototipos/propuesta_*.md` |
