@@ -21,9 +21,13 @@
     font-family: "Roboto", -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
     font-weight: 300;
   }
-  /* Una capa por captura, todas a pantalla completa y una encima de otra.
-     El orden de apilado lo da el orden en el DOM, que arma CAPAS. */
-  canvas.capa { position: fixed; top: 0; left: 0; display: block; pointer-events: none; }
+  /* Un solo lienzo con todos los elementos de las tres capturas. Queda
+     transparente: el blanco lo pone el body, igual que en las copias. */
+  #escena {
+    position: fixed; top: 0; left: 0; display: block;
+    touch-action: none;           /* el arrastre es nuestro, no del navegador */
+    user-select: none; -webkit-user-select: none;
+  }
   #vacio {
     position: fixed; inset: 0;
     display: none; align-items: center; justify-content: center;
@@ -37,10 +41,12 @@
     font-size: 11px;
     color: #aaa;
     font-variant-numeric: tabular-nums;
+    white-space: pre;
   }
 </style>
 </head>
 <body>
+<canvas id="escena"></canvas>
 <div id="vacio">No hay composiciones capturadas.</div>
 <div id="pie">11 / 11  ·  ←</div>
 
@@ -49,41 +55,610 @@
   "use strict";
 
   // ---------------------------------------------------------------
-  // Pantalla 11 de la experiencia: las tres capturas superpuestas.
+  // Pantalla 11 de la experiencia: la composición de las tres capturas.
   //
   // Cada página _experiencia, al pulsar la barra espaciadora, guarda en
   // IndexedDB ("experiencia", almacén "capturas") un registro
   //   { imagen: PNG transparente, ancho, alto (px CSS), dpr,
   //     elementos: [...], version, fecha }
-  // con clave "bandada", "guante" o "emg". Acá se leen y se apilan, cada
-  // una en su propio canvas: en una etapa siguiente cada capa se va a poder
-  // editar, ocultar o reordenar por separado, y para eso están también los
-  // `elementos` (por ahora no se usan: se dibujan los PNG).
+  // con clave "bandada", "guante" o "emg".
   //
-  // ← vuelve a experiencia.html#10. Inicio es la tecla del operador: borra
-  // las capturas y vuelve a la pantalla 0 para la próxima persona.
+  // v2, etapa 1 (ver prototipos/cambios_experiencia_composicion_v2.md): ya
+  // no se apilan los PNG. Los `elementos` de las tres capturas se vuelcan en
+  // una sola lista ordenada, la escena, y se redibujan en vector en un único
+  // canvas. Es la base para que en las etapas siguientes cada elemento se
+  // pueda seleccionar y modificar, venga del dispositivo que venga.
+  //
+  // Etapa 2: seleccionar, mover, eliminar, deshacer.
+  //
+  // Mouse:
+  //   clic          selecciona el elemento de más arriba bajo el puntero
+  //   Mayús+clic    lo suma a la selección o lo quita
+  //   clic al vacío deselecciona
+  //   arrastrar     mueve la selección
+  // Teclas:
+  //   Supr, Retroceso    elimina la selección
+  //   Ctrl+Z             deshace; Ctrl+Mayús+Z o Ctrl+Y rehace
+  //   Esc                deselecciona
+  //   ←       vuelve a experiencia.html#10
+  //   Inicio  (operador) borra las capturas y vuelve a la pantalla 0
+  //   V       diagnóstico: alterna entre la escena en vector y los PNG
+  //           originales. Si la escena está bien construida, al alternar no
+  //           se mueve nada (salvo el multiply del guante sobre la EMG, que
+  //           los PNG no tienen: ver el registro de cambios). Mientras se
+  //           ven los PNG la edición queda en pausa: no reflejan los cambios.
+  //
+  // composicion.html#demo arma una escena sintética con los cuatro tipos de
+  // elemento, sin leer ni borrar la base: sirve para trabajar el editor sin
+  // recorrer las tres páginas con el hardware.
   // ---------------------------------------------------------------
 
-  // Orden de apilado, de abajo hacia arriba: lo grande y translúcido (los
+  // Orden de volcado, de abajo hacia arriba: lo grande y translúcido (los
   // cuadriláteros de la EMG) de fondo, el detalle fino (los puntos de la
-  // bandada) encima, para que nunca quede tapado.
+  // bandada) encima. Es sólo el orden inicial de la escena.
   const CAPAS = ["emg", "guante", "bandada"];
   const NOMBRES = { emg: "dispositivo tres", guante: "dispositivo dos", bandada: "dispositivo uno" };
+  const DEMO = location.hash === "#demo";
+  const TAU = Math.PI * 2;
 
   const DPR = Math.max(1, window.devicePixelRatio || 1);
+  const lienzo = document.getElementById("escena");
+  const g = lienzo.getContext("2d");
   const pieEl = document.getElementById("pie");
   const vacioEl = document.getElementById("vacio");
 
-  // clave -> { canvas, registro, bitmap }
-  const capas = {};
-  CAPAS.forEach(function (clave) {
-    const c = document.createElement("canvas");
-    c.className = "capa";
-    c.id = "capa-" + clave;
-    document.body.insertBefore(c, vacioEl);
-    capas[clave] = { canvas: c, registro: null, bitmap: null };
+  // clave -> { registro, bitmap }. bitmap es null si el PNG no se pudo leer
+  // (o en la demo): la escena no lo necesita salvo para capturas sin
+  // `elementos`.
+  const capturas = {};
+
+  // La escena: { ancho, alto, elementos }. ancho/alto son el marco en px
+  // CSS en que viven las coordenadas de los elementos (el tamaño de pantalla
+  // en que se capturó); al dibujar, el marco se encaja en la ventana actual.
+  // Así un cambio de tamaño de ventana no toca los elementos.
+  let escena = null;
+  let vista = "vector";             // "vector" | "png"
+  let pieBase = "11 / 11  ·  ←";
+  let proximoId = 1;
+
+  // ===============================================================
+  // Construcción de la escena
+  // ===============================================================
+
+  // Encaje sin deformar (contain) de un rectángulo de origen en uno de
+  // destino: escala k y desplazamiento (ox, oy) para centrarlo.
+  function encaje(anchoO, altoO, anchoD, altoD) {
+    const k = Math.min(anchoD / anchoO, altoD / altoO);
+    return { k: k, ox: (anchoD - anchoO * k) / 2, oy: (altoD - altoO * k) / 2 };
+  }
+
+  function finito() {
+    for (let i = 0; i < arguments.length; i++) {
+      if (typeof arguments[i] !== "number" || !isFinite(arguments[i])) return false;
+    }
+    return true;
+  }
+
+  function alphaDe(e) {
+    return finito(e.alpha) ? Math.max(0, Math.min(1, e.alpha)) : 1;
+  }
+
+  // Elemento de escena con forma común a todos los tipos: un centro (x, y),
+  // una escala (lo que van a editar las operaciones), la geometría relativa
+  // al centro en `forma` y el aspecto en `estilo`. Mover y escalar son la
+  // misma cuenta para cualquier tipo: translate(x, y) · scale(escala).
+  function nuevoElemento(origen, tipo, x, y, forma, estilo) {
+    return { id: proximoId++, origen: origen, tipo: tipo, x: x, y: y, escala: 1,
+             forma: forma, estilo: estilo };
+  }
+
+  // Convierte un elemento tal como lo guardó la captura (px CSS de la
+  // pantalla en que se capturó) a elemento de escena, llevándolo al marco
+  // con el encaje f. Un tipo desconocido o un dato roto devuelve null y el
+  // elemento se ignora en silencio, como las líneas serie que no se
+  // reconocen.
+  function convertirElemento(e, origen, f) {
+    if (!e || typeof e !== "object") return null;
+    const X = function (x) { return f.ox + x * f.k; };
+    const Y = function (y) { return f.oy + y * f.k; };
+    switch (e.tipo) {
+      case "punto":
+        if (!finito(e.x, e.y, e.r)) return null;
+        return nuevoElemento(origen, "punto", X(e.x), Y(e.y),
+          { r: e.r * f.k },
+          { color: e.color || "#000", alpha: alphaDe(e) });
+      case "disco":
+        if (!finito(e.x, e.y, e.r)) return null;
+        return nuevoElemento(origen, "disco", X(e.x), Y(e.y),
+          { r: e.r * f.k },
+          { color: e.color || "#000", alpha: alphaDe(e), modo: e.modo || null });
+      case "anillo":
+        if (!finito(e.x, e.y, e.r)) return null;
+        return nuevoElemento(origen, "anillo", X(e.x), Y(e.y),
+          { r: e.r * f.k, grosor: (finito(e.grosor) ? e.grosor : 1) * f.k },
+          { color: e.color || "#000", alpha: alphaDe(e), modo: e.modo || null });
+      case "cuadrilatero": {
+        if (!Array.isArray(e.puntos) || e.puntos.length < 3) return null;
+        const pts = [];
+        for (const p of e.puntos) {
+          if (!Array.isArray(p) || !finito(p[0], p[1])) return null;
+          pts.push([X(p[0]), Y(p[1])]);
+        }
+        // Centro: el promedio de los vértices. Es el punto respecto del cual
+        // se va a escalar, y para un cuadrilátero convexo cae adentro.
+        let cx = 0, cy = 0;
+        for (const p of pts) { cx += p[0]; cy += p[1]; }
+        cx /= pts.length; cy /= pts.length;
+        return nuevoElemento(origen, "cuadrilatero", cx, cy,
+          { puntos: pts.map(function (p) { return [p[0] - cx, p[1] - cy]; }) },
+          { color: e.color || "#000", alpha: alphaDe(e) });
+      }
+      default:
+        return null;
+    }
+  }
+
+  function medidasDe(c) {
+    const r = c.registro;
+    return {
+      ancho: r.ancho || (c.bitmap && c.bitmap.width) || window.innerWidth,
+      alto: r.alto || (c.bitmap && c.bitmap.height) || window.innerHeight
+    };
+  }
+
+  // Vuelca las capturas en una escena, en el orden de CAPAS y, dentro de
+  // cada una, en el orden en que se dibujaron. El marco es la pantalla de la
+  // primera captura: en la instalación las tres se toman en la misma, así
+  // que el encaje de cada una en el marco es la identidad.
+  function construirEscena(caps) {
+    const presentes = CAPAS.filter(function (k) { return caps[k]; });
+    const marco = presentes.length
+      ? medidasDe(caps[presentes[0]])
+      : { ancho: window.innerWidth, alto: window.innerHeight };
+    const elementos = [];
+    presentes.forEach(function (clave) {
+      const c = caps[clave];
+      const m = medidasDe(c);
+      const f = encaje(m.ancho, m.alto, marco.ancho, marco.alto);
+      if (Array.isArray(c.registro.elementos) && c.registro.version >= 1) {
+        for (const e of c.registro.elementos) {
+          const el = convertirElemento(e, clave, f);
+          if (el) elementos.push(el);
+        }
+      } else if (c.bitmap) {
+        // Captura anterior a `elementos`: entra entera como una imagen. Por
+        // ahora es sólo de respaldo; no va a admitir operaciones.
+        elementos.push(nuevoElemento(clave, "imagen",
+          f.ox + m.ancho * f.k / 2, f.oy + m.alto * f.k / 2,
+          { ancho: m.ancho * f.k, alto: m.alto * f.k },
+          { alpha: 1 }));
+      }
+    });
+    return { ancho: marco.ancho, alto: marco.alto, elementos: elementos };
+  }
+
+  // ===============================================================
+  // Dibujo
+  // ===============================================================
+
+  // Cada elemento se dibuja con su propio modo de fusión: los anillos y el
+  // disco del guante multiplican sobre lo que tengan debajo, sea del guante
+  // o de la EMG, igual que entre ellos dentro de su captura.
+  function dibujarElemento(c, el) {
+    const est = el.estilo;
+    c.save();
+    c.translate(el.x, el.y);
+    if (el.escala !== 1) c.scale(el.escala, el.escala);
+    c.globalAlpha = est.alpha;
+    c.globalCompositeOperation = est.modo || "source-over";
+    switch (el.tipo) {
+      case "punto":
+      case "disco":
+        c.beginPath();
+        c.arc(0, 0, el.forma.r, 0, TAU);
+        c.fillStyle = est.color;
+        c.fill();
+        break;
+      case "anillo":
+        c.beginPath();
+        c.arc(0, 0, el.forma.r, 0, TAU);
+        c.lineWidth = el.forma.grosor;
+        c.strokeStyle = est.color;
+        c.stroke();
+        break;
+      case "cuadrilatero": {
+        const pts = el.forma.puntos;
+        c.beginPath();
+        c.moveTo(pts[0][0], pts[0][1]);
+        for (let i = 1; i < pts.length; i++) c.lineTo(pts[i][0], pts[i][1]);
+        c.closePath();
+        c.fillStyle = est.color;
+        c.fill();
+        break;
+      }
+      case "imagen": {
+        const cap = capturas[el.origen];
+        if (cap && cap.bitmap) {
+          const w = el.forma.ancho, h = el.forma.alto;
+          c.imageSmoothingQuality = "high";
+          c.drawImage(cap.bitmap, -w / 2, -h / 2, w, h);
+        }
+        break;
+      }
+    }
+    c.restore();
+  }
+
+  function dibujarEscena(c) {
+    for (const el of escena.elementos) dibujarElemento(c, el);
+  }
+
+  // Diagnóstico: los PNG originales apilados como en la v1, cada uno
+  // encajado en el marco. Entre capturas la composición es source-over.
+  function dibujarPNG(c) {
+    CAPAS.forEach(function (clave) {
+      const cap = capturas[clave];
+      if (!cap || !cap.bitmap) return;
+      const m = medidasDe(cap);
+      const f = encaje(m.ancho, m.alto, escena.ancho, escena.alto);
+      c.imageSmoothingQuality = "high";
+      c.drawImage(cap.bitmap, f.ox, f.oy, m.ancho * f.k, m.alto * f.k);
+    });
+  }
+
+  // Encaje del marco de la escena en la ventana actual.
+  function encajeVentana() {
+    return encaje(escena.ancho, escena.alto, window.innerWidth, window.innerHeight);
+  }
+
+  // Cambiar width/height de un canvas lo borra y realoca: sólo al cambiar
+  // el tamaño de la ventana, no en cada cuadro de un arrastre.
+  function ajustarLienzo() {
+    const W = window.innerWidth, H = window.innerHeight;
+    lienzo.width = Math.round(W * DPR);
+    lienzo.height = Math.round(H * DPR);
+    lienzo.style.width = W + "px";
+    lienzo.style.height = H + "px";
+    pintar();
+  }
+
+  function pintar() {
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.clearRect(0, 0, lienzo.width, lienzo.height);
+    if (!escena) return;
+    const f = encajeVentana();
+    g.setTransform(DPR * f.k, 0, 0, DPR * f.k, DPR * f.ox, DPR * f.oy);
+    if (vista === "png") {
+      dibujarPNG(g);
+    } else {
+      dibujarEscena(g);
+      pintarSeleccion(f);
+    }
+  }
+
+  // Un repintado por cuadro como mucho, por más eventos de puntero que
+  // lleguen en el medio.
+  let dibujoPedido = false;
+  function pedirDibujo() {
+    if (dibujoPedido) return;
+    dibujoPedido = true;
+    requestAnimationFrame(function () {
+      dibujoPedido = false;
+      pintar();
+      actualizarPie();
+    });
+  }
+
+  function actualizarPie() {
+    let txt = pieBase;
+    if (DEMO) txt = "demo   ·   " + txt;
+    if (vista === "png") {
+      const hay = CAPAS.some(function (k) { return capturas[k] && capturas[k].bitmap; });
+      txt = (hay ? "PNG originales, edición en pausa (V)" : "sin PNG para comparar (V)") +
+        "   ·   " + txt;
+    } else if (seleccion.size) {
+      txt = seleccion.size + (seleccion.size === 1 ? " seleccionado" : " seleccionados") +
+        "   ·   " + txt;
+    }
+    pieEl.textContent = txt;
+  }
+
+  // ===============================================================
+  // Permisos: qué operación admite cada tipo de elemento. El código de
+  // interacción sólo pregunta `permite(el, op)`, nunca por tipos concretos.
+  // La etapa 3 suma escalar, duplicar, copiar/pegar y orden; un tipo sin
+  // operaciones (la `imagen` de respaldo) no se puede ni seleccionar.
+  // ===============================================================
+  const PERMITIDAS = {
+    punto:        ["mover", "eliminar"],
+    anillo:       ["mover", "eliminar"],
+    disco:        ["mover", "eliminar"],
+    cuadrilatero: ["mover", "eliminar"],
+    imagen:       []
+  };
+
+  function permite(el, op) {
+    const p = PERMITIDAS[el.tipo];
+    return !!p && p.indexOf(op) >= 0;
+  }
+
+  function seleccionable(el) {
+    const p = PERMITIDAS[el.tipo];
+    return !!p && p.length > 0;
+  }
+
+  // ===============================================================
+  // Prueba de impacto: qué elemento hay bajo el puntero. Cada tipo intercepta
+  // sólo lo que se ve de él: un anillo responde en su trazo y no en el hueco,
+  // así un anillo grande no bloquea lo que rodea. Las tolerancias son en px
+  // de pantalla, para que no dependan del encaje.
+  // ===============================================================
+  const TOL_PUNTO_PX = 8;   // radio mínimo para tocar un punto de la bandada
+  const TOL_BORDE_PX = 3;   // margen para discos y trazos de anillos
+
+  function puntoEnPoligono(x, y, pts) {
+    let dentro = false;
+    for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+      const xi = pts[i][0], yi = pts[i][1], xj = pts[j][0], yj = pts[j][1];
+      if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) dentro = !dentro;
+    }
+    return dentro;
+  }
+
+  // (mx, my) en coordenadas del marco; px es cuánto mide un px de pantalla
+  // en el marco.
+  function toca(el, mx, my, px) {
+    const dx = mx - el.x, dy = my - el.y, s = el.escala;
+    const d = Math.sqrt(dx * dx + dy * dy);
+    switch (el.tipo) {
+      case "punto":
+        return d <= Math.max(el.forma.r * s, TOL_PUNTO_PX * px);
+      case "disco":
+        return d <= el.forma.r * s + TOL_BORDE_PX * px;
+      case "anillo":
+        return Math.abs(d - el.forma.r * s) <= el.forma.grosor * s / 2 + TOL_BORDE_PX * px;
+      case "cuadrilatero":
+        return puntoEnPoligono(dx / s, dy / s, el.forma.puntos);
+      default:
+        return false;
+    }
+  }
+
+  // El de más arriba que se pueda seleccionar: la escena se recorre de atrás
+  // hacia adelante.
+  function elementoEn(mx, my, px) {
+    const els = escena.elementos;
+    for (let i = els.length - 1; i >= 0; i--) {
+      if (seleccionable(els[i]) && toca(els[i], mx, my, px)) return els[i];
+    }
+    return null;
+  }
+
+  // Caja que ocupa el elemento, en el marco.
+  function caja(el) {
+    const s = el.escala;
+    let rx, ry, x0, y0, x1, y1;
+    switch (el.tipo) {
+      case "punto":
+      case "disco":
+        rx = ry = el.forma.r * s;
+        return { x0: el.x - rx, y0: el.y - ry, x1: el.x + rx, y1: el.y + ry };
+      case "anillo":
+        rx = ry = (el.forma.r + el.forma.grosor / 2) * s;
+        return { x0: el.x - rx, y0: el.y - ry, x1: el.x + rx, y1: el.y + ry };
+      case "cuadrilatero":
+        x0 = y0 = Infinity; x1 = y1 = -Infinity;
+        for (const p of el.forma.puntos) {
+          x0 = Math.min(x0, p[0]); x1 = Math.max(x1, p[0]);
+          y0 = Math.min(y0, p[1]); y1 = Math.max(y1, p[1]);
+        }
+        return { x0: el.x + x0 * s, y0: el.y + y0 * s, x1: el.x + x1 * s, y1: el.y + y1 * s };
+      default:
+        return { x0: el.x, y0: el.y, x1: el.x, y1: el.y };
+    }
+  }
+
+  // ===============================================================
+  // Selección: un conjunto de ids. Se marca con un recuadro alrededor de
+  // cada elemento, dibujado en px de pantalla (grosor constante con
+  // cualquier encaje) y nunca dentro de la escena.
+  // ===============================================================
+  let seleccion = new Set();
+
+  function seleccionados() {
+    return escena.elementos.filter(function (el) { return seleccion.has(el.id); });
+  }
+
+  // Después de deshacer o eliminar, la selección sólo conserva lo que existe.
+  function depurarSeleccion() {
+    const ids = new Set(escena.elementos.map(function (el) { return el.id; }));
+    seleccion = new Set(Array.from(seleccion).filter(function (id) { return ids.has(id); }));
+  }
+
+  const MARGEN_SEL_PX = 4;
+  const LADO_MIN_SEL_PX = 12;
+
+  function pintarSeleccion(f) {
+    if (!seleccion.size) return;
+    g.save();
+    g.setTransform(DPR, 0, 0, DPR, 0, 0);
+    g.globalAlpha = 1;
+    g.globalCompositeOperation = "source-over";
+    for (const el of seleccionados()) {
+      const b = caja(el);
+      let x0 = f.ox + b.x0 * f.k - MARGEN_SEL_PX, x1 = f.ox + b.x1 * f.k + MARGEN_SEL_PX;
+      let y0 = f.oy + b.y0 * f.k - MARGEN_SEL_PX, y1 = f.oy + b.y1 * f.k + MARGEN_SEL_PX;
+      if (x1 - x0 < LADO_MIN_SEL_PX) { const c = (x0 + x1) / 2; x0 = c - LADO_MIN_SEL_PX / 2; x1 = c + LADO_MIN_SEL_PX / 2; }
+      if (y1 - y0 < LADO_MIN_SEL_PX) { const c = (y0 + y1) / 2; y0 = c - LADO_MIN_SEL_PX / 2; y1 = c + LADO_MIN_SEL_PX / 2; }
+      // Blanco por debajo y negro punteado encima: se lee sobre cualquier
+      // color de la escena.
+      g.setLineDash([]);
+      g.lineWidth = 3;
+      g.strokeStyle = "rgba(255,255,255,0.85)";
+      g.strokeRect(x0, y0, x1 - x0, y1 - y0);
+      g.setLineDash([4, 3]);
+      g.lineWidth = 1;
+      g.strokeStyle = "#111";
+      g.strokeRect(x0, y0, x1 - x0, y1 - y0);
+    }
+    g.restore();
+  }
+
+  // ===============================================================
+  // Historial: instantáneas de la lista de elementos. Con unos cientos de
+  // elementos copiar la lista entera por paso es barato, y mucho más simple
+  // que saber invertir cada operación.
+  // ===============================================================
+  const HISTORIAL_MAX = 50;
+  const pasado = [], futuro = [];
+
+  function instantanea() {
+    return JSON.parse(JSON.stringify(escena.elementos));
+  }
+
+  // `antes` es la instantánea tomada antes del cambio que se confirma.
+  function confirmarCambio(antes) {
+    pasado.push(antes);
+    if (pasado.length > HISTORIAL_MAX) pasado.shift();
+    futuro.length = 0;
+  }
+
+  function deshacer() {
+    if (!pasado.length) return;
+    futuro.push(instantanea());
+    escena.elementos = pasado.pop();
+    depurarSeleccion();
+    pedirDibujo();
+  }
+
+  function rehacer() {
+    if (!futuro.length) return;
+    pasado.push(instantanea());
+    escena.elementos = futuro.pop();
+    depurarSeleccion();
+    pedirDibujo();
+  }
+
+  // ===============================================================
+  // Operaciones de la etapa 2
+  // ===============================================================
+  function eliminarSeleccion() {
+    const borrar = seleccionados().filter(function (el) { return permite(el, "eliminar"); });
+    if (!borrar.length) return;
+    const antes = instantanea();
+    const ids = new Set(borrar.map(function (el) { return el.id; }));
+    escena.elementos = escena.elementos.filter(function (el) { return !ids.has(el.id); });
+    confirmarCambio(antes);
+    depurarSeleccion();
+    pedirDibujo();
+  }
+
+  // ===============================================================
+  // Puntero: seleccionar y arrastrar
+  // ===============================================================
+  const UMBRAL_ARRASTRE_PX = 3;   // por debajo, fue un clic y no un arrastre
+  let arrastre = null;
+
+  function aMarco(e) {
+    const f = encajeVentana();
+    return { x: (e.clientX - f.ox) / f.k, y: (e.clientY - f.oy) / f.k, px: 1 / f.k };
+  }
+
+  function editable() {
+    return !!escena && vista === "vector";
+  }
+
+  function empezarArrastre(e, m) {
+    const movibles = seleccionados().filter(function (el) { return permite(el, "mover"); });
+    if (!movibles.length) return;
+    // Rango del desplazamiento para que ningún centro salga del marco (o,
+    // si ya estaba afuera, como una copia fantasma de la bandada, que no se
+    // aleje más). Se limita el desplazamiento del grupo y no cada elemento,
+    // para que el grupo no se deforme contra un borde.
+    let dxMin = -Infinity, dxMax = Infinity, dyMin = -Infinity, dyMax = Infinity;
+    for (const el of movibles) {
+      dxMin = Math.max(dxMin, Math.min(0, el.x) - el.x);
+      dxMax = Math.min(dxMax, Math.max(escena.ancho, el.x) - el.x);
+      dyMin = Math.max(dyMin, Math.min(0, el.y) - el.y);
+      dyMax = Math.min(dyMax, Math.max(escena.alto, el.y) - el.y);
+    }
+    arrastre = {
+      id: e.pointerId,
+      x0: m.x, y0: m.y, cx0: e.clientX, cy0: e.clientY,
+      origenes: movibles.map(function (el) { return { el: el, x: el.x, y: el.y }; }),
+      dxMin: dxMin, dxMax: dxMax, dyMin: dyMin, dyMax: dyMax,
+      antes: instantanea(),
+      movio: false
+    };
+    if (lienzo.setPointerCapture) lienzo.setPointerCapture(e.pointerId);
+  }
+
+  lienzo.addEventListener("pointerdown", function (e) {
+    if (e.button !== 0 || !editable() || arrastre) return;
+    const m = aMarco(e);
+    const el = elementoEn(m.x, m.y, m.px);
+    if (!el) {
+      if (!e.shiftKey) seleccion.clear();
+      pedirDibujo();
+      return;
+    }
+    if (e.shiftKey) {
+      if (seleccion.has(el.id)) {
+        seleccion.delete(el.id);
+        pedirDibujo();
+        return;
+      }
+      seleccion.add(el.id);
+    } else if (!seleccion.has(el.id)) {
+      // Un clic sobre algo ya seleccionado conserva la selección: así se
+      // arrastra un grupo entero tomándolo de cualquiera de sus elementos.
+      seleccion = new Set([el.id]);
+    }
+    empezarArrastre(e, m);
+    pedirDibujo();
   });
 
+  lienzo.addEventListener("pointermove", function (e) {
+    if (!editable()) return;
+    if (!arrastre) {
+      const m = aMarco(e);
+      lienzo.style.cursor = elementoEn(m.x, m.y, m.px) ? "move" : "default";
+      return;
+    }
+    if (e.pointerId !== arrastre.id) return;
+    if (!arrastre.movio &&
+        Math.hypot(e.clientX - arrastre.cx0, e.clientY - arrastre.cy0) < UMBRAL_ARRASTRE_PX) return;
+    arrastre.movio = true;
+    const m = aMarco(e);
+    const dx = Math.min(arrastre.dxMax, Math.max(arrastre.dxMin, m.x - arrastre.x0));
+    const dy = Math.min(arrastre.dyMax, Math.max(arrastre.dyMin, m.y - arrastre.y0));
+    for (const o of arrastre.origenes) { o.el.x = o.x + dx; o.el.y = o.y + dy; }
+    pedirDibujo();
+  });
+
+  function terminarArrastre(e) {
+    if (!arrastre || e.pointerId !== arrastre.id) return;
+    if (arrastre.movio) confirmarCambio(arrastre.antes);
+    arrastre = null;
+  }
+  lienzo.addEventListener("pointerup", terminarArrastre);
+  lienzo.addEventListener("pointercancel", terminarArrastre);
+
+  function mostrarFaltantes(faltan) {
+    if (faltan.length === CAPAS.length) {
+      vacioEl.classList.add("visible");
+      return;
+    }
+    if (faltan.length) {
+      pieBase = "falta: " + faltan.map(function (k) { return NOMBRES[k]; }).join(", ") +
+        "   ·   11 / 11  ·  ←";
+    }
+    actualizarPie();
+  }
+
+  // ===============================================================
+  // IndexedDB
+  // ===============================================================
   function abrirBase() {
     return new Promise(function (ok, mal) {
       if (typeof indexedDB === "undefined") return mal(new Error("IndexedDB no disponible"));
@@ -121,70 +696,134 @@
     }).catch(function () {});
   }
 
-  // Dibuja cada captura en su canvas, encajada sin deformar (contain) en la
-  // ventana actual. Si se capturó en la misma pantalla, el encaje es la
-  // identidad. ancho/alto del registro son px CSS; las capturas anteriores
-  // a ese campo caen en el tamaño del PNG.
-  function dibujar() {
-    const W = window.innerWidth, H = window.innerHeight;
-    CAPAS.forEach(function (clave) {
-      const capa = capas[clave];
-      const c = capa.canvas;
-      c.width = Math.round(W * DPR);
-      c.height = Math.round(H * DPR);
-      c.style.width = W + "px";
-      c.style.height = H + "px";
-      const g = c.getContext("2d");
-      g.setTransform(DPR, 0, 0, DPR, 0, 0);
-      g.clearRect(0, 0, W, H);
-      if (!capa.bitmap) return;
-      const r = capa.registro;
-      const ancho = r.ancho || capa.bitmap.width;
-      const alto = r.alto || capa.bitmap.height;
-      const k = Math.min(W / ancho, H / alto);
-      const dw = ancho * k, dh = alto * k;
-      g.imageSmoothingQuality = "high";
-      g.drawImage(capa.bitmap, (W - dw) / 2, (H - dh) / 2, dw, dh);
-    });
+  // ===============================================================
+  // Demo: registros de captura sintéticos, en el mismo formato que
+  // guardan las copias, para que pasen por el mismo camino de conversión.
+  // Semilla fija: la demo es siempre la misma escena.
+  // ===============================================================
+  function registrosDemo() {
+    let s = 20261104;
+    function azar() {                 // mulberry32
+      s = (s + 0x6D2B79F5) | 0;
+      let t = Math.imul(s ^ (s >>> 15), 1 | s);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    }
+    function entre(a, b) { return a + azar() * (b - a); }
+    const W = window.innerWidth, H = window.innerHeight, menor = Math.min(W, H);
+
+    // EMG: cuadriláteros irregulares de dos familias, superpuestos al centro.
+    const tonos = ["#f2a7a1", "#e9b44c", "#f07a5f", "#c2306f",
+                   "#7fa7d9", "#5b8ccf", "#3a6bb5", "#28488f"];
+    const emg = [];
+    for (let i = 0; i < 14; i++) {
+      const cx = W / 2 + entre(-0.28, 0.28) * W, cy = H / 2 + entre(-0.25, 0.25) * H;
+      const sa = menor * entre(0.08, 0.16), sb = sa * entre(1.1, 1.8);
+      const esq = [[-sb, -sa], [sb, -sa], [sb, sa], [-sb, sa]];
+      emg.push({ tipo: "cuadrilatero", color: tonos[i % tonos.length], alpha: entre(0.35, 0.75),
+        puntos: esq.map(function (p) {
+          return [cx + p[0] + entre(-0.3, 0.3) * sa, cy + p[1] + entre(-0.3, 0.3) * sa];
+        }) });
+    }
+
+    // Guante: anillos de los dos dedos y un disco del FSR, en multiply.
+    const guante = [];
+    for (let i = 0; i < 12; i++) {
+      const r = menor * entre(0.03, 0.12);
+      guante.push({ tipo: "anillo", dedo: i % 2, x: entre(0.1, 0.9) * W, y: entre(0.1, 0.9) * H,
+        r: r, grosor: Math.max(1, r * 0.35), color: i % 2 ? "#ff8c1a" : "#ffde21",
+        alpha: entre(0.5, 0.95), modo: "multiply" });
+    }
+    guante.push({ tipo: "disco", x: W * 0.62, y: H * 0.45, r: menor * 0.1,
+      color: "#0000ff", alpha: 0.55, modo: "multiply" });
+
+    // Bandada: puntos negros, más un pájaro partido por el borde izquierdo
+    // con su copia fantasma del lado derecho, como los deja el campo
+    // continuo.
+    const bandada = [];
+    for (let i = 0; i < 40; i++) {
+      const z = entre(-1, 1);
+      bandada.push({ tipo: "punto", x: W / 2 + entre(-0.2, 0.2) * W, y: H / 2 + entre(-0.15, 0.15) * H,
+        r: 4.5 * (0.7 + 0.3 * (z + 1)), alpha: 0.3 + 0.7 * (z + 1) / 2, color: "#0a0a0a" });
+    }
+    bandada.push({ tipo: "punto", x: 2, y: H * 0.3, r: 6, alpha: 1, color: "#0a0a0a" });
+    bandada.push({ tipo: "punto", x: W + 2, y: H * 0.3, r: 6, alpha: 1, color: "#0a0a0a" });
+
+    function registro(elementos) {
+      return { ancho: W, alto: H, dpr: DPR, elementos: elementos, version: 1, fecha: 0 };
+    }
+    return { emg: registro(emg), guante: registro(guante), bandada: registro(bandada) };
   }
 
-  function mostrarFaltantes(faltan) {
-    if (faltan.length === CAPAS.length) {
-      vacioEl.classList.add("visible");
-      return;
+  // ===============================================================
+  // Arranque
+  // ===============================================================
+  function cargar() {
+    if (DEMO) {
+      const regs = registrosDemo();
+      CAPAS.forEach(function (k) { capturas[k] = { registro: regs[k], bitmap: null }; });
+      return Promise.resolve();
     }
-    if (faltan.length) {
-      pieEl.textContent = "falta: " + faltan.map(function (k) { return NOMBRES[k]; }).join(", ") +
-        "   ·   11 / 11  ·  ←";
-    }
+    return leerCapturas()
+      .then(function (leidas) {
+        return Promise.all(CAPAS.map(function (clave) {
+          const r = leidas[clave];
+          if (!r) return null;
+          capturas[clave] = { registro: r, bitmap: null };
+          // El PNG ya no hace falta para la escena; se decodifica para el
+          // diagnóstico (V) y para las capturas sin `elementos`.
+          return createImageBitmap(r.imagen).then(function (bmp) {
+            capturas[clave].bitmap = bmp;
+          }, function () { /* PNG ilegible: la escena sigue con los elementos */ });
+        }));
+      })
+      .catch(function (err) {
+        vacioEl.textContent = "No se pudieron leer las capturas (" + (err && err.message || err) + ").";
+      });
   }
 
-  leerCapturas()
-    .then(function (leidas) {
-      return Promise.all(CAPAS.map(function (clave) {
-        const r = leidas[clave];
-        if (!r) return null;
-        return createImageBitmap(r.imagen).then(function (bmp) {
-          capas[clave].registro = r;
-          capas[clave].bitmap = bmp;
-        }, function () { /* PNG ilegible: la capa queda como faltante */ });
-      }));
-    })
-    .catch(function (err) {
-      vacioEl.textContent = "No se pudieron leer las capturas (" + (err && err.message || err) + ").";
-    })
-    .then(function () {
-      dibujar();
-      mostrarFaltantes(CAPAS.filter(function (k) { return !capas[k].bitmap; }));
-    });
+  cargar().then(function () {
+    escena = construirEscena(capturas);
+    ajustarLienzo();
+    mostrarFaltantes(CAPAS.filter(function (k) { return !capturas[k]; }));
+  });
 
-  window.addEventListener("resize", dibujar);
+  // Enganche de diagnóstico (consola o un harness de Node): la página no lo
+  // usa.
+  window.__escena = function () { return escena; };
+
+  window.addEventListener("resize", ajustarLienzo);
+  window.addEventListener("hashchange", function () { location.reload(); });
 
   window.addEventListener("keydown", function (e) {
+    const ctrl = e.ctrlKey || e.metaKey;
+    const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
     if (e.key === "ArrowLeft") {
       location.href = "experiencia.html#10";
     } else if (e.key === "Home") {
+      // En la demo no se borra nada: la base es de la instalación.
+      if (DEMO) { location.href = "experiencia.html#0"; return; }
       borrarCapturas().then(function () { location.href = "experiencia.html#0"; });
+    } else if (k === "v" && !ctrl && !e.repeat) {
+      if (arrastre) return;
+      vista = vista === "vector" ? "png" : "vector";
+      lienzo.style.cursor = "default";
+      pedirDibujo();
+    } else if (!editable() || arrastre) {
+      // Con los PNG a la vista o en medio de un arrastre, nada edita.
+      return;
+    } else if (e.key === "Delete" || e.key === "Backspace") {
+      e.preventDefault();
+      if (!e.repeat) eliminarSeleccion();
+    } else if (e.key === "Escape") {
+      seleccion.clear();
+      pedirDibujo();
+    } else if (ctrl && k === "z") {
+      e.preventDefault();
+      if (e.shiftKey) rehacer(); else deshacer();
+    } else if (ctrl && k === "y") {
+      e.preventDefault();
+      rehacer();
     }
   });
 })();

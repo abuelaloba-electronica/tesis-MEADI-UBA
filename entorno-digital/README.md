@@ -29,9 +29,13 @@ tres visualizaciones en un recorrido de pantallas (0–11) a partir del guion
 pantalla de texto anterior a cada una (4, 6 y 8). Borran con Retroceso, capturan el lienzo con la barra
 espaciadora (sin vuelta atrás, guardado en IndexedDB) y recién entonces pasan a
 la siguiente con →. Desde la 10, → lleva a la 11,
-[`experiencia/composicion.html`](experiencia/composicion.html): las tres
-capturas superpuestas sobre blanco, de abajo hacia arriba EMG, guante y
-bandada. Ahí Inicio borra las capturas y vuelve a la 0.
+[`experiencia/composicion.html`](experiencia/composicion.html): los
+elementos de las tres capturas volcados en una sola escena y redibujados en
+vector sobre blanco, de abajo hacia arriba EMG, guante y bandada. Ahí Inicio
+borra las capturas y vuelve a la 0; `composicion.html#demo` muestra una escena
+sintética sin necesidad de capturar. Es la base del editor que se describe en
+[`propuesta_composicion_editable.md`](prototipos/propuesta_composicion_editable.md)
+(la v1, que apilaba los PNG, quedó en `prototipos/composicion_v1.html`).
 
 Cada captura es un registro `{ imagen, ancho, alto, dpr, elementos, version,
 fecha }` en IndexedDB (`experiencia` / `capturas`, claves `bandada`, `guante` y
@@ -39,7 +43,9 @@ fecha }` en IndexedDB (`experiencia` / `capturas`, claves `bandada`, `guante` y
 anillos y discos, cuadriláteros) en px CSS, pensada para poder editar los
 elementos más adelante. Para que el PNG salga transparente, las copias pintan
 el fondo en el CSS y no en el canvas; ver
-[`cambios_experiencia_composicion.md`](prototipos/cambios_experiencia_composicion.md).
+[`cambios_experiencia_composicion.md`](prototipos/cambios_experiencia_composicion.md),
+y para la escena en vector
+[`cambios_experiencia_composicion_v2.md`](prototipos/cambios_experiencia_composicion_v2.md).
 
 Las copias no cambian la física: si se ajusta una visualización activa, el
 cambio hay que portarlo a mano a su copia `_experiencia`.

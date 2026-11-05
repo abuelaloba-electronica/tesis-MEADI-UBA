@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Experiencia · 11 · Composición (MAEDI)</title>
+<style>
+  /* Roboto Light, local en fuentes/ (sin CDN: la página se abre por file://). */
+  @font-face {
+    font-family: "Roboto"; font-style: normal; font-weight: 300;
+    src: local("Roboto Light"), local("Roboto-Light"), url("fuentes/roboto-latin-300-normal.woff2") format("woff2");
+  }
+  @font-face {
+    font-family: "Roboto"; font-style: italic; font-weight: 300;
+    src: local("Roboto Light Italic"), local("Roboto-LightItalic"), url("fuentes/roboto-latin-300-italic.woff2") format("woff2");
+  }
+  html, body {
+    margin: 0; padding: 0; height: 100%; overflow: hidden;
+    background: #fff;
+    color: #111;
+    font-family: "Roboto", -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+    font-weight: 300;
+  }
+  /* Una capa por captura, todas a pantalla completa y una encima de otra.
+     El orden de apilado lo da el orden en el DOM, que arma CAPAS. */
+  canvas.capa { position: fixed; top: 0; left: 0; display: block; pointer-events: none; }
+  #vacio {
+    position: fixed; inset: 0;
+    display: none; align-items: center; justify-content: center;
+    padding: 32px; box-sizing: border-box; text-align: center;
+    font-size: 24px; font-style: italic; color: #888;
+  }
+  #vacio.visible { display: flex; }
+  #pie {
+    position: fixed;
+    bottom: 14px; right: 18px;
+    font-size: 11px;
+    color: #aaa;
+    font-variant-numeric: tabular-nums;
+  }
+</style>
+</head>
+<body>
+<div id="vacio">No hay composiciones capturadas.</div>
+<div id="pie">11 / 11  ·  ←</div>
+
+<script>
+(function () {
+  "use strict";
+
+  // ---------------------------------------------------------------
+  // Pantalla 11 de la experiencia: las tres capturas superpuestas.
+  //
+  // Cada página _experiencia, al pulsar la barra espaciadora, guarda en
+  // IndexedDB ("experiencia", almacén "capturas") un registro
+  //   { imagen: PNG transparente, ancho, alto (px CSS), dpr,
+  //     elementos: [...], version, fecha }
+  // con clave "bandada", "guante" o "emg". Acá se leen y se apilan, cada
+  // una en su propio canvas: en una etapa siguiente cada capa se va a poder
+  // editar, ocultar o reordenar por separado, y para eso están también los
+  // `elementos` (por ahora no se usan: se dibujan los PNG).
+  //
+  // ← vuelve a experiencia.html#10. Inicio es la tecla del operador: borra
+  // las capturas y vuelve a la pantalla 0 para la próxima persona.
+  // ---------------------------------------------------------------
+
+  // Orden de apilado, de abajo hacia arriba: lo grande y translúcido (los
+  // cuadriláteros de la EMG) de fondo, el detalle fino (los puntos de la
+  // bandada) encima, para que nunca quede tapado.
+  const CAPAS = ["emg", "guante", "bandada"];
+  const NOMBRES = { emg: "dispositivo tres", guante: "dispositivo dos", bandada: "dispositivo uno" };
+
+  const DPR = Math.max(1, window.devicePixelRatio || 1);
+  const pieEl = document.getElementById("pie");
+  const vacioEl = document.getElementById("vacio");
+
+  // clave -> { canvas, registro, bitmap }
+  const capas = {};
+  CAPAS.forEach(function (clave) {
+    const c = document.createElement("canvas");
+    c.className = "capa";
+    c.id = "capa-" + clave;
+    document.body.insertBefore(c, vacioEl);
+    capas[clave] = { canvas: c, registro: null, bitmap: null };
+  });
+
+  function abrirBase() {
+    return new Promise(function (ok, mal) {
+      if (typeof indexedDB === "undefined") return mal(new Error("IndexedDB no disponible"));
+      const pedido = indexedDB.open("experiencia", 1);
+      pedido.onupgradeneeded = function () { pedido.result.createObjectStore("capturas"); };
+      pedido.onerror = function () { mal(pedido.error); };
+      pedido.onsuccess = function () { ok(pedido.result); };
+    });
+  }
+
+  // Devuelve { clave: registro } con las capturas que existan.
+  function leerCapturas() {
+    return abrirBase().then(function (db) {
+      return new Promise(function (ok, mal) {
+        const tx = db.transaction("capturas", "readonly");
+        const almacen = tx.objectStore("capturas");
+        const leidas = {};
+        CAPAS.forEach(function (clave) {
+          const p = almacen.get(clave);
+          p.onsuccess = function () { if (p.result && p.result.imagen) leidas[clave] = p.result; };
+        });
+        tx.oncomplete = function () { db.close(); ok(leidas); };
+        tx.onerror = function () { db.close(); mal(tx.error); };
+      });
+    });
+  }
+
+  function borrarCapturas() {
+    return abrirBase().then(function (db) {
+      return new Promise(function (ok) {
+        const tx = db.transaction("capturas", "readwrite");
+        tx.objectStore("capturas").clear();
+        tx.oncomplete = tx.onerror = function () { db.close(); ok(); };
+      });
+    }).catch(function () {});
+  }
+
+  // Dibuja cada captura en su canvas, encajada sin deformar (contain) en la
+  // ventana actual. Si se capturó en la misma pantalla, el encaje es la
+  // identidad. ancho/alto del registro son px CSS; las capturas anteriores
+  // a ese campo caen en el tamaño del PNG.
+  function dibujar() {
+    const W = window.innerWidth, H = window.innerHeight;
+    CAPAS.forEach(function (clave) {
+      const capa = capas[clave];
+      const c = capa.canvas;
+      c.width = Math.round(W * DPR);
+      c.height = Math.round(H * DPR);
+      c.style.width = W + "px";
+      c.style.height = H + "px";
+      const g = c.getContext("2d");
+      g.setTransform(DPR, 0, 0, DPR, 0, 0);
+      g.clearRect(0, 0, W, H);
+      if (!capa.bitmap) return;
+      const r = capa.registro;
+      const ancho = r.ancho || capa.bitmap.width;
+      const alto = r.alto || capa.bitmap.height;
+      const k = Math.min(W / ancho, H / alto);
+      const dw = ancho * k, dh = alto * k;
+      g.imageSmoothingQuality = "high";
+      g.drawImage(capa.bitmap, (W - dw) / 2, (H - dh) / 2, dw, dh);
+    });
+  }
+
+  function mostrarFaltantes(faltan) {
+    if (faltan.length === CAPAS.length) {
+      vacioEl.classList.add("visible");
+      return;
+    }
+    if (faltan.length) {
+      pieEl.textContent = "falta: " + faltan.map(function (k) { return NOMBRES[k]; }).join(", ") +
+        "   ·   11 / 11  ·  ←";
+    }
+  }
+
+  leerCapturas()
+    .then(function (leidas) {
+      return Promise.all(CAPAS.map(function (clave) {
+        const r = leidas[clave];
+        if (!r) return null;
+        return createImageBitmap(r.imagen).then(function (bmp) {
+          capas[clave].registro = r;
+          capas[clave].bitmap = bmp;
+        }, function () { /* PNG ilegible: la capa queda como faltante */ });
+      }));
+    })
+    .catch(function (err) {
+      vacioEl.textContent = "No se pudieron leer las capturas (" + (err && err.message || err) + ").";
+    })
+    .then(function () {
+      dibujar();
+      mostrarFaltantes(CAPAS.filter(function (k) { return !capas[k].bitmap; }));
+    });
+
+  window.addEventListener("resize", dibujar);
+
+  window.addEventListener("keydown", function (e) {
+    if (e.key === "ArrowLeft") {
+      location.href = "experiencia.html#10";
+    } else if (e.key === "Home") {
+      borrarCapturas().then(function () { location.href = "experiencia.html#0"; });
+    }
+  });
+})();
+</script>
+</body>
+</html>

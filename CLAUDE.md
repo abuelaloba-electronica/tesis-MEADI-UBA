@@ -38,8 +38,13 @@ sin romper nada.
 5, 7 y 9 son copias `_experiencia` de las tres páginas activas (sus
 instrucciones están en la pantalla de texto anterior: 4, 6 y 8), con Retroceso para borrar, barra espaciadora para capturar
 (definitiva: PNG transparente + lista de `elementos` en IndexedDB) y → para seguir.
-La pantalla 11, `composicion.html`, superpone las tres capturas (EMG abajo,
-guante, bandada arriba); ahí Inicio borra las capturas y vuelve a la 0. Las copias no cambian la
+La pantalla 11, `composicion.html`, vuelca los `elementos` de las tres capturas
+en una sola escena y los redibuja en vector (EMG abajo, guante, bandada
+arriba), y ya permite seleccionar, mover, eliminar y deshacer: es el editor
+de `prototipos/propuesta_composicion_editable.md`, que se construye por etapas;
+ahí Inicio borra las capturas y vuelve a la 0, V alterna con los PNG
+originales para diagnóstico y `composicion.html#demo` arma una escena
+sintética sin capturar. Las copias no cambian la
 física: un ajuste en una página activa hay que portarlo a mano a su copia.
 La única diferencia buscada es el fondo: en las copias lo pinta el CSS y no el
 canvas, para que la captura salga transparente.
@@ -189,4 +194,5 @@ Verificación de sintaxis rápida: extraer el `<script>` a un `.js` y correr
 | la acumulación EMG v4 (centro que se muda, familias de color) | `entorno-digital/prototipos/cambios_emg_acumulacion_v4.md` |
 | la experiencia completa (pantallas, captura, navegación) | el guion `entorno-digital/experiencia-interactiva-guion.md` |
 | la composición final (capturas transparentes, `elementos`) | `entorno-digital/prototipos/cambios_experiencia_composicion.md` |
+| la composición editable (escena en vector, operaciones, etapas) | `entorno-digital/prototipos/propuesta_composicion_editable.md` + `entorno-digital/prototipos/cambios_experiencia_composicion_v2.md` |
 | visualizaciones sin hardware todavía (EMG, estiramiento) | `entorno-digital/prototipos/propuesta_*.md` |
