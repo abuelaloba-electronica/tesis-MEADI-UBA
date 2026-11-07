@@ -45,7 +45,7 @@ pw-record --target <nodo de Helm o monitor de la salida> guante.wav
 ### B. Grabar desde la página del guante (`getUserMedia` + `MediaRecorder`)
 
 PipeWire expone la salida de cualquier *sink* como una fuente de captura (el
-*monitor*). Chrome en Linux la ve como un micrófono más. La página del guante
+*monitor*). El navegador (Chrome o Brave) en Linux la ve como un micrófono más. La página del guante
 abre esa fuente con `getUserMedia`, la graba con `MediaRecorder` (Opus en
 WebM) y al pulsar la barra espaciadora guarda el `Blob` en IndexedDB **junto
 con la captura**, igual que hoy guarda el PNG y los `elementos`.
@@ -140,10 +140,25 @@ Todo en la copia `_experiencia` (la página activa no graba nada):
   (el mismo encadenamiento de hoy, para no superponer avisos), se pide
   `getUserMedia({ audio: { deviceId, echoCancellation: false,
   noiseSuppression: false, autoGainControl: false, channelCount: 2 } })`. La
-  única fuente aceptada es `MAEDI-Helm-grabacion`, buscada por nombre: no hay
-  selector ni respaldo. Si no aparece (no se corrió `audio_helm.sh`) o no hay
-  permiso, la página funciona igual, la captura sale sin sonido y el panel
-  lo dice.
+  única fuente aceptada es `MAEDI-Helm-grabacion`, buscada por nombre en
+  `enumerateDevices()`: no hay selector ni respaldo. Si no aparece (no se
+  corrió `audio_helm.sh`) o no hay permiso, la página funciona igual, la
+  captura sale sin sonido y el panel lo dice.
+- **Por qué hace falta el permiso concedido de antemano.** El diagnóstico
+  (`tools/diagnostico_audio.html`, en Brave sobre Chromium 156 y 157) mostró
+  que en `file://` el permiso no se guarda: queda en `prompt`, y mientras
+  tanto el navegador oculta los nombres de todas las fuentes, incluso con
+  una captura abierta. Sin nombres no hay forma de encontrar la de Helm. Con
+  el perfil de la sala (ver Decisiones tomadas) el permiso está en
+  `granted`, los nombres se ven y la captura se abre en ~50 ms, sin aviso.
+- **No se usa la entrada por defecto.** Pedir `getUserMedia({ audio: true })`
+  entrega el alias «Predeterminado», que no dice qué fuente hay detrás: no
+  se puede comprobar que sea Helm. Se probó dejar la fuente de Helm como
+  entrada por defecto del sistema y se descartó por eso, y porque dejaba sin
+  micrófono al resto de la máquina.
+- **Comprobación final.** Aunque se haya pedido por `deviceId`, la página
+  mira el nombre de la pista recibida (`track.label`); si no es
+  `MAEDI-Helm-grabacion`, la cierra sin grabar.
 - **Nunca un micrófono.** Un monitor es la copia digital de lo que se manda a
   un sink: no pasa por ningún micrófono, así que no graba la sala ni las
   conversaciones. El riesgo es que la página termine abriendo el micrófono
@@ -335,12 +350,17 @@ primero al guion.
 - **Sólo se graba lo que produce Helm.** La única fuente es el sink propio
   (`MAEDI-Helm-grabacion`); no se usa el monitor general, ni un selector, ni
   un respaldo. Sin esa fuente, no se graba.
-- **Permiso en la sala.** Como la página sólo pide la fuente de Helm, por
-  `deviceId` exacto, se puede abrir Chrome con
-  `--use-fake-ui-for-media-stream` para que no aparezca el aviso de
-  "micrófono" en cada carga. Ese flag concede cualquier pedido de audio a
-  cualquier página, así que va en un perfil de Chrome dedicado a la
-  instalación (`--user-data-dir=…`), no en el de uso diario.
+- **Navegador y permiso en la sala: Brave con un perfil propio.**
+  ```
+  brave-browser --user-data-dir=$HOME/.config/maedi-sala --use-fake-ui-for-media-stream
+  ```
+  Brave tiene todo lo que usa la experiencia (Web Serial, Web MIDI, Opus en
+  WebM, IndexedDB; verificado con el diagnóstico). El flag concede el
+  permiso de audio sin aviso, y es lo que hace visibles los nombres de las
+  fuentes en `file://`. Como lo concede a cualquier pedido de cualquier
+  página, va sólo en el perfil `maedi-sala`, nunca en el de uso diario; y la
+  página sólo pide la fuente de Helm, por `deviceId` exacto y comprobando el
+  nombre de la pista. Chrome debería comportarse igual, pero no se probó.
 - **Reproducción en loop** en la pantalla 11, con la animación siguiendo
   cada vuelta.
 - **Confirmar antes de finalizar, en todas las pantallas.** La barra

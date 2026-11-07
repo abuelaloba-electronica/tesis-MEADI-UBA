@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Diagnóstico de audio (MAEDI)</title>
+<style>
+  body {
+    margin: 0; padding: 24px 28px 48px;
+    background: #faf6f0; color: #222;
+    font: 14px/1.5 -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+    max-width: 860px;
+  }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  h2 { font-size: 14px; margin: 28px 0 8px; text-transform: uppercase; letter-spacing: 0.05em; color: #555; }
+  p { margin: 6px 0; }
+  .nota { color: #777; font-size: 12.5px; }
+  button {
+    padding: 7px 12px; margin: 4px 6px 4px 0;
+    border: 1px solid #999; border-radius: 6px; background: #fff;
+    font: inherit; cursor: pointer;
+  }
+  button:hover:not(:disabled) { background: #f2f2f2; }
+  button:disabled { color: #aaa; cursor: default; }
+  table { border-collapse: collapse; width: 100%; font-size: 12.5px; margin-top: 6px; }
+  th, td { text-align: left; padding: 3px 6px; border-bottom: 1px solid #e3ddd3; }
+  th { color: #777; font-weight: 600; }
+  tr.helm td { background: #e8f5e9; font-weight: 600; }
+  .ok { color: #2f9e44; font-weight: 600; }
+  .mal { color: #d9480f; font-weight: 600; }
+  #nivel { width: 100%; height: 10px; background: #ececec; border-radius: 5px; overflow: hidden; margin: 8px 0; }
+  #nivelBarra { height: 100%; width: 0; background: #2f9e44; }
+  #informe {
+    width: 100%; box-sizing: border-box; height: 260px;
+    font: 12px/1.45 ui-monospace, Menlo, Consolas, monospace;
+    border: 1px solid #ccc; border-radius: 6px; padding: 8px; background: #fff;
+  }
+  audio { width: 100%; margin-top: 8px; }
+</style>
+</head>
+<body>
+
+<h1>Diagnóstico de audio · grabar Helm desde el navegador</h1>
+<p class="nota">
+  Comprueba lo que supone <code>prototipos/propuesta_sonido_composicion.md</code>: que el
+  navegador ve la fuente <b>MAEDI-Helm-grabacion</b> (la crea <code>tools/audio_helm.sh</code>,
+  con Helm abierto), que la graba sin el procesamiento de voz y qué tan bien suena. Esta
+  página nunca graba otra fuente que esa.
+</p>
+
+<h2>1 · Navegador</h2>
+<div id="navegador"></div>
+
+<h2>2 · Fuentes de audio</h2>
+<p class="nota">
+  Sin permiso, el navegador oculta los nombres de las fuentes. Para verlos hay que
+  concederlo una vez: <b>Desbloquear nombres</b> abre la entrada por defecto y la cierra en
+  el mismo instante, sin leer ni un dato. Si los nombres ya se ven, no hace falta.
+</p>
+<button id="btnListar">Listar fuentes</button>
+<button id="btnDesbloquear">Desbloquear nombres</button>
+<div id="estadoFuentes"></div>
+<table><thead><tr><th>Nombre</th><th>deviceId</th></tr></thead><tbody id="tablaFuentes"></tbody></table>
+
+<h2>3 · Grabar 5 segundos de Helm</h2>
+<p class="nota">Tocar Helm (y hablar cerca de la máquina) mientras graba: tiene que oírse sólo Helm.</p>
+<p class="nota">
+  En la sala, Brave se abre con un perfil propio y el permiso concedido de antemano:
+  <code>brave-browser --user-data-dir=$HOME/.config/maedi-sala --use-fake-ui-for-media-stream</code>.
+  Sin permiso guardado (en <code>file://</code> Brave no lo recuerda) los nombres de la sección 2
+  quedan ocultos y no hay forma de encontrar la fuente de Helm.
+</p>
+<p class="nota">
+  <b>Entrada por defecto</b> graba lo que el navegador llama «Predeterminado»: un alias que no
+  dice qué fuente hay detrás. Por eso se cierra sin grabar, y la página del guante no lo usa:
+  queda para comprobarlo.
+</p>
+<button id="btnGrabarDefecto">Grabar 5 s desde la entrada por defecto</button>
+<button id="btnGrabar" disabled>Grabar 5 s desde la fuente elegida</button>
+<span id="cuenta"></span>
+<div id="nivel"><div id="nivelBarra"></div></div>
+<div id="estadoGrabacion"></div>
+<audio id="reproductor" controls hidden></audio>
+<p><a id="descarga" hidden>Descargar la grabación</a></p>
+
+<h2>4 · Informe</h2>
+<p class="nota">Copiar y pegar en la conversación.</p>
+<button id="btnCopiar">Copiar informe</button>
+<textarea id="informe" readonly></textarea>
+
+<script>
+(function () {
+  "use strict";
+
+  const NOMBRE_FUENTE = "MAEDI-Helm-grabacion";
+  const DURACION_MS = 5000;
+  const MIME = "audio/webm;codecs=opus";
+
+  const $ = function (id) { return document.getElementById(id); };
+  const datos = {};       // lo que va al informe, por sección
+
+  function marca(ok) { return ok ? '<span class="ok">sí</span>' : '<span class="mal">no</span>'; }
+
+  function escribirInforme() {
+    const lineas = [];
+    Object.keys(datos).forEach(function (sec) {
+      lineas.push("[" + sec + "]");
+      Object.keys(datos[sec]).forEach(function (k) { lineas.push("  " + k + ": " + datos[sec][k]); });
+    });
+    $("informe").value = lineas.join("\n");
+  }
+
+  // -------------------------------------------------------------
+  // 1 · Navegador: además del audio, lo que necesitan las otras
+  // páginas de la experiencia, para elegir el navegador de la sala.
+  // -------------------------------------------------------------
+  function revisarNavegador() {
+    const n = {
+      "agente": navigator.userAgent,
+      "brave": navigator.brave ? "sí" : "no",
+      "origen": location.protocol,
+      "contexto seguro": window.isSecureContext ? "sí" : "no",
+      "Web Serial": "serial" in navigator ? "sí" : "no",
+      "Web MIDI": navigator.requestMIDIAccess ? "sí" : "no",
+      "getUserMedia": navigator.mediaDevices && navigator.mediaDevices.getUserMedia ? "sí" : "no",
+      "MediaRecorder": typeof MediaRecorder !== "undefined" ? "sí" : "no",
+      "Opus en WebM": typeof MediaRecorder !== "undefined" && MediaRecorder.isTypeSupported(MIME) ? "sí" : "no",
+      "IndexedDB": typeof indexedDB !== "undefined" ? "sí" : "no"
+    };
+    datos["navegador"] = n;
+    $("navegador").innerHTML = Object.keys(n).map(function (k) {
+      const v = n[k];
+      const celda = v === "sí" || v === "no" ? marca(v === "sí") : v;
+      return "<div>" + k + ": " + celda + "</div>";
+    }).join("");
+    if (navigator.permissions && navigator.permissions.query) {
+      navigator.permissions.query({ name: "microphone" }).then(function (st) {
+        n["permiso de audio"] = st.state;
+        escribirInforme();
+      }).catch(function () {});
+    }
+    escribirInforme();
+  }
+
+  // -------------------------------------------------------------
+  // 2 · Fuentes
+  // -------------------------------------------------------------
+  let fuenteHelm = null;
+
+  function listar(momento) {
+    return navigator.mediaDevices.enumerateDevices().then(function (devs) {
+      const entradas = devs.filter(function (d) { return d.kind === "audioinput"; });
+      const conNombre = entradas.some(function (d) { return d.label; });
+      fuenteHelm = entradas.find(function (d) { return d.label.indexOf(NOMBRE_FUENTE) >= 0; }) || null;
+      $("tablaFuentes").innerHTML = "";
+      entradas.forEach(function (d) {
+        const tr = document.createElement("tr");
+        if (d === fuenteHelm) tr.className = "helm";
+        [d.label || "(oculto)", d.deviceId ? d.deviceId.slice(0, 16) + "…" : "(oculto)"].forEach(function (t) {
+          const td = document.createElement("td");
+          td.textContent = t;
+          tr.appendChild(td);
+        });
+        $("tablaFuentes").appendChild(tr);
+      });
+      $("estadoFuentes").innerHTML =
+        "<p>Nombres visibles: " + marca(conNombre) +
+        " · Fuente " + NOMBRE_FUENTE + ": " + marca(!!fuenteHelm) + "</p>" +
+        (!conNombre ? '<p class="nota">Pulsar <b>Desbloquear nombres</b>.</p>' :
+         !fuenteHelm ? '<p class="nota">¿Está Helm abierto y se corrió <code>tools/audio_helm.sh</code>? Después, <b>Listar fuentes</b> otra vez.</p>' : "");
+      $("btnGrabar").disabled = !fuenteHelm;
+      datos["fuentes"] = datos["fuentes"] || {};
+      datos["fuentes"]["nombres visibles (" + momento + ")"] = conNombre ? "sí" : "no";
+      datos["fuentes"]["entradas"] = entradas.map(function (d) { return d.label || "(oculto)"; }).join(" | ");
+      datos["fuentes"]["MAEDI-Helm-grabacion"] = fuenteHelm ? "sí" : "no";
+      escribirInforme();
+    });
+  }
+
+  // Abre una entrada sólo para que el navegador conceda el permiso, y la
+  // cierra sin conectarla a nada: no se lee ninguna muestra.
+  //
+  // La lista se pide ANTES de cerrarla. En file:// el permiso puede no
+  // quedar guardado, y entonces el navegador muestra los nombres sólo
+  // mientras haya una captura abierta (en Brave, cerrarla primero dejaba
+  // todo "(oculto)"). Además, si en el aviso de permiso se eligió la
+  // fuente de Helm, la propia pista dice cuál es: se usa aunque la lista
+  // no muestre nombres.
+  function desbloquear() {
+    return navigator.mediaDevices.getUserMedia({ audio: true }).then(function (s) {
+      const pista = s.getAudioTracks()[0];
+      const elegida = { label: pista ? pista.label : "", deviceId: pista ? pista.getSettings().deviceId : "" };
+      datos["fuentes"] = datos["fuentes"] || {};
+      datos["fuentes"]["elegida en el aviso"] = elegida.label + " (deviceId " + (elegida.deviceId ? "sí" : "no") + ")";
+      return listar("con la captura abierta").then(function () {
+        s.getTracks().forEach(function (t) { t.stop(); });
+        if (!fuenteHelm && elegida.label.indexOf(NOMBRE_FUENTE) >= 0 && elegida.deviceId) {
+          fuenteHelm = elegida;
+          $("btnGrabar").disabled = false;
+          $("estadoFuentes").innerHTML += "<p>La lista no muestra nombres, pero la fuente elegida en el aviso es " +
+            NOMBRE_FUENTE + ": " + marca(true) + "</p>";
+        }
+        return listar("después de cerrar").then(function () {
+          // listar() recalcula fuenteHelm desde la lista; si ahí no está, se
+          // conserva la elegida en el aviso.
+          if (!fuenteHelm && elegida.label.indexOf(NOMBRE_FUENTE) >= 0 && elegida.deviceId) {
+            fuenteHelm = elegida;
+            $("btnGrabar").disabled = false;
+          }
+          if (navigator.permissions && navigator.permissions.query) {
+            return navigator.permissions.query({ name: "microphone" }).then(function (st) {
+              datos["fuentes"]["permiso después"] = st.state;
+              escribirInforme();
+            }).catch(function () {});
+          }
+        });
+      });
+    }).catch(function (err) {
+      $("estadoFuentes").innerHTML = '<p class="mal">Permiso denegado: ' + err.name + " · " + err.message + "</p>";
+      datos["fuentes"] = datos["fuentes"] || {};
+      datos["fuentes"]["desbloquear"] = err.name + ": " + err.message;
+      escribirInforme();
+    });
+  }
+
+  // -------------------------------------------------------------
+  // 3 · Grabación: las mismas restricciones que usará la página del
+  // guante. deviceId con `exact`: si la fuente faltara, falla en vez de
+  // caer al micrófono por defecto.
+  // -------------------------------------------------------------
+  //
+  // modo "elegida": la fuente encontrada en la sección 2, por deviceId.
+  // modo "defecto": la entrada por defecto, sin deviceId. Brave la entrega
+  // como el alias «Predeterminado», que no dice qué fuente hay detrás, así
+  // que nunca pasa la comprobación: queda para mostrar por qué la página
+  // del guante busca la fuente por nombre. En los dos casos, si la pista no
+  // es la de Helm se cierra sin grabar.
+  function grabar(modo) {
+    if (modo === "elegida" && !fuenteHelm) return;
+    $("btnGrabar").disabled = $("btnGrabarDefecto").disabled = true;
+    $("estadoGrabacion").textContent = "";
+    const g = datos["grabación (" + (modo === "defecto" ? "entrada por defecto" : "fuente elegida") + ")"] = {};
+    const restricciones = {
+      echoCancellation: false, noiseSuppression: false, autoGainControl: false,
+      channelCount: 2
+    };
+    if (modo === "elegida") restricciones.deviceId = { exact: fuenteHelm.deviceId };
+    const tPedido = performance.now();
+
+    function liberarBotones() {
+      $("btnGrabar").disabled = !fuenteHelm;
+      $("btnGrabarDefecto").disabled = false;
+    }
+
+    navigator.mediaDevices.getUserMedia({ audio: restricciones }).then(function (stream) {
+      const pista = stream.getAudioTracks()[0];
+      const ajustes = pista.getSettings();
+      // Si tardó más que un instante, hubo un aviso de permiso esperando a
+      // la persona: con --use-fake-ui-for-media-stream no debería haberlo.
+      g["espera del permiso"] = Math.round(performance.now() - tPedido) + " ms";
+      g["pista"] = pista.label;
+      g["es la fuente de Helm"] = pista.label.indexOf(NOMBRE_FUENTE) >= 0 ? "sí" : "NO";
+      if (pista.label.indexOf(NOMBRE_FUENTE) < 0) {
+        stream.getTracks().forEach(function (t) { t.stop(); });
+        g["resultado"] = "no es Helm: se cerró sin grabar";
+        // "Predeterminado" / "Default" es el alias del navegador para la
+        // entrada por defecto: no dice qué fuente hay detrás, así que no se
+        // puede confirmar que sea Helm (si no se corrió el script, sería el
+        // micrófono de la sala).
+        const alias = /^(predeterminad|default)/i.test(pista.label);
+        $("estadoGrabacion").innerHTML = '<p class="mal">La entrada recibida es «' + pista.label +
+          "», no " + NOMBRE_FUENTE + ": se cerró sin grabar. " +
+          (alias ? "Es el alias del navegador para la entrada por defecto: no dice qué fuente hay detrás. " +
+                   "Probar <b>Listar fuentes</b> y, si aparece " + NOMBRE_FUENTE + ", grabar desde la fuente elegida."
+                 : "¿Se corrió <code>tools/audio_helm.sh</code>?") + "</p>";
+        liberarBotones();
+        escribirInforme();
+        return;
+      }
+      ["echoCancellation", "noiseSuppression", "autoGainControl", "channelCount", "sampleRate", "latency"]
+        .forEach(function (k) { g[k] = String(ajustes[k]); });
+
+      // Medidor: Web Audio sólo para leer el nivel, nada suena por acá.
+      const ac = new AudioContext();
+      const analizador = ac.createAnalyser();
+      analizador.fftSize = 2048;
+      ac.createMediaStreamSource(stream).connect(analizador);
+      const buf = new Float32Array(analizador.fftSize);
+      let picoVivo = 0, midiendo = true;
+      (function medir() {
+        if (!midiendo) return;
+        analizador.getFloatTimeDomainData(buf);
+        let p = 0;
+        for (let i = 0; i < buf.length; i++) p = Math.max(p, Math.abs(buf[i]));
+        picoVivo = Math.max(picoVivo, p);
+        $("nivelBarra").style.width = Math.min(100, p * 100) + "%";
+        requestAnimationFrame(medir);
+      })();
+
+      const rec = new MediaRecorder(stream, { mimeType: MIME, audioBitsPerSecond: 128000 });
+      const trozos = [];
+      rec.ondataavailable = function (e) { if (e.data.size) trozos.push(e.data); };
+      rec.onstop = function () {
+        midiendo = false;
+        stream.getTracks().forEach(function (t) { t.stop(); });
+        $("nivelBarra").style.width = "0";
+        $("cuenta").textContent = "";
+        const blob = new Blob(trozos, { type: MIME });
+        const url = URL.createObjectURL(blob);
+        $("reproductor").src = url;
+        $("reproductor").hidden = false;
+        $("descarga").href = url;
+        $("descarga").download = "prueba-helm.webm";
+        $("descarga").hidden = false;
+        g["tamaño"] = Math.round(blob.size / 1024) + " KB";
+        g["pico en vivo"] = picoVivo.toFixed(3);
+        // Decodificar es lo que hará la pantalla 11: confirma que el Blob
+        // se puede leer y que la duración es la esperada.
+        blob.arrayBuffer().then(function (ab) { return ac.decodeAudioData(ab); }).then(function (audio) {
+          let pico = 0;
+          for (let c = 0; c < audio.numberOfChannels; c++) {
+            const d = audio.getChannelData(c);
+            for (let i = 0; i < d.length; i++) pico = Math.max(pico, Math.abs(d[i]));
+          }
+          g["decodifica"] = "sí";
+          g["duración decodificada"] = audio.duration.toFixed(2) + " s";
+          g["canales"] = String(audio.numberOfChannels);
+          g["pico grabado"] = pico.toFixed(3);
+          $("estadoGrabacion").innerHTML = "<p>Grabado: " + g["duración decodificada"] + ", " + g["tamaño"] +
+            ", pico " + g["pico grabado"] + (pico < 0.01 ? ' <span class="mal">(silencio: ¿sonó Helm?)</span>' : "") +
+            ". Escucharlo abajo.</p>";
+        }).catch(function (err) {
+          g["decodifica"] = "NO: " + err.message;
+          $("estadoGrabacion").innerHTML = '<p class="mal">No se pudo decodificar: ' + err.message + "</p>";
+        }).then(function () {
+          ac.close();
+          liberarBotones();
+          escribirInforme();
+        });
+      };
+      rec.start(1000);
+      const t0 = performance.now();
+      (function contar() {
+        const resta = Math.ceil((DURACION_MS - (performance.now() - t0)) / 1000);
+        if (rec.state !== "recording") return;
+        $("cuenta").textContent = "grabando… " + resta + " s";
+        if (resta > 0) setTimeout(contar, 200);
+      })();
+      setTimeout(function () { rec.stop(); }, DURACION_MS);
+      escribirInforme();
+    }).catch(function (err) {
+      g["error"] = err.name + ": " + err.message;
+      $("estadoGrabacion").innerHTML = '<p class="mal">' + g["error"] + "</p>";
+      liberarBotones();
+      escribirInforme();
+    });
+  }
+
+  $("btnListar").addEventListener("click", function () { listar("a mano"); });
+  $("btnDesbloquear").addEventListener("click", desbloquear);
+  $("btnGrabar").addEventListener("click", function () { grabar("elegida"); });
+  $("btnGrabarDefecto").addEventListener("click", function () { grabar("defecto"); });
+  $("btnCopiar").addEventListener("click", function () {
+    $("informe").select();
+    if (navigator.clipboard) navigator.clipboard.writeText($("informe").value).catch(function () {});
+    else document.execCommand("copy");
+  });
+
+  revisarNavegador();
+  if (!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)) $("btnGrabarDefecto").disabled = true;
+  if (navigator.mediaDevices && navigator.mediaDevices.enumerateDevices) listar("al cargar");
+})();
+</script>
+</body>
+</html>
