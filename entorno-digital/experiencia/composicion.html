@@ -61,7 +61,9 @@
   // IndexedDB ("experiencia", almacén "capturas") un registro
   //   { imagen: PNG transparente, ancho, alto (px CSS), dpr,
   //     elementos: [...], version, fecha }
-  // con clave "bandada", "guante" o "emg".
+  // con clave "bandada", "guante" o "emg". El del guante es version 2 y
+  // suma `sonido` (la grabación de Helm y sus eventos, o null; ver
+  // prototipos/cambios_experiencia_sonido_v1.md): todavía no se usa acá.
   //
   // v2 (ver prototipos/cambios_experiencia_composicion_v2.md): los
   // `elementos` de las tres capturas se vuelcan en una sola lista ordenada,

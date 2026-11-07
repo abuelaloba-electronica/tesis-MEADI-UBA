@@ -149,14 +149,14 @@
     font-size: 11px;
     color: #777;
   }
-  #statusDot, #midiDot {
+  #statusDot, #midiDot, #audioDot {
     width: 9px; height: 9px;
     border-radius: 50%;
     background: #bbb;
     flex-shrink: 0;
   }
-  #statusDot.connected, #midiDot.connected { background: var(--ok); }
-  #statusDot.error, #midiDot.error { background: var(--bad); }
+  #statusDot.connected, #midiDot.connected, #audioDot.connected { background: var(--ok); }
+  #statusDot.error, #midiDot.error, #audioDot.error { background: var(--bad); }
 
   #unsupportedNote, #midiUnsupportedNote {
     display: none;
@@ -418,6 +418,13 @@
   </div>
   <button class="plain" id="panicBtn">Silenciar todo (pánico)</button>
   <div class="note">La página no produce sonido: manda la nota del tramo donde cayó el golpe por el canal 1, y la presión del FSR como CC1. En Linux, elegir <b>Midi Through</b> acá y la misma entrada en Helm. El volumen y la latencia de audio se ajustan en Helm.</div>
+
+  <hr class="divider">
+
+  <div class="section-title">Grabación del sonido</div>
+  <div class="status-row"><div id="audioDot"></div><span id="audioStatusText">Sin pedir: se busca junto con el MIDI</span></div>
+  <button class="plain" id="audioBtn">Buscar la fuente de Helm</button>
+  <div class="note">Graba sólo la fuente <b>MAEDI-Helm-grabacion</b> (la crea <b>tools/audio_helm.sh</b>, con Helm abierto), nunca un micrófono. Se busca junto con el MIDI. Arranca con el primer golpe o la primera presión (también con A, L y F), Retroceso la descarta junto con el lienzo y la barra espaciadora la guarda con la captura, 2 s después, para que entre la cola del delay y la reverb. Sin esa fuente la página funciona igual y la captura sale sin sonido.</div>
 
   <hr class="divider">
   <button class="plain" id="resetBtn">Limpiar lienzo</button>
@@ -696,7 +703,9 @@
     enviar([0x80 | CANAL, nota, 0]);
   }
 
-  function dispararNota(nota, v) {
+  // `dedo` y `ahora` (performance.now() del golpe) sólo van a la lista de
+  // eventos de la grabación: el mensaje MIDI no cambia.
+  function dispararNota(nota, v, dedo, ahora) {
     if (!salida) return;
     // Retrigger de la misma nota con la anterior todavia abierta: se la cierra
     // ANTES del noteOn nuevo. Si no, el noteOff atrasado del golpe viejo
@@ -706,7 +715,9 @@
     // Sin timestamp: "lo antes posible". Programar a futuro solo sumaria
     // latencia, y el noteOff se maneja con setTimeout porque un mensaje con
     // timestamp ya enviado no se puede cancelar.
-    if (!enviar([0x90 | CANAL, nota, velocity(v)])) return;
+    const vel = velocity(v);
+    if (!enviar([0x90 | CANAL, nota, vel])) return;
+    anotarEvento("nota", { nota: nota, vel: vel, dedo: dedo }, ahora);
     notasEnviadas++;
     compuertas[nota] = setTimeout(function () {
       delete compuertas[nota];
@@ -717,10 +728,13 @@
   // FSR -> CC1. El sensor llega a 50Hz y el CC tiene 128 pasos: se manda solo
   // si el valor cambio, para no saturar el puerto con repeticiones. El
   // suavizado entre pasos lo hace Helm, no la pagina.
-  function enviarFuerza(f) {
+  function enviarFuerza(f, ahora) {
     const valor = Math.round(Math.min(1, Math.max(0, f)) * 127);
     if (valor === ultimoCC || !salida) return;
-    if (enviar([0xB0 | CANAL, CC_FUERZA, valor])) ultimoCC = valor;
+    if (enviar([0xB0 | CANAL, CC_FUERZA, valor])) {
+      ultimoCC = valor;
+      anotarEvento("cc", { valor: valor }, ahora);
+    }
   }
 
   // Panico: cierra las notas propias y ademas manda All Notes Off (CC123) y
@@ -731,7 +745,10 @@
     Object.keys(compuertas).forEach(function (n) { noteOff(parseInt(n, 10)); });
     enviar([0xB0 | CANAL, 123, 0]);
     enviar([0xB0 | CANAL, 120, 0]);
-    enviar([0xB0 | CANAL, CC_FUERZA, 0]);
+    // El CC1 a 0 es lo que apaga los efectos en Helm: entra a la lista de
+    // eventos, salvo que ya estuviera en 0 (la lista sólo guarda cambios).
+    const ccPrevio = ultimoCC;
+    if (enviar([0xB0 | CANAL, CC_FUERZA, 0]) && ccPrevio !== 0) anotarEvento("cc", { valor: 0 });
     ultimoCC = 0;
   }
 
@@ -832,7 +849,9 @@
     return midi;
   }
 
-  midiBtn.addEventListener("click", habilitarMidi);
+  // El permiso de audio se pide recién cuando el de MIDI quedó resuelto: así
+  // nunca hay dos avisos de permiso superpuestos.
+  midiBtn.addEventListener("click", function () { return habilitarMidi().then(habilitarAudio); });
   document.getElementById("panicBtn").addEventListener("click", silenciarTodo);
   // Al cerrar o recargar la pagina, que Helm no quede con notas abiertas ni
   // con la distorsion trabada.
@@ -846,8 +865,339 @@
     // Si el permiso ya se concedio en una visita anterior, no hace falta el
     // clic: se habilita solo al cargar.
     navigator.permissions.query({ name: "midi" }).then(function (st) {
-      if (st.state === "granted") habilitarMidi();
+      if (st.state === "granted") habilitarMidi().then(habilitarAudio);
     }).catch(function () {});
+  }
+
+  // ===============================================================
+  // Grabación del sonido de Helm (sólo en esta copia _experiencia; ver
+  // prototipos/propuesta_sonido_composicion.md, punto 2, y
+  // prototipos/cambios_experiencia_sonido_v1.md).
+  //
+  // La página no tiene el audio: lo tiene Helm. tools/audio_helm.sh copia
+  // su salida a un sink virtual y publica el monitor de ese sink como la
+  // fuente MAEDI-Helm-grabacion, que el navegador ve como un micrófono más.
+  // Se graba ESA fuente y ninguna otra:
+  //   - se busca por nombre en enumerateDevices(), sin selector ni
+  //     respaldo, y se pide por deviceId { exact }: con un pedido simple,
+  //     si la fuente faltara, el navegador caería al micrófono por defecto;
+  //   - se descartan los alias "default"/"communications" aunque digan
+  //     MAEDI-Helm-grabacion: no garantizan qué hay detrás;
+  //   - la pista recibida tiene que llamarse así, o se cierra sin grabar.
+  // Sin la fuente (o sin permiso, o con los nombres ocultos) la página
+  // funciona igual y la captura sale con `sonido: null`.
+  //
+  // Ciclo: la fuente se abre junto con el MIDI y queda abierta; el
+  // MediaRecorder arranca con el primer golpe o la primera presión,
+  // Retroceso lo descarta junto con el lienzo, y la barra espaciadora lo
+  // cierra COLA_MS después de congelar, para que entre la cola de los
+  // efectos.
+  //
+  // Tiempos: mientras se graba, todo se anota en performance.now()
+  // absoluto. Recién al cerrar se pasa a ms desde `t0`, el instante del
+  // evento `start` del MediaRecorder, que llega unos ms DESPUÉS del golpe
+  // que abrió la grabación: ese primer golpe queda en t = 0.
+  // ===============================================================
+  const FUENTE_HELM = "MAEDI-Helm-grabacion";
+  const GRABACION_MIME = "audio/webm;codecs=opus";
+  const GRABACION_BPS = 128000;              // ~1 MB por minuto
+  const GRABACION_MAX_MS = 15 * 60 * 1000;   // tope: después se sigue dibujando sin grabar
+  const COLA_MS = 2000;                      // cola del delay y la reverb tras congelar; ajustar a oído con el patch
+  const LATENCIA_MS = 0;                     // corrimiento evento → sonido en la grabación; a medir
+  const ESPERA_CIERRE_MS = 5000;             // si el MediaRecorder no avisa que paró, la captura sale sin sonido
+
+  // sin-pedir · pidiendo · lista · sin-fuente · sin-nombres · sin-permiso ·
+  // no-disponible · cerrando · guardada · sin-sonido
+  let audioEstado = "sin-pedir";
+  let audioDetalle = "";
+  let flujoHelm = null;      // MediaStream de la fuente de Helm, abierto hasta la captura
+  // Grabación en curso o cerrada:
+  //   { rec, trozos, tLlamado, t0, tFin, eventos, marcados, estado, motivo,
+  //     tope, terminada }
+  // estado "grabando" → "cerrada" (tope, fuente perdida o captura). null
+  // antes del primer golpe y después de Retroceso.
+  let grabacion = null;
+
+  const audioDot = document.getElementById("audioDot");
+  const audioStatusTextEl = document.getElementById("audioStatusText");
+  const audioBtn = document.getElementById("audioBtn");
+
+  const TEXTOS_AUDIO = {
+    "sin-pedir":     ["", "Sin pedir: se busca junto con el MIDI"],
+    "pidiendo":      ["", "Buscando la fuente de Helm…"],
+    "lista":         ["connected", "Lista: graba desde el primer golpe"],
+    "sin-fuente":    ["error", "No aparece " + FUENTE_HELM + ": ¿se corrió tools/audio_helm.sh con Helm abierto? La captura sale sin sonido"],
+    "sin-nombres":   ["error", "El navegador oculta los nombres de las fuentes: abrir Brave con el perfil de la sala. La captura sale sin sonido"],
+    "sin-permiso":   ["error", "Permiso de audio denegado. La captura sale sin sonido"],
+    "no-disponible": ["error", "Este navegador no puede grabar Opus en WebM. La captura sale sin sonido"],
+    "cerrando":      ["connected", "Grabando la cola de los efectos…"],
+    "guardada":      ["connected", "Grabación guardada con la captura"],
+    "sin-sonido":    ["", "La captura se guardó sin sonido"]
+  };
+
+  function reloj(ms) {
+    const s = Math.max(0, Math.floor(ms / 1000));
+    return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
+  }
+
+  function setAudio(estado, detalle) {
+    audioEstado = estado;
+    audioDetalle = detalle || "";
+    pintarAudio();
+  }
+
+  // Se llama en cada frame (actualizarLecturas) para el reloj de la
+  // grabación, y en cada cambio de estado. Sólo toca el DOM si cambió algo.
+  function pintarAudio() {
+    let tipo, texto;
+    const g = grabacion;
+    if (g && g.estado === "grabando" && !congelado) {
+      tipo = "connected";
+      texto = "Grabando · " + reloj(performance.now() - g.tLlamado);
+    } else if (g && g.estado === "cerrada" && g.motivo !== "captura" && !congelado) {
+      tipo = "error";
+      texto = g.motivo === "tope"
+        ? "Tope de " + (GRABACION_MAX_MS / 60000) + " min: ya no graba, se sigue dibujando"
+        : "Se dejó de grabar (" + g.motivo + "); se conserva lo grabado";
+    } else {
+      const t = TEXTOS_AUDIO[audioEstado] || ["", audioEstado];
+      tipo = t[0];
+      texto = t[1] + (audioDetalle ? " (" + audioDetalle + ")" : "");
+    }
+    const clase = tipo === "connected" ? "connected" : (tipo === "error" ? "error" : "");
+    if (audioDot.className !== clase) audioDot.className = clase;
+    if (audioStatusTextEl.textContent !== texto) audioStatusTextEl.textContent = texto;
+    const reintentable = !congelado && !flujoHelm && audioEstado !== "pidiendo" && audioEstado !== "no-disponible";
+    if (audioBtn.disabled === reintentable) audioBtn.disabled = !reintentable;
+  }
+
+  function cerrarFlujo(flujo) {
+    flujo.getTracks().forEach(function (t) { t.stop(); });
+  }
+
+  function puedeGrabar() {
+    return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia &&
+              navigator.mediaDevices.enumerateDevices &&
+              typeof MediaRecorder !== "undefined" &&
+              MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(GRABACION_MIME));
+  }
+
+  // Abre la fuente de Helm y la deja lista. No graba: eso empieza con el
+  // primer golpe. Se puede llamar las veces que haga falta (botón del panel,
+  // devicechange): si ya está abierta o pidiéndose, no hace nada.
+  async function habilitarAudio() {
+    if (flujoHelm || audioEstado === "pidiendo" || congelado) return;
+    if (!puedeGrabar()) { setAudio("no-disponible"); return; }
+    setAudio("pidiendo");
+
+    let fuente;
+    try {
+      const entradas = (await navigator.mediaDevices.enumerateDevices())
+        .filter(function (d) { return d.kind === "audioinput"; });
+      fuente = entradas.find(function (d) {
+        return (d.label || "").indexOf(FUENTE_HELM) >= 0 && d.deviceId &&
+               d.deviceId !== "default" && d.deviceId !== "communications";
+      });
+      if (!fuente) {
+        // Sin permiso concedido el navegador entrega la lista con los
+        // nombres vacíos: no hay forma de saber cuál es Helm.
+        const conNombres = entradas.some(function (d) { return d.label; });
+        setAudio(conNombres ? "sin-fuente" : "sin-nombres");
+        return;
+      }
+    } catch (err) {
+      setAudio("sin-fuente", err.message);
+      return;
+    }
+
+    let flujo;
+    try {
+      flujo = await navigator.mediaDevices.getUserMedia({ audio: {
+        deviceId: { exact: fuente.deviceId },
+        // El procesamiento de voz del navegador destroza la música.
+        echoCancellation: false, noiseSuppression: false, autoGainControl: false,
+        channelCount: 2
+      } });
+    } catch (err) {
+      setAudio(err && err.name === "NotAllowedError" ? "sin-permiso" : "sin-fuente",
+               err && err.message);
+      return;
+    }
+
+    const pista = flujo.getAudioTracks()[0];
+    if (!pista || (pista.label || "").indexOf(FUENTE_HELM) < 0) {
+      cerrarFlujo(flujo);
+      setAudio("sin-fuente", "se recibió «" + (pista ? pista.label : "nada") + "», se cerró sin grabar");
+      return;
+    }
+    // Se capturó mientras se esperaba el permiso: ya no hay nada que grabar.
+    if (congelado) { cerrarFlujo(flujo); return; }
+    flujoHelm = flujo;
+    pista.addEventListener("ended", perderFuente);
+    setAudio("lista");
+  }
+
+  // La fuente desapareció (se corrió audio_helm.sh --quitar, se reinició
+  // PipeWire): lo grabado hasta acá se conserva, como con el tope.
+  function perderFuente() {
+    flujoHelm = null;
+    if (grabando()) cortarGrabacion(grabacion, "se perdió la fuente");
+    if (!congelado) setAudio("sin-fuente", "se perdió durante la sesión");
+  }
+
+  audioBtn.addEventListener("click", function () { return habilitarAudio(); });
+  // Si audio_helm.sh se corre con la página ya abierta, la fuente aparece
+  // sola, sin recargar.
+  if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) {
+    navigator.mediaDevices.addEventListener("devicechange", function () {
+      if (audioEstado === "sin-fuente" || audioEstado === "sin-nombres") habilitarAudio();
+    });
+  }
+  // Con el perfil de la sala el permiso ya está concedido: la fuente se abre
+  // al cargar, sin esperar al MIDI.
+  if (puedeGrabar() && navigator.permissions && navigator.permissions.query) {
+    navigator.permissions.query({ name: "microphone" }).then(function (st) {
+      if (st.state === "granted") habilitarAudio();
+    }).catch(function () {});
+  }
+
+  function grabando() {
+    return !!(grabacion && grabacion.estado === "grabando");
+  }
+
+  function iniciarGrabacion() {
+    if (grabacion || !flujoHelm || congelado) return;
+    let rec;
+    try {
+      rec = new MediaRecorder(flujoHelm, { mimeType: GRABACION_MIME, audioBitsPerSecond: GRABACION_BPS });
+    } catch (err) {
+      setAudio("no-disponible", err.message);
+      return;
+    }
+    const g = {
+      rec: rec, trozos: [], tLlamado: performance.now(), t0: null, tFin: null,
+      eventos: [], marcados: [], estado: "grabando", motivo: "", tope: 0, terminada: null
+    };
+    g.terminada = new Promise(function (ok) {
+      rec.onstop = function () { ok(new Blob(g.trozos, { type: GRABACION_MIME })); };
+    });
+    rec.onstart = function () { g.t0 = performance.now(); };
+    rec.ondataavailable = function (e) { if (e.data && e.data.size) g.trozos.push(e.data); };
+    rec.onerror = function (e) { cortarGrabacion(g, "error: " + ((e && e.error && e.error.message) || "MediaRecorder")); };
+    g.tope = setTimeout(function () { cortarGrabacion(g, "tope"); }, GRABACION_MAX_MS);
+    grabacion = g;
+    try {
+      // Trozos de 1 s: el Blob final es la concatenación, en orden.
+      rec.start(1000);
+    } catch (err) {
+      clearTimeout(g.tope);
+      grabacion = null;
+      setAudio("no-disponible", err.message);
+      return;
+    }
+    pintarAudio();
+  }
+
+  // Deja de grabar y conserva lo grabado (tope, fuente perdida, captura).
+  function cortarGrabacion(g, motivo) {
+    if (g.estado !== "grabando") return;
+    g.estado = "cerrada";
+    g.motivo = motivo;
+    g.tFin = performance.now();
+    clearTimeout(g.tope);
+    if (g.rec.state !== "inactive") {
+      try { g.rec.stop(); } catch (e) { /* ya se había detenido solo */ }
+    }
+    pintarAudio();
+  }
+
+  // Retroceso: se tira la grabación sin esperar su Blob. Si se está
+  // apretando el FSR, esa presión es la primera del dibujo nuevo: abre
+  // la grabación siguiente en el acto.
+  function descartarGrabacion() {
+    const g = grabacion;
+    if (!g) return;
+    grabacion = null;
+    clearTimeout(g.tope);
+    g.estado = "descartada";
+    g.rec.onstart = g.rec.ondataavailable = g.rec.onstop = g.rec.onerror = null;
+    if (g.rec.state !== "inactive") {
+      try { g.rec.stop(); } catch (e) { /* ya se había detenido solo */ }
+    }
+    if (presion) {
+      iniciarGrabacion();
+      presion.t0 = grabando() ? performance.now() : null;
+      presion.grab = grabacion;
+    }
+    pintarAudio();
+  }
+
+  function anotarEvento(tipo, datos, ahora) {
+    if (!grabando()) return;
+    const ev = { t: ahora === undefined ? performance.now() : ahora, tipo: tipo };
+    Object.keys(datos).forEach(function (k) { ev[k] = datos[k]; });
+    grabacion.eventos.push(ev);
+  }
+
+  // Anota tiempos (absolutos) en un elemento y lo recuerda para pasarlos a
+  // relativos al cerrar.
+  function sellar(g, el, tiempos) {
+    Object.keys(tiempos).forEach(function (k) { el[k] = tiempos[k]; });
+    g.marcados.push({ el: el, campos: Object.keys(tiempos) });
+  }
+
+  function esperar(ms) {
+    return new Promise(function (ok) { setTimeout(ok, ms); });
+  }
+
+  // Lo llama capturar() justo después de congelar(). Espera la cola, cierra
+  // la grabación, pasa los tiempos a relativos y devuelve el campo `sonido`
+  // del registro (o null). Nunca rechaza: un problema con el audio no puede
+  // impedir que se guarde la imagen.
+  function cerrarSonido() {
+    const g = grabacion;
+    if (!g) {
+      if (flujoHelm) cerrarFlujo(flujoHelm);
+      flujoHelm = null;
+      setAudio(audioEstado === "lista" || audioEstado === "sin-pedir" ? "sin-sonido" : audioEstado, audioDetalle);
+      return Promise.resolve(null);
+    }
+    if (g.estado === "grabando") setAudio("cerrando");
+    return esperar(g.estado === "grabando" ? COLA_MS : 0)
+      .then(function () {
+        cortarGrabacion(g, "captura");
+        return Promise.race([g.terminada, esperar(ESPERA_CIERRE_MS).then(function () { return null; })]);
+      })
+      .then(function (audio) {
+        const hay = !!(audio && audio.size > 0);
+        const t0 = g.t0 !== null ? g.t0 : g.tLlamado;
+        const rel = function (abs) { return Math.max(0, Math.round(abs - t0)); };
+        // Sin audio, los tiempos no significan nada: se quitan.
+        g.marcados.forEach(function (m) {
+          m.campos.forEach(function (k) {
+            if (hay) m.el[k] = rel(m.el[k]); else delete m.el[k];
+          });
+        });
+        if (flujoHelm) cerrarFlujo(flujoHelm);
+        flujoHelm = null;
+        if (!hay) { setAudio("sin-sonido", "el grabador no entregó audio"); return null; }
+        g.eventos.forEach(function (e) { e.t = rel(e.t); });
+        const duracion = Math.round(g.tFin - t0) / 1000;
+        setAudio("guardada", reloj(duracion * 1000) + ", " + Math.round(audio.size / 1024) + " KB");
+        return {
+          audio: audio,               // audio/webm;codecs=opus
+          duracion: duracion,         // s, medida acá: el WebM de Chrome no la trae
+          eventos: g.eventos,         // en orden; t en ms desde el inicio de la grabación
+          latenciaMs: LATENCIA_MS
+        };
+      })
+      .catch(function (err) {
+        g.marcados.forEach(function (m) { m.campos.forEach(function (k) { delete m.el[k]; }); });
+        if (flujoHelm) cerrarFlujo(flujoHelm);
+        flujoHelm = null;
+        setAudio("sin-sonido", err && err.message);
+        return null;
+      });
   }
 
   // ===============================================================
@@ -858,12 +1208,16 @@
   // Un golpe de piezo. `pico` es la lectura cruda del sketch (0-1023).
   window.feedGolpe = function (dedo, pico) {
     if (congelado) return;
+    // Un solo instante para la nota, el anillo y el evento grabado: así el
+    // `t` del anillo es exactamente el de su nota en la lista de eventos.
+    const ahora = performance.now();
+    iniciarGrabacion();      // el primer golpe abre la grabación, antes de la nota
     const d = (dedo === 1 || dedo === "1") ? 1 : 0;
     const v = picoAIntensidad(pico);
     const g = cuantizar(d, v);
     const nota = TONICA[d] + GRADOS[g];
-    dispararNota(nota, v);
-    dibujarGolpe(d, v);      // el dibujo de (a) sigue usando la intensidad continua
+    dispararNota(nota, v, d, ahora);
+    dibujarGolpe(d, v, ahora);   // el dibujo de (a) sigue usando la intensidad continua
     registrarGolpe(d, pico, v, nota, g);
   };
 
@@ -873,19 +1227,23 @@
   // es un evento que dibuja un disco.
   window.feedForce = function (value01) {
     if (congelado) return;
+    const ahora = performance.now();
     fuerza =Math.min(1, Math.max(0, value01));
-    enviarFuerza(fuerza);
+    // La primera presión también abre la grabación, antes del CC que la
+    // acompaña: así el primer evento grabado es el de la presión.
+    if (!presion && fuerza > FSR_ON) iniciarGrabacion();
+    enviarFuerza(fuerza, ahora);
     if (!presion && fuerza > FSR_ON) {
-      empezarPresion();
+      empezarPresion(ahora);
     } else if (presion && fuerza < FSR_OFF) {
-      terminarPresion();
+      terminarPresion(ahora);
     }
   };
 
   // ===============================================================
   // Dibujo de cada golpe sobre el lienzo acumulado
   // ===============================================================
-  function dibujarGolpe(dedo, v) {
+  function dibujarGolpe(dedo, v, ahora) {
     const menor = Math.min(W, H);
     const r = menor * (R_MIN_FRAC + v * (R_MAX_FRAC - R_MIN_FRAC));
     const alpha = intensidadAAlpha(v);
@@ -922,9 +1280,13 @@
     ctxA.stroke();
     ctxA.globalCompositeOperation = "source-over";
     ctxA.globalAlpha = 1;
-    elementos.push({ tipo: "anillo", dedo: dedo, x: x, y: y, r: r,
-                     grosor: ctxA.lineWidth, color: ctxA.strokeStyle,
-                     alpha: alpha, modo: "multiply" });
+    const el = { tipo: "anillo", dedo: dedo, x: x, y: y, r: r,
+                 grosor: ctxA.lineWidth, color: ctxA.strokeStyle,
+                 alpha: alpha, modo: "multiply" };
+    // `t`: cuándo sonó, para que la pantalla 11 lo vuelva a golpear en su
+    // momento. Sin grabación en curso el anillo queda sin `t`.
+    if (grabando()) sellar(grabacion, el, { t: ahora });
+    elementos.push(el);
 
     if (anillos.length < MAX_ANILLOS) {
       anillos.push({ x: x, y: y, r: r, rgb: rgb, nacio: t });
@@ -944,12 +1306,17 @@
     return Math.min(W, H) * (R_FSR_MIN + v * (R_FSR_MAX - R_FSR_MIN));
   }
 
-  function empezarPresion() {
+  // `t0` y `grab`: cuándo empezó la presión y en qué grabación. Si la
+  // grabación se descarta (Retroceso) mientras se aprieta, `grab` deja de
+  // ser la actual y el disco no se sella con tiempos ajenos.
+  function empezarPresion(ahora) {
     const margen = radioFsr(1) + 10;
     presion = {
       x: margen + Math.random() * Math.max(1, W - margen * 2),
       y: margen + Math.random() * Math.max(1, H - margen * 2),
-      pico: 0
+      pico: 0,
+      t0: grabando() ? ahora : null,
+      grab: grabacion
     };
   }
 
@@ -962,7 +1329,7 @@
     ctx.globalAlpha = 1;
   }
 
-  function terminarPresion() {
+  function terminarPresion(ahora) {
     const p = presion;
     presion = null;
     // Una presion tan breve que el suavizado no llego a registrarla no deja
@@ -971,9 +1338,16 @@
     ctxA.globalCompositeOperation = "multiply";
     discoFsr(ctxA, p);
     ctxA.globalCompositeOperation = "source-over";
-    elementos.push({ tipo: "disco", x: p.x, y: p.y, r: radioFsr(p.pico),
-                     color: COLOR_FSR, alpha: intensidadAAlpha(p.pico),
-                     modo: "multiply" });
+    const el = { tipo: "disco", x: p.x, y: p.y, r: radioFsr(p.pico),
+                 color: COLOR_FSR, alpha: intensidadAAlpha(p.pico),
+                 modo: "multiply" };
+    // `t0`/`t1`: de cruzar FSR_ON a bajar de FSR_OFF. Si la grabación se
+    // cortó por el tope en medio de la presión, `t1` es el final de la
+    // grabación: el disco termina de inflarse con el último sonido.
+    if (p.t0 !== null && p.grab && p.grab === grabacion) {
+      sellar(grabacion, el, { t0: p.t0, t1: grabando() ? ahora : grabacion.tFin });
+    }
+    elementos.push(el);
   }
 
   // ===============================================================
@@ -1055,7 +1429,7 @@
       // De paso pide el permiso MIDI, por si todavia no se habilito con su
       // boton. Recien despues de elegir el puerto serie: pedirlo antes
       // superpondria el aviso de permiso con el selector de puertos.
-      habilitarMidi();
+      habilitarMidi().then(habilitarAudio);
       connectBtn.textContent = "Desconectar";
       connectBtn.classList.add("connected");
       reading = true;
@@ -1244,6 +1618,9 @@
   armarTablaRangos();
 
   function limpiarLienzo() {
+    // El sonido corresponde siempre a lo que está dibujado: borrar el lienzo
+    // descarta también la grabación (y la próxima arranca con el próximo golpe).
+    descartarGrabacion();
     pintarFondo();
     anillos.length = 0;
     elementos.length = 0;
@@ -1273,7 +1650,7 @@
       window.feedForce(0);
     }
     congelado = true;
-    ["connectBtn", "resetBtn", "picoMin", "picoMax", "escalaSelect", "colorSelect"]
+    ["connectBtn", "resetBtn", "picoMin", "picoMax", "escalaSelect", "colorSelect", "audioBtn"]
       .forEach(function (id) { document.getElementById(id).disabled = true; });
   }
 
@@ -1308,6 +1685,7 @@
     forceFillBarEl.style.width = Math.round(fuerza * 100) + "%";
     midiCountValEl.textContent = String(notasEnviadas);
     ccValEl.textContent = ultimoCC < 0 ? "—" : String(ultimoCC);
+    pintarAudio();
   }
 
   requestAnimationFrame(draw);
@@ -1319,7 +1697,8 @@
     congelar: congelar,
     limpiar: limpiarLienzo,
     lienzos: function () { return [acum]; },
-    elementos: function () { return elementos.slice(); }
+    elementos: function () { return elementos.slice(); },
+    sonido: cerrarSonido
   });
 
   // ===============================================================
@@ -1329,7 +1708,8 @@
   // capturar. Retroceso borra, la barra espaciadora captura (sin vuelta atrás) y
   // recién entonces → lleva a la pantalla siguiente. La captura se guarda
   // en IndexedDB como PNG con fondo transparente, más la lista de elementos
-  // dibujados (para editarlos en una etapa futura): composicion.html, la
+  // dibujados (para editarlos en una etapa futura) y, en esta copia, el
+  // sonido grabado de Helm (ver cerrarSonido): composicion.html, la
   // pantalla 11, superpone las tres. Por eso esta copia, a diferencia de la
   // página activa, no pinta el fondo dentro del canvas sino en el CSS: en
   // pantalla se ve igual. Todo pasa por teclado: ni la física ni la frontera
@@ -1382,14 +1762,21 @@
       clearTimeout(temporizadorConfirmar);
       etapa = "guardando";
       op.congelar();
+      // congelar() ya silenció Helm, pero el delay y la reverb siguen
+      // sonando: la grabación se cierra COLA_MS después. El aviso cubre la
+      // espera y → sigue bloqueado hasta que todo esté guardado. cerrarSonido
+      // nunca falla: sin grabación, resuelve null.
+      const sonido = op.sonido();
       mostrarAviso("info", "Capturando la composición…", "");
       // Un frame de gracia para que el último cuadro congelado esté pintado.
       requestAnimationFrame(function () {
         const lienzos = op.lienzos();
-        componerCaptura(lienzos)
-          .then(function (blob) {
+        Promise.all([componerCaptura(lienzos), sonido])
+          .then(function (r) {
+            // op.elementos() recién acá: cerrarSonido ya pasó los tiempos de
+            // los anillos y discos a ms desde el inicio de la grabación.
             return guardarCaptura(op.clave, {
-              imagen: blob,
+              imagen: r[0],
               // Medidas en px CSS y densidad del canvas: la bandada no usa
               // devicePixelRatio y las otras dos sí, así que los PNG pueden
               // tener resoluciones distintas para la misma pantalla.
@@ -1397,7 +1784,10 @@
               alto: window.innerHeight,
               dpr: lienzos[0].width / window.innerWidth,
               elementos: op.elementos(),
-              version: 1,
+              // v2: suma `sonido` (ver cerrarSonido); null si no se grabó.
+              // composicion.html lee los elementos de toda versión >= 1.
+              sonido: r[1],
+              version: 2,
               fecha: Date.now()
             });
           })

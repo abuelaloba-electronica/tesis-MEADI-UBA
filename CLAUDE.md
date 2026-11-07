@@ -38,6 +38,10 @@ sin romper nada.
 5, 7 y 9 son copias `_experiencia` de las tres páginas activas (sus
 instrucciones están en la pantalla de texto anterior: 4, 6 y 8), con Retroceso para borrar, barra espaciadora dos veces para capturar
 (la primera pide confirmación; definitiva: PNG transparente + lista de `elementos` en IndexedDB) y → para seguir.
+La copia del guante además graba lo que suena en Helm (sólo la fuente
+`MAEDI-Helm-grabacion` que arma `tools/audio_helm.sh`, nunca un micrófono) y
+lo guarda con la captura (`version: 2`, campo `sonido`); ver
+`prototipos/propuesta_sonido_composicion.md` y `prototipos/cambios_experiencia_sonido_v1.md`.
 La pantalla 11, `composicion.html`, vuelca los `elementos` de las tres capturas
 en una sola escena y los redibuja en vector (EMG abajo, guante, bandada
 arriba), y ya permite seleccionar (con clic o con un marco), mover,
@@ -132,7 +136,9 @@ No hay suite de tests. Tres técnicas, en orden de costo:
    en paralelo y recibe los golpes por Web MIDI): para ellas está
    `entorno-digital/tools/harness_midi.js`, que con un `MIDIAccess` falso
    verifica notas colgadas, retrigger, CC del FSR, pánico y el reparto de la
-   intensidad en tramos de la escala.
+   intensidad en tramos de la escala. En la copia `_experiencia` verifica
+   también la grabación del sonido, con `mediaDevices`, `MediaRecorder` e
+   IndexedDB falsos (en la activa esa sección dice "no aplica").
 
    Para la acumulación EMG está `entorno-digital/tools/harness_emg.js`, que
    en vez de inventar la señal **reproduce una captura del Monitor Serial**
