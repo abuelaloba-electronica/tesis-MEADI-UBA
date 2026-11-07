@@ -27,7 +27,8 @@ tres visualizaciones en un recorrido de pantallas (0–11) a partir del guion
 6, 8 y 10 son texto y se recorren con ← →; la 5, la 7 y la 9 son copias
 `_experiencia` de las tres páginas activas; sus instrucciones están en la
 pantalla de texto anterior a cada una (4, 6 y 8). Borran con Retroceso, capturan el lienzo con la barra
-espaciadora (sin vuelta atrás, guardado en IndexedDB) y recién entonces pasan a
+espaciadora pulsada dos veces —la primera pide confirmación, que se cancela
+sola a los 4 s o con Esc— (sin vuelta atrás, guardado en IndexedDB) y recién entonces pasan a
 la siguiente con →. Desde la 10, → lleva a la 11,
 [`experiencia/composicion.html`](experiencia/composicion.html): los
 elementos de las tres capturas volcados en una sola escena y redibujados en

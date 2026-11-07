@@ -1679,6 +1679,7 @@
     const avisoTitulo = document.getElementById("avisoTitulo");
     const avisoTexto = document.getElementById("avisoTexto");
     document.getElementById("avisoCerrar").addEventListener("click", function () {
+      if (etapa === "confirmando") { cancelarConfirmacion(); return; }
       aviso.classList.remove("visible");
     });
 
@@ -1689,12 +1690,34 @@
       avisoTexto.textContent = texto;
     }
 
-    // "libre" → "guardando" → "lista". → sólo funciona en "lista": si se
-    // navegara mientras toBlob o la transacción siguen en curso, la captura
-    // se perdería.
+    // "libre" → "confirmando" → "guardando" → "lista". → sólo funciona en
+    // "lista": si se navegara mientras toBlob o la transacción siguen en
+    // curso, la captura se perdería.
+    //
+    // La captura es definitiva, así que la barra espaciadora pide
+    // confirmación: la primera pulsación sólo muestra el aviso, y hay que
+    // volver a pulsarla antes de CONFIRMAR_MS. Mientras tanto la página sigue
+    // viva: si no se confirma, el aviso se va y no pasó nada.
+    const CONFIRMAR_MS = 4000;
     let etapa = "libre";
+    let temporizadorConfirmar = 0;
+
+    function pedirConfirmacion() {
+      etapa = "confirmando";
+      mostrarAviso("info", "¿Capturar la composición?",
+        "Pulsa otra vez la barra espaciadora para confirmar.\nLa captura es definitiva: después ya no se puede seguir dibujando.");
+      temporizadorConfirmar = setTimeout(cancelarConfirmacion, CONFIRMAR_MS);
+    }
+
+    function cancelarConfirmacion() {
+      if (etapa !== "confirmando") return;
+      clearTimeout(temporizadorConfirmar);
+      etapa = "libre";
+      aviso.classList.remove("visible");
+    }
 
     function capturar() {
+      clearTimeout(temporizadorConfirmar);
       etapa = "guardando";
       op.congelar();
       mostrarAviso("info", "Capturando la composición…", "");
@@ -1728,15 +1751,21 @@
     window.addEventListener("keydown", function (e) {
       if (e.code === "Space" || e.key === " ") {
         e.preventDefault();          // sin esto la barra scrollea o pulsa el botón con foco
-        if (etapa === "libre") capturar();
+        // Sin e.repeat: mantener la barra apretada no puede confirmar sola.
+        if (e.repeat) return;
+        if (etapa === "libre") pedirConfirmacion();
+        else if (etapa === "confirmando") capturar();
         return;
       }
+      if (e.key === "Escape") { cancelarConfirmacion(); return; }
       // Las flechas y el Retroceso son de los sliders y selects mientras
       // tengan el foco.
       const tag = e.target && e.target.tagName;
       if (tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA") return;
       if (e.key === "Backspace") {
         e.preventDefault();
+        // Borrar durante la confirmación la cancela: se sigue dibujando.
+        cancelarConfirmacion();
         if (etapa === "libre" && !e.repeat) op.limpiar();
       } else if (e.key === "ArrowRight") {
         if (etapa === "lista") location.href = op.siguiente;

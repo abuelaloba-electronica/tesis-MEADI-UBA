@@ -36,8 +36,8 @@ sin romper nada.
 **La experiencia completa** vive en `entorno-digital/experiencia/`:
 `experiencia.html` son las pantallas de texto (0–4, 6, 8 y 10, ← →), y las pantallas
 5, 7 y 9 son copias `_experiencia` de las tres páginas activas (sus
-instrucciones están en la pantalla de texto anterior: 4, 6 y 8), con Retroceso para borrar, barra espaciadora para capturar
-(definitiva: PNG transparente + lista de `elementos` en IndexedDB) y → para seguir.
+instrucciones están en la pantalla de texto anterior: 4, 6 y 8), con Retroceso para borrar, barra espaciadora dos veces para capturar
+(la primera pide confirmación; definitiva: PNG transparente + lista de `elementos` en IndexedDB) y → para seguir.
 La pantalla 11, `composicion.html`, vuelca los `elementos` de las tres capturas
 en una sola escena y los redibuja en vector (EMG abajo, guante, bandada
 arriba), y ya permite seleccionar (con clic o con un marco), mover,

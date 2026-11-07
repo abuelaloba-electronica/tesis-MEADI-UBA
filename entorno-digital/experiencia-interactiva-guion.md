@@ -40,7 +40,7 @@ Mueve tu mano derecha en diferentes direcciones.
 
 Explora los movimientos de tu mano y lo que traduce la pantalla.
 
-Captura la composición gráfica pulsando la barra espaciadora.
+Captura la composición gráfica pulsando dos veces la barra espaciadora.
 
 Para borrar todo e iniciar nuevamente pulsa la tecla Retroceso.
 
@@ -62,7 +62,7 @@ Presiona con tu dedo índice de la mano derecha el sensor ubicado en tu pecho.
 
 Explora las huellas de tus dedos, los colores, el sonido.
 
-Captura la composición gráfica pulsando la barra espaciadora.
+Captura la composición gráfica pulsando dos veces la barra espaciadora.
 
 Para borrar todo e iniciar nuevamente pulsa la tecla Retroceso.
 
@@ -82,7 +82,7 @@ Realiza movimientos que involucren el músculo de la pantorrilla.
 
 Explora tu esfuerzo muscular a través de la traducción que ves en la pantalla.
 
-Captura la composición gráfica pulsando la barra espaciadora.
+Captura la composición gráfica pulsando dos veces la barra espaciadora.
 
 Para borrar todo e iniciar nuevamente pulsa la tecla Retroceso.
 
