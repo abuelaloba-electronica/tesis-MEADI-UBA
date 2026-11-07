@@ -40,7 +40,8 @@ instrucciones están en la pantalla de texto anterior: 4, 6 y 8), con Retroceso 
 (definitiva: PNG transparente + lista de `elementos` en IndexedDB) y → para seguir.
 La pantalla 11, `composicion.html`, vuelca los `elementos` de las tres capturas
 en una sola escena y los redibuja en vector (EMG abajo, guante, bandada
-arriba), y ya permite seleccionar, mover, eliminar y deshacer: es el editor
+arriba), y ya permite seleccionar (con clic o con un marco), mover,
+agrandar (no los puntos de la bandada), copiar y pegar, eliminar y deshacer: es el editor
 de `prototipos/propuesta_composicion_editable.md`, que se construye por etapas;
 ahí Inicio borra las capturas y vuelve a la 0, V alterna con los PNG
 originales para diagnóstico y `composicion.html#demo` arma una escena

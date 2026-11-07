@@ -63,23 +63,27 @@
   //     elementos: [...], version, fecha }
   // con clave "bandada", "guante" o "emg".
   //
-  // v2, etapa 1 (ver prototipos/cambios_experiencia_composicion_v2.md): ya
-  // no se apilan los PNG. Los `elementos` de las tres capturas se vuelcan en
-  // una sola lista ordenada, la escena, y se redibujan en vector en un único
-  // canvas. Es la base para que en las etapas siguientes cada elemento se
-  // pueda seleccionar y modificar, venga del dispositivo que venga.
-  //
-  // Etapa 2: seleccionar, mover, eliminar, deshacer.
+  // v2 (ver prototipos/cambios_experiencia_composicion_v2.md): los
+  // `elementos` de las tres capturas se vuelcan en una sola lista ordenada,
+  // la escena, y se redibujan en vector en un único canvas, donde cada uno
+  // se puede seleccionar y modificar venga del dispositivo que venga.
   //
   // Mouse:
-  //   clic          selecciona el elemento de más arriba bajo el puntero
-  //   Mayús+clic    lo suma a la selección o lo quita
-  //   clic al vacío deselecciona
-  //   arrastrar     mueve la selección
+  //   clic                  selecciona el elemento de más arriba bajo el puntero
+  //   Mayús+clic            lo suma a la selección o lo quita
+  //   arrastrar             mueve la selección
+  //   arrastrar en el vacío marco: selecciona todo lo que toca, aunque esté
+  //                         debajo de otros (con Mayús, lo suma)
+  //   clic al vacío         deselecciona
+  //   tirador de la esquina o rueda
+  //                         agranda o achica la selección. Los anillos, discos y
+  //                         cuadriláteros cambian de tamaño; los puntos de la
+  //                         bandada no: sólo se separan o se juntan.
   // Teclas:
-  //   Supr, Retroceso    elimina la selección
-  //   Ctrl+Z             deshace; Ctrl+Mayús+Z o Ctrl+Y rehace
-  //   Esc                deselecciona
+  //   Ctrl+C / Ctrl+V       copia la selección / la pega desplazada, encima
+  //   Supr, Retroceso       elimina la selección
+  //   Ctrl+Z                deshace; Ctrl+Mayús+Z o Ctrl+Y rehace
+  //   Esc                   deselecciona
   //   ←       vuelve a experiencia.html#10
   //   Inicio  (operador) borra las capturas y vuelve a la pantalla 0
   //   V       diagnóstico: alterna entre la escena en vector y los PNG
@@ -91,6 +95,15 @@
   // composicion.html#demo arma una escena sintética con los cuatro tipos de
   // elemento, sin leer ni borrar la base: sirve para trabajar el editor sin
   // recorrer las tres páginas con el hardware.
+  //
+  // El script va en capas, de la más pura a la más atada al DOM; cada una
+  // usa sólo las de arriba:
+  //   modelo   geometría · tipos · construcción · permisos · operaciones
+  //            (funciones sobre listas de elementos, sin DOM ni estado)
+  //   editor   historial · selección · portapapeles · comandos
+  //   vista    dibujo de la escena y de las marcas de edición
+  //   entrada  gestos de puntero, rueda y teclado
+  //   datos    IndexedDB, demo y arranque
   // ---------------------------------------------------------------
 
   // Orden de volcado, de abajo hacia arriba: lo grande y translúcido (los
@@ -100,6 +113,21 @@
   const NOMBRES = { emg: "dispositivo tres", guante: "dispositivo dos", bandada: "dispositivo uno" };
   const DEMO = location.hash === "#demo";
   const TAU = Math.PI * 2;
+
+  // Tolerancias de la prueba de impacto, en px de pantalla para que no
+  // dependan del encaje.
+  const TOL_PUNTO_PX = 8;          // radio mínimo para tocar un punto de la bandada
+  const TOL_BORDE_PX = 3;          // margen para discos y trazos de anillos
+  const TOL_TIRADOR_PX = 8;        // medio lado del área que agarra el tirador
+
+  // Edición.
+  const ESCALA_MIN = 0.2;          // respecto del tamaño capturado
+  const ESCALA_MAX = 8;
+  const PASO_PEGADO = 16;          // px del marco que se corre cada pegado
+  const HISTORIAL_MAX = 50;
+  const UMBRAL_ARRASTRE_PX = 3;    // por debajo, fue un clic y no un arrastre
+  const RUEDA_K = 0.0015;          // factor de escala por px de rueda: exp(-k·Δ)
+  const RUEDA_PAUSA_MS = 350;      // una ráfaga de rueda es un solo paso de deshacer
 
   const DPR = Math.max(1, window.devicePixelRatio || 1);
   const lienzo = document.getElementById("escena");
@@ -119,10 +147,9 @@
   let escena = null;
   let vista = "vector";             // "vector" | "png"
   let pieBase = "11 / 11  ·  ←";
-  let proximoId = 1;
 
   // ===============================================================
-  // Construcción de la escena
+  // MODELO · Geometría
   // ===============================================================
 
   // Encaje sin deformar (contain) de un rectángulo de origen en uno de
@@ -139,63 +166,257 @@
     return true;
   }
 
+  function acotar(v, min, max) { return Math.min(max, Math.max(min, v)); }
+
+  function propio(obj, clave) { return Object.prototype.hasOwnProperty.call(obj, clave); }
+
+  function copiaProfunda(v) { return JSON.parse(JSON.stringify(v)); }
+
+  // Los rectángulos son siempre { x0, y0, x1, y1 } con x0 <= x1, y0 <= y1.
+  function rectEntre(a, b) {
+    return { x0: Math.min(a.x, b.x), y0: Math.min(a.y, b.y),
+             x1: Math.max(a.x, b.x), y1: Math.max(a.y, b.y) };
+  }
+
+  function unirRects(rects) {
+    if (!rects.length) return null;
+    const u = { x0: Infinity, y0: Infinity, x1: -Infinity, y1: -Infinity };
+    for (const r of rects) {
+      u.x0 = Math.min(u.x0, r.x0); u.y0 = Math.min(u.y0, r.y0);
+      u.x1 = Math.max(u.x1, r.x1); u.y1 = Math.max(u.y1, r.y1);
+    }
+    return u;
+  }
+
+  function centroDe(r) { return { x: (r.x0 + r.x1) / 2, y: (r.y0 + r.y1) / 2 }; }
+
+  function dentroDeRect(x, y, r) { return x >= r.x0 && x <= r.x1 && y >= r.y0 && y <= r.y1; }
+
+  // Distancia de (x, y) al punto más cercano y al más lejano del rectángulo.
+  function distanciaMinARect(x, y, r) {
+    return Math.hypot(Math.max(r.x0 - x, 0, x - r.x1), Math.max(r.y0 - y, 0, y - r.y1));
+  }
+  function distanciaMaxARect(x, y, r) {
+    return Math.hypot(Math.max(x - r.x0, r.x1 - x), Math.max(y - r.y0, r.y1 - y));
+  }
+
+  function puntoEnPoligono(x, y, pts) {
+    let dentro = false;
+    for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+      const xi = pts[i][0], yi = pts[i][1], xj = pts[j][0], yj = pts[j][1];
+      if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) dentro = !dentro;
+    }
+    return dentro;
+  }
+
+  function orientacion(a, b, c) {
+    return (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
+  }
+
+  function segmentosSeCortan(a, b, c, d) {
+    return (orientacion(a, b, c) > 0) !== (orientacion(a, b, d) > 0) &&
+           (orientacion(c, d, a) > 0) !== (orientacion(c, d, b) > 0);
+  }
+
+  // Un polígono (no necesariamente convexo) y un rectángulo se tocan si un
+  // vértice de uno cae dentro del otro o si dos lados se cruzan.
+  function poligonoTocaRect(pts, r) {
+    for (const p of pts) if (dentroDeRect(p[0], p[1], r)) return true;
+    const esq = [[r.x0, r.y0], [r.x1, r.y0], [r.x1, r.y1], [r.x0, r.y1]];
+    for (const q of esq) if (puntoEnPoligono(q[0], q[1], pts)) return true;
+    for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+      for (let k = 0; k < 4; k++) {
+        if (segmentosSeCortan(pts[j], pts[i], esq[k], esq[(k + 1) % 4])) return true;
+      }
+    }
+    return false;
+  }
+
+  // ===============================================================
+  // MODELO · Tipos de elemento
+  //
+  // Elemento de escena, con forma común a todos los tipos: un centro (x, y),
+  // una escala (lo que editan las operaciones), la geometría relativa al
+  // centro en `forma` y el aspecto en `estilo`. Mover y escalar son la misma
+  // cuenta para cualquier tipo: translate(x, y) · scale(escala).
+  //
+  // Cada tipo es una estrategia con la misma interfaz:
+  //   desdeCaptura(e, origen, f)  elemento de escena desde lo que guardó la
+  //                               captura, encajado con f; null si está roto
+  //   dibujar(c, el, recursos)    en coordenadas locales (centro en el
+  //                               origen, sin escala)
+  //   caja(el)                    rectángulo que ocupa, en el marco
+  //   toca(el, mx, my, px)        si (mx, my) lo toca; px es cuánto mide un px
+  //                               de pantalla en el marco
+  //   tocaRect(el, r)             si cruza el rectángulo r
+  // Nada fuera de esta sección pregunta por un tipo concreto: un tipo nuevo
+  // es una entrada en TIPOS y su fila en PERMITIDAS.
+  // ===============================================================
+  let proximoId = 1;
+  function nuevoId() { return proximoId++; }
+
+  function nuevoElemento(origen, tipo, x, y, forma, estilo) {
+    return { id: nuevoId(), origen: origen, tipo: tipo, x: x, y: y, escala: 1,
+             forma: forma, estilo: estilo };
+  }
+
   function alphaDe(e) {
     return finito(e.alpha) ? Math.max(0, Math.min(1, e.alpha)) : 1;
   }
 
-  // Elemento de escena con forma común a todos los tipos: un centro (x, y),
-  // una escala (lo que van a editar las operaciones), la geometría relativa
-  // al centro en `forma` y el aspecto en `estilo`. Mover y escalar son la
-  // misma cuenta para cualquier tipo: translate(x, y) · scale(escala).
-  function nuevoElemento(origen, tipo, x, y, forma, estilo) {
-    return { id: proximoId++, origen: origen, tipo: tipo, x: x, y: y, escala: 1,
-             forma: forma, estilo: estilo };
+  function estiloDe(e) {
+    return { color: e.color || "#000", alpha: alphaDe(e), modo: e.modo || null };
   }
 
-  // Convierte un elemento tal como lo guardó la captura (px CSS de la
-  // pantalla en que se capturó) a elemento de escena, llevándolo al marco
-  // con el encaje f. Un tipo desconocido o un dato roto devuelve null y el
-  // elemento se ignora en silencio, como las líneas serie que no se
-  // reconocen.
-  function convertirElemento(e, origen, f) {
-    if (!e || typeof e !== "object") return null;
-    const X = function (x) { return f.ox + x * f.k; };
-    const Y = function (y) { return f.oy + y * f.k; };
-    switch (e.tipo) {
-      case "punto":
+  function radioDe(el) { return el.forma.r * el.escala; }
+
+  function cajaCircular(el, R) {
+    return { x0: el.x - R, y0: el.y - R, x1: el.x + R, y1: el.y + R };
+  }
+
+  function verticesEnMarco(el) {
+    const s = el.escala;
+    return el.forma.puntos.map(function (p) { return [el.x + p[0] * s, el.y + p[1] * s]; });
+  }
+
+  // Punto de la bandada y disco del FSR: círculos rellenos que sólo difieren
+  // en cuánto margen dan para tocarlos.
+  function tipoCirculo(nombre, radioMinPx, margenPx) {
+    return {
+      desdeCaptura: function (e, origen, f) {
         if (!finito(e.x, e.y, e.r)) return null;
-        return nuevoElemento(origen, "punto", X(e.x), Y(e.y),
-          { r: e.r * f.k },
-          { color: e.color || "#000", alpha: alphaDe(e) });
-      case "disco":
+        return nuevoElemento(origen, nombre, f.ox + e.x * f.k, f.oy + e.y * f.k,
+          { r: e.r * f.k }, estiloDe(e));
+      },
+      dibujar: function (c, el) {
+        c.beginPath();
+        c.arc(0, 0, el.forma.r, 0, TAU);
+        c.fillStyle = el.estilo.color;
+        c.fill();
+      },
+      caja: function (el) { return cajaCircular(el, radioDe(el)); },
+      toca: function (el, mx, my, px) {
+        return Math.hypot(mx - el.x, my - el.y) <= Math.max(radioDe(el), radioMinPx * px) + margenPx * px;
+      },
+      tocaRect: function (el, r) { return distanciaMinARect(el.x, el.y, r) <= radioDe(el); }
+    };
+  }
+
+  const TIPOS = {
+    punto: tipoCirculo("punto", TOL_PUNTO_PX, 0),
+    disco: tipoCirculo("disco", 0, TOL_BORDE_PX),
+
+    // Sólo el trazo intercepta, no el hueco: un anillo grande no bloquea lo
+    // que rodea, ni lo atrapa un marco trazado adentro de él.
+    anillo: {
+      desdeCaptura: function (e, origen, f) {
         if (!finito(e.x, e.y, e.r)) return null;
-        return nuevoElemento(origen, "disco", X(e.x), Y(e.y),
-          { r: e.r * f.k },
-          { color: e.color || "#000", alpha: alphaDe(e), modo: e.modo || null });
-      case "anillo":
-        if (!finito(e.x, e.y, e.r)) return null;
-        return nuevoElemento(origen, "anillo", X(e.x), Y(e.y),
-          { r: e.r * f.k, grosor: (finito(e.grosor) ? e.grosor : 1) * f.k },
-          { color: e.color || "#000", alpha: alphaDe(e), modo: e.modo || null });
-      case "cuadrilatero": {
+        return nuevoElemento(origen, "anillo", f.ox + e.x * f.k, f.oy + e.y * f.k,
+          { r: e.r * f.k, grosor: (finito(e.grosor) ? e.grosor : 1) * f.k }, estiloDe(e));
+      },
+      dibujar: function (c, el) {
+        c.beginPath();
+        c.arc(0, 0, el.forma.r, 0, TAU);
+        c.lineWidth = el.forma.grosor;
+        c.strokeStyle = el.estilo.color;
+        c.stroke();
+      },
+      caja: function (el) {
+        return cajaCircular(el, (el.forma.r + el.forma.grosor / 2) * el.escala);
+      },
+      toca: function (el, mx, my, px) {
+        const s = el.escala;
+        return Math.abs(Math.hypot(mx - el.x, my - el.y) - el.forma.r * s) <=
+          el.forma.grosor * s / 2 + TOL_BORDE_PX * px;
+      },
+      // Las distancias del centro a los puntos del rectángulo cubren un
+      // intervalo [min, max]; el rectángulo cruza la corona si ese intervalo
+      // se superpone con [radio interior, radio exterior].
+      tocaRect: function (el, r) {
+        const s = el.escala, medio = el.forma.grosor / 2;
+        return distanciaMinARect(el.x, el.y, r) <= (el.forma.r + medio) * s &&
+               distanciaMaxARect(el.x, el.y, r) >= Math.max(0, el.forma.r - medio) * s;
+      }
+    },
+
+    cuadrilatero: {
+      desdeCaptura: function (e, origen, f) {
         if (!Array.isArray(e.puntos) || e.puntos.length < 3) return null;
         const pts = [];
         for (const p of e.puntos) {
           if (!Array.isArray(p) || !finito(p[0], p[1])) return null;
-          pts.push([X(p[0]), Y(p[1])]);
+          pts.push([f.ox + p[0] * f.k, f.oy + p[1] * f.k]);
         }
-        // Centro: el promedio de los vértices. Es el punto respecto del cual
-        // se va a escalar, y para un cuadrilátero convexo cae adentro.
+        // Centro: el promedio de los vértices; para un cuadrilátero convexo
+        // cae adentro.
         let cx = 0, cy = 0;
         for (const p of pts) { cx += p[0]; cy += p[1]; }
         cx /= pts.length; cy /= pts.length;
+        const est = estiloDe(e);
         return nuevoElemento(origen, "cuadrilatero", cx, cy,
           { puntos: pts.map(function (p) { return [p[0] - cx, p[1] - cy]; }) },
-          { color: e.color || "#000", alpha: alphaDe(e) });
-      }
-      default:
-        return null;
+          { color: est.color, alpha: est.alpha });
+      },
+      dibujar: function (c, el) {
+        const pts = el.forma.puntos;
+        c.beginPath();
+        c.moveTo(pts[0][0], pts[0][1]);
+        for (let i = 1; i < pts.length; i++) c.lineTo(pts[i][0], pts[i][1]);
+        c.closePath();
+        c.fillStyle = el.estilo.color;
+        c.fill();
+      },
+      caja: function (el) {
+        const v = verticesEnMarco(el);
+        return unirRects(v.map(function (p) { return { x0: p[0], y0: p[1], x1: p[0], y1: p[1] }; }));
+      },
+      toca: function (el, mx, my) {
+        return puntoEnPoligono((mx - el.x) / el.escala, (my - el.y) / el.escala, el.forma.puntos);
+      },
+      tocaRect: function (el, r) { return poligonoTocaRect(verticesEnMarco(el), r); }
+    },
+
+    // Respaldo para capturas anteriores a `elementos`: el PNG entero. No se
+    // construye desde un elemento de captura, sino con imagenDeRespaldo().
+    imagen: {
+      desdeCaptura: null,
+      dibujar: function (c, el, recursos) {
+        const bmp = recursos.bitmap(el.origen);
+        if (!bmp) return;
+        const w = el.forma.ancho, h = el.forma.alto;
+        c.imageSmoothingQuality = "high";
+        c.drawImage(bmp, -w / 2, -h / 2, w, h);
+      },
+      caja: function (el) {
+        const w = el.forma.ancho * el.escala / 2, h = el.forma.alto * el.escala / 2;
+        return { x0: el.x - w, y0: el.y - h, x1: el.x + w, y1: el.y + h };
+      },
+      toca: function () { return false; },
+      tocaRect: function () { return false; }
     }
+  };
+
+  function cajaDe(el) { return TIPOS[el.tipo].caja(el); }
+  function cajaDeGrupo(els) { return unirRects(els.map(cajaDe)); }
+
+  // ===============================================================
+  // MODELO · Construcción de la escena
+  // ===============================================================
+
+  // Convierte un elemento tal como lo guardó la captura a elemento de
+  // escena. Un tipo desconocido o un dato roto devuelve null y el elemento
+  // se ignora en silencio, como las líneas serie que no se reconocen.
+  function convertirElemento(e, origen, f) {
+    if (!e || typeof e !== "object" || !propio(TIPOS, e.tipo)) return null;
+    const desde = TIPOS[e.tipo].desdeCaptura;
+    return desde ? desde(e, origen, f) : null;
+  }
+
+  function imagenDeRespaldo(origen, m, f) {
+    return nuevoElemento(origen, "imagen",
+      f.ox + m.ancho * f.k / 2, f.oy + m.alto * f.k / 2,
+      { ancho: m.ancho * f.k, alto: m.alto * f.k },
+      { alpha: 1 });
   }
 
   function medidasDe(c) {
@@ -226,20 +447,284 @@
           if (el) elementos.push(el);
         }
       } else if (c.bitmap) {
-        // Captura anterior a `elementos`: entra entera como una imagen. Por
-        // ahora es sólo de respaldo; no va a admitir operaciones.
-        elementos.push(nuevoElemento(clave, "imagen",
-          f.ox + m.ancho * f.k / 2, f.oy + m.alto * f.k / 2,
-          { ancho: m.ancho * f.k, alto: m.alto * f.k },
-          { alpha: 1 }));
+        elementos.push(imagenDeRespaldo(clave, m, f));
       }
     });
     return { ancho: marco.ancho, alto: marco.alto, elementos: elementos };
   }
 
   // ===============================================================
-  // Dibujo
+  // MODELO · Permisos: qué operación admite cada tipo de elemento. El resto
+  // del código sólo pregunta `permite(el, op)`, nunca por tipos concretos.
+  //
+  // Agrandar (`escalar`) vale para lo que viene del guante (anillos y
+  // discos) y de la EMG (cuadriláteros), no para los puntos de la bandada:
+  // en una selección mixta los puntos se separan o se juntan con el resto,
+  // pero conservan su radio. Un tipo sin operaciones (la `imagen` de
+  // respaldo) no se puede ni seleccionar.
   // ===============================================================
+  const PERMITIDAS = {
+    punto:        ["mover", "copiar", "eliminar"],
+    anillo:       ["mover", "escalar", "copiar", "eliminar"],
+    disco:        ["mover", "escalar", "copiar", "eliminar"],
+    cuadrilatero: ["mover", "escalar", "copiar", "eliminar"],
+    imagen:       []
+  };
+
+  function permite(el, op) {
+    return propio(PERMITIDAS, el.tipo) && PERMITIDAS[el.tipo].indexOf(op) >= 0;
+  }
+
+  function seleccionable(el) {
+    return propio(PERMITIDAS, el.tipo) && PERMITIDAS[el.tipo].length > 0;
+  }
+
+  // Los de `els` que admiten `op`. Una operación sobre una selección mixta
+  // se aplica a éstos y deja quietos a los demás.
+  function admiten(els, op) {
+    return els.filter(function (el) { return permite(el, op); });
+  }
+
+  // ===============================================================
+  // MODELO · Consultas y operaciones sobre listas de elementos. No tocan el
+  // DOM ni el estado del editor: reciben la lista (y el marco) y devuelven
+  // el resultado, o una transformación preparada que se aplica muchas veces
+  // durante un gesto, siempre desde el estado inicial.
+  // ===============================================================
+
+  // El de más arriba que se pueda seleccionar bajo (mx, my).
+  function elementoEn(elementos, mx, my, px) {
+    for (let i = elementos.length - 1; i >= 0; i--) {
+      const el = elementos[i];
+      if (seleccionable(el) && TIPOS[el.tipo].toca(el, mx, my, px)) return el;
+    }
+    return null;
+  }
+
+  // Todos los que cruzan el rectángulo, tapados o no.
+  function elementosEnRect(elementos, r) {
+    return elementos.filter(function (el) {
+      return seleccionable(el) && TIPOS[el.tipo].tocaRect(el, r);
+    });
+  }
+
+  // Dónde puede quedar el centro de un elemento: dentro del marco, para que
+  // nada se pierda fuera de la pantalla. Si ya estaba afuera (una copia
+  // fantasma de la bandada) puede volver, pero no alejarse más.
+  function limitesDelCentro(el, marco) {
+    return { x0: Math.min(0, el.x), x1: Math.max(marco.ancho, el.x),
+             y0: Math.min(0, el.y), y1: Math.max(marco.alto, el.y) };
+  }
+
+  // Traslado del grupo: aplicar(dx, dy) lleva cada elemento movible a su
+  // posición inicial + (dx, dy). Se acota el desplazamiento del grupo y no
+  // el de cada elemento, para que el grupo no se deforme contra un borde.
+  function prepararTraslado(els, marco) {
+    const movibles = admiten(els, "mover");
+    if (!movibles.length) return null;
+    let dxMin = -Infinity, dxMax = Infinity, dyMin = -Infinity, dyMax = Infinity;
+    for (const el of movibles) {
+      const L = limitesDelCentro(el, marco);
+      dxMin = Math.max(dxMin, L.x0 - el.x); dxMax = Math.min(dxMax, L.x1 - el.x);
+      dyMin = Math.max(dyMin, L.y0 - el.y); dyMax = Math.min(dyMax, L.y1 - el.y);
+    }
+    const inicio = movibles.map(function (el) { return { el: el, x: el.x, y: el.y }; });
+    return function aplicar(dx, dy) {
+      dx = acotar(dx, dxMin, dxMax);
+      dy = acotar(dy, dyMin, dyMax);
+      for (const o of inicio) { o.el.x = o.x + dx; o.el.y = o.y + dy; }
+    };
+  }
+
+  // Restringe el factor k para que c + d·k quede en [lo, hi]. El intervalo
+  // siempre contiene k = 1, porque la posición inicial c + d ya cumple.
+  function acotarFactorEje(rango, c, d, lo, hi) {
+    if (Math.abs(d) < 1e-9) return;
+    const a = (lo - c) / d, b = (hi - c) / d;
+    rango[0] = Math.max(rango[0], Math.min(a, b));
+    rango[1] = Math.min(rango[1], Math.max(a, b));
+  }
+
+  // Escalado del grupo respecto del centro de su caja. aplicar(k) multiplica
+  // por k la escala de lo que admite `escalar` y la distancia al centro de
+  // lo que admite `mover`; devuelve el k efectivamente aplicado, acotado
+  // para que ninguna escala salga de [ESCALA_MIN, ESCALA_MAX] y ningún
+  // centro salga del marco. null si nada en el grupo se puede escalar.
+  function prepararEscalado(els, marco) {
+    const escalables = admiten(els, "escalar");
+    if (!escalables.length) return null;
+    const pivote = centroDe(cajaDeGrupo(els));
+    const rango = [0, Infinity];
+    for (const el of escalables) {
+      rango[0] = Math.max(rango[0], Math.min(1, ESCALA_MIN / el.escala));
+      rango[1] = Math.min(rango[1], Math.max(1, ESCALA_MAX / el.escala));
+    }
+    for (const el of admiten(els, "mover")) {
+      const L = limitesDelCentro(el, marco);
+      acotarFactorEje(rango, pivote.x, el.x - pivote.x, L.x0, L.x1);
+      acotarFactorEje(rango, pivote.y, el.y - pivote.y, L.y0, L.y1);
+    }
+    const inicio = els.map(function (el) {
+      return { el: el, x: el.x, y: el.y, escala: el.escala,
+               mueve: permite(el, "mover"), crece: permite(el, "escalar") };
+    });
+    return {
+      pivote: pivote,
+      aplicar: function (k) {
+        k = acotar(k, rango[0], rango[1]);
+        for (const o of inicio) {
+          if (o.mueve) {
+            o.el.x = pivote.x + (o.x - pivote.x) * k;
+            o.el.y = pivote.y + (o.y - pivote.y) * k;
+          }
+          if (o.crece) o.el.escala = o.escala * k;
+        }
+        return k;
+      }
+    };
+  }
+
+  // Copia de lo que admite `copiar`, en su orden de apilado y sin compartir
+  // ningún objeto con la escena: lo que se edite después no la altera.
+  function copiar(els) {
+    return admiten(els, "copiar").map(copiaProfunda);
+  }
+
+  // Agrega a la escena una copia nueva de cada plantilla (con id propio y
+  // sin compartir objetos con ellas), encima de todo y corrida
+  // `desplazamiento` px en diagonal, sin sacar ningún centro del marco.
+  function pegar(elementos, plantillas, desplazamiento, marco) {
+    const nuevos = plantillas.map(function (p) {
+      const el = copiaProfunda(p);
+      el.id = nuevoId();
+      return el;
+    });
+    const trasladar = prepararTraslado(nuevos, marco);
+    if (trasladar) trasladar(desplazamiento, desplazamiento);
+    return { elementos: elementos.concat(nuevos), nuevos: nuevos };
+  }
+
+  function eliminar(elementos, ids) {
+    return elementos.filter(function (el) { return !ids.has(el.id); });
+  }
+
+  // ===============================================================
+  // EDITOR · Historial: instantáneas de la lista de elementos. Con unos
+  // cientos de elementos copiar la lista entera por paso es barato, y mucho
+  // más simple y robusto que saber invertir cada operación.
+  // ===============================================================
+  function crearHistorial(max, leer, escribir) {
+    const pasado = [], futuro = [];
+    function foto() { return copiaProfunda(leer()); }
+    function saltar(desde, hacia) {
+      if (!desde.length) return false;
+      hacia.push(foto());
+      escribir(desde.pop());
+      return true;
+    }
+    return {
+      foto: foto,
+      // `antes` es la foto tomada antes del cambio que se confirma.
+      registrar: function (antes) {
+        pasado.push(antes);
+        if (pasado.length > max) pasado.shift();
+        futuro.length = 0;
+      },
+      deshacer: function () { return saltar(pasado, futuro); },
+      rehacer: function () { return saltar(futuro, pasado); }
+    };
+  }
+
+  const historial = crearHistorial(HISTORIAL_MAX,
+    function () { return escena.elementos; },
+    function (els) { escena.elementos = els; });
+
+  // ===============================================================
+  // EDITOR · Selección: un conjunto de ids.
+  // ===============================================================
+  let seleccion = new Set();
+
+  function idsDe(els) { return new Set(els.map(function (el) { return el.id; })); }
+
+  // En orden de apilado.
+  function seleccionados() {
+    return escena.elementos.filter(function (el) { return seleccion.has(el.id); });
+  }
+
+  // Después de deshacer o eliminar, la selección sólo conserva lo que existe.
+  function depurarSeleccion() {
+    seleccion = idsDe(seleccionados());
+  }
+
+  // ===============================================================
+  // EDITOR · Portapapeles interno (no el del sistema). Guarda copias, no
+  // referencias: copiar y después mover o borrar el original no cambia lo
+  // que se pega. Cada pegado de la misma copia se corre un paso más, para
+  // que no caiga exactamente encima del anterior.
+  // ===============================================================
+  const portapapeles = { plantillas: [], pegados: 0 };
+
+  // ===============================================================
+  // EDITOR · Comandos: lo que dispara el teclado. Cada cambio discreto es un
+  // paso del historial.
+  // ===============================================================
+
+  // `cambio` modifica la escena; si devuelve false no hubo nada que cambiar
+  // y no se registra el paso.
+  function aplicarCambio(cambio) {
+    const antes = historial.foto();
+    if (cambio() === false) return;
+    historial.registrar(antes);
+    depurarSeleccion();
+    pedirDibujo();
+  }
+
+  function eliminarSeleccion() {
+    const ids = idsDe(admiten(seleccionados(), "eliminar"));
+    if (!ids.size) return;
+    aplicarCambio(function () { escena.elementos = eliminar(escena.elementos, ids); });
+  }
+
+  function copiarSeleccion() {
+    const copia = copiar(seleccionados());
+    if (!copia.length) return;
+    portapapeles.plantillas = copia;
+    portapapeles.pegados = 0;
+    pedirDibujo();
+  }
+
+  // Lo pegado queda seleccionado, listo para arrastrarlo a su lugar.
+  function pegarPortapapeles() {
+    if (!portapapeles.plantillas.length) return;
+    aplicarCambio(function () {
+      portapapeles.pegados++;
+      const r = pegar(escena.elementos, portapapeles.plantillas,
+        PASO_PEGADO * portapapeles.pegados, escena);
+      escena.elementos = r.elementos;
+      seleccion = idsDe(r.nuevos);
+    });
+  }
+
+  function deshacer() {
+    if (historial.deshacer()) { depurarSeleccion(); pedirDibujo(); }
+  }
+
+  function rehacer() {
+    if (historial.rehacer()) { depurarSeleccion(); pedirDibujo(); }
+  }
+
+  // ===============================================================
+  // VISTA · Dibujo de la escena
+  // ===============================================================
+
+  // Lo que un tipo puede necesitar de afuera para dibujarse: hoy, sólo el
+  // PNG de la `imagen` de respaldo.
+  const recursos = {
+    bitmap: function (origen) {
+      const c = capturas[origen];
+      return c ? c.bitmap : null;
+    }
+  };
 
   // Cada elemento se dibuja con su propio modo de fusión: los anillos y el
   // disco del guante multiplican sobre lo que tengan debajo, sea del guante
@@ -251,41 +736,7 @@
     if (el.escala !== 1) c.scale(el.escala, el.escala);
     c.globalAlpha = est.alpha;
     c.globalCompositeOperation = est.modo || "source-over";
-    switch (el.tipo) {
-      case "punto":
-      case "disco":
-        c.beginPath();
-        c.arc(0, 0, el.forma.r, 0, TAU);
-        c.fillStyle = est.color;
-        c.fill();
-        break;
-      case "anillo":
-        c.beginPath();
-        c.arc(0, 0, el.forma.r, 0, TAU);
-        c.lineWidth = el.forma.grosor;
-        c.strokeStyle = est.color;
-        c.stroke();
-        break;
-      case "cuadrilatero": {
-        const pts = el.forma.puntos;
-        c.beginPath();
-        c.moveTo(pts[0][0], pts[0][1]);
-        for (let i = 1; i < pts.length; i++) c.lineTo(pts[i][0], pts[i][1]);
-        c.closePath();
-        c.fillStyle = est.color;
-        c.fill();
-        break;
-      }
-      case "imagen": {
-        const cap = capturas[el.origen];
-        if (cap && cap.bitmap) {
-          const w = el.forma.ancho, h = el.forma.alto;
-          c.imageSmoothingQuality = "high";
-          c.drawImage(cap.bitmap, -w / 2, -h / 2, w, h);
-        }
-        break;
-      }
-    }
+    TIPOS[el.tipo].dibujar(c, el, recursos);
     c.restore();
   }
 
@@ -332,7 +783,7 @@
       dibujarPNG(g);
     } else {
       dibujarEscena(g);
-      pintarSeleccion(f);
+      pintarMarcasDeEdicion(f);
     }
   }
 
@@ -349,215 +800,191 @@
     });
   }
 
+  function plural(n, uno, varios) { return n + " " + (n === 1 ? uno : varios); }
+
   function actualizarPie() {
-    let txt = pieBase;
-    if (DEMO) txt = "demo   ·   " + txt;
+    const partes = [];
+    if (DEMO) partes.push("demo");
     if (vista === "png") {
       const hay = CAPAS.some(function (k) { return capturas[k] && capturas[k].bitmap; });
-      txt = (hay ? "PNG originales, edición en pausa (V)" : "sin PNG para comparar (V)") +
-        "   ·   " + txt;
-    } else if (seleccion.size) {
-      txt = seleccion.size + (seleccion.size === 1 ? " seleccionado" : " seleccionados") +
-        "   ·   " + txt;
+      partes.push(hay ? "PNG originales, edición en pausa (V)" : "sin PNG para comparar (V)");
+    } else {
+      if (seleccion.size) partes.push(plural(seleccion.size, "seleccionado", "seleccionados"));
+      if (portapapeles.plantillas.length) {
+        partes.push(plural(portapapeles.plantillas.length, "copiado", "copiados"));
+      }
     }
-    pieEl.textContent = txt;
+    partes.push(pieBase);
+    pieEl.textContent = partes.join("   ·   ");
   }
 
   // ===============================================================
-  // Permisos: qué operación admite cada tipo de elemento. El código de
-  // interacción sólo pregunta `permite(el, op)`, nunca por tipos concretos.
-  // La etapa 3 suma escalar, duplicar, copiar/pegar y orden; un tipo sin
-  // operaciones (la `imagen` de respaldo) no se puede ni seleccionar.
+  // VISTA · Marcas de edición: recuadros de la selección, el tirador de
+  // escalar y lo que dibuje el gesto en curso (el marco de selección).
+  // Van en px de pantalla (grosor constante con cualquier encaje), después
+  // de la escena y nunca dentro de ella: no van a salir en la exportación.
   // ===============================================================
-  const PERMITIDAS = {
-    punto:        ["mover", "eliminar"],
-    anillo:       ["mover", "eliminar"],
-    disco:        ["mover", "eliminar"],
-    cuadrilatero: ["mover", "eliminar"],
-    imagen:       []
-  };
-
-  function permite(el, op) {
-    const p = PERMITIDAS[el.tipo];
-    return !!p && p.indexOf(op) >= 0;
-  }
-
-  function seleccionable(el) {
-    const p = PERMITIDAS[el.tipo];
-    return !!p && p.length > 0;
-  }
-
-  // ===============================================================
-  // Prueba de impacto: qué elemento hay bajo el puntero. Cada tipo intercepta
-  // sólo lo que se ve de él: un anillo responde en su trazo y no en el hueco,
-  // así un anillo grande no bloquea lo que rodea. Las tolerancias son en px
-  // de pantalla, para que no dependan del encaje.
-  // ===============================================================
-  const TOL_PUNTO_PX = 8;   // radio mínimo para tocar un punto de la bandada
-  const TOL_BORDE_PX = 3;   // margen para discos y trazos de anillos
-
-  function puntoEnPoligono(x, y, pts) {
-    let dentro = false;
-    for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
-      const xi = pts[i][0], yi = pts[i][1], xj = pts[j][0], yj = pts[j][1];
-      if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) dentro = !dentro;
-    }
-    return dentro;
-  }
-
-  // (mx, my) en coordenadas del marco; px es cuánto mide un px de pantalla
-  // en el marco.
-  function toca(el, mx, my, px) {
-    const dx = mx - el.x, dy = my - el.y, s = el.escala;
-    const d = Math.sqrt(dx * dx + dy * dy);
-    switch (el.tipo) {
-      case "punto":
-        return d <= Math.max(el.forma.r * s, TOL_PUNTO_PX * px);
-      case "disco":
-        return d <= el.forma.r * s + TOL_BORDE_PX * px;
-      case "anillo":
-        return Math.abs(d - el.forma.r * s) <= el.forma.grosor * s / 2 + TOL_BORDE_PX * px;
-      case "cuadrilatero":
-        return puntoEnPoligono(dx / s, dy / s, el.forma.puntos);
-      default:
-        return false;
-    }
-  }
-
-  // El de más arriba que se pueda seleccionar: la escena se recorre de atrás
-  // hacia adelante.
-  function elementoEn(mx, my, px) {
-    const els = escena.elementos;
-    for (let i = els.length - 1; i >= 0; i--) {
-      if (seleccionable(els[i]) && toca(els[i], mx, my, px)) return els[i];
-    }
-    return null;
-  }
-
-  // Caja que ocupa el elemento, en el marco.
-  function caja(el) {
-    const s = el.escala;
-    let rx, ry, x0, y0, x1, y1;
-    switch (el.tipo) {
-      case "punto":
-      case "disco":
-        rx = ry = el.forma.r * s;
-        return { x0: el.x - rx, y0: el.y - ry, x1: el.x + rx, y1: el.y + ry };
-      case "anillo":
-        rx = ry = (el.forma.r + el.forma.grosor / 2) * s;
-        return { x0: el.x - rx, y0: el.y - ry, x1: el.x + rx, y1: el.y + ry };
-      case "cuadrilatero":
-        x0 = y0 = Infinity; x1 = y1 = -Infinity;
-        for (const p of el.forma.puntos) {
-          x0 = Math.min(x0, p[0]); x1 = Math.max(x1, p[0]);
-          y0 = Math.min(y0, p[1]); y1 = Math.max(y1, p[1]);
-        }
-        return { x0: el.x + x0 * s, y0: el.y + y0 * s, x1: el.x + x1 * s, y1: el.y + y1 * s };
-      default:
-        return { x0: el.x, y0: el.y, x1: el.x, y1: el.y };
-    }
-  }
-
-  // ===============================================================
-  // Selección: un conjunto de ids. Se marca con un recuadro alrededor de
-  // cada elemento, dibujado en px de pantalla (grosor constante con
-  // cualquier encaje) y nunca dentro de la escena.
-  // ===============================================================
-  let seleccion = new Set();
-
-  function seleccionados() {
-    return escena.elementos.filter(function (el) { return seleccion.has(el.id); });
-  }
-
-  // Después de deshacer o eliminar, la selección sólo conserva lo que existe.
-  function depurarSeleccion() {
-    const ids = new Set(escena.elementos.map(function (el) { return el.id; }));
-    seleccion = new Set(Array.from(seleccion).filter(function (id) { return ids.has(id); }));
-  }
-
   const MARGEN_SEL_PX = 4;
   const LADO_MIN_SEL_PX = 12;
+  const LADO_TIRADOR_PX = 9;
 
-  function pintarSeleccion(f) {
-    if (!seleccion.size) return;
+  function rectEnPantalla(r, f) {
+    return { x0: f.ox + r.x0 * f.k, y0: f.oy + r.y0 * f.k,
+             x1: f.ox + r.x1 * f.k, y1: f.oy + r.y1 * f.k };
+  }
+
+  // Caja de selección en pantalla: con margen y un lado mínimo, para que se
+  // vea alrededor de un punto de 2 px.
+  function recuadroEnPantalla(r, f) {
+    const b = rectEnPantalla(r, f);
+    b.x0 -= MARGEN_SEL_PX; b.y0 -= MARGEN_SEL_PX;
+    b.x1 += MARGEN_SEL_PX; b.y1 += MARGEN_SEL_PX;
+    if (b.x1 - b.x0 < LADO_MIN_SEL_PX) {
+      const c = (b.x0 + b.x1) / 2; b.x0 = c - LADO_MIN_SEL_PX / 2; b.x1 = c + LADO_MIN_SEL_PX / 2;
+    }
+    if (b.y1 - b.y0 < LADO_MIN_SEL_PX) {
+      const c = (b.y0 + b.y1) / 2; b.y0 = c - LADO_MIN_SEL_PX / 2; b.y1 = c + LADO_MIN_SEL_PX / 2;
+    }
+    return b;
+  }
+
+  // El tirador va en la esquina inferior derecha del recuadro de toda la
+  // selección, y sólo si algo de ella admite escalar. Es la única fuente de
+  // su posición: la usan tanto el dibujo como la prueba de impacto.
+  function tiradorDe(sel, f) {
+    if (!admiten(sel, "escalar").length) return null;
+    const b = recuadroEnPantalla(cajaDeGrupo(sel), f);
+    return { x: b.x1, y: b.y1 };
+  }
+
+  function tocaTirador(clientX, clientY) {
+    const t = tiradorDe(seleccionados(), encajeVentana());
+    return !!t && Math.abs(clientX - t.x) <= TOL_TIRADOR_PX && Math.abs(clientY - t.y) <= TOL_TIRADOR_PX;
+  }
+
+  // Blanco por debajo y negro encima: se lee sobre cualquier color.
+  function trazarRecuadro(c, b, punteado) {
+    c.setLineDash([]);
+    c.lineWidth = 3;
+    c.strokeStyle = "rgba(255,255,255,0.85)";
+    c.strokeRect(b.x0, b.y0, b.x1 - b.x0, b.y1 - b.y0);
+    c.setLineDash(punteado ? [4, 3] : []);
+    c.lineWidth = 1;
+    c.strokeStyle = "#111";
+    c.strokeRect(b.x0, b.y0, b.x1 - b.x0, b.y1 - b.y0);
+  }
+
+  function pintarSeleccion(c, f) {
+    const sel = seleccionados();
+    if (!sel.length) return;
+    for (const el of sel) trazarRecuadro(c, recuadroEnPantalla(cajaDe(el), f), true);
+    const t = tiradorDe(sel, f);
+    if (!t) return;
+    // Con varios elementos, el recuadro conjunto muestra a qué pertenece el
+    // tirador y respecto de qué centro se escala.
+    if (sel.length > 1) trazarRecuadro(c, recuadroEnPantalla(cajaDeGrupo(sel), f), false);
+    const l = LADO_TIRADOR_PX;
+    c.setLineDash([]);
+    c.fillStyle = "#fff";
+    c.fillRect(t.x - l / 2, t.y - l / 2, l, l);
+    c.lineWidth = 1;
+    c.strokeStyle = "#111";
+    c.strokeRect(t.x - l / 2, t.y - l / 2, l, l);
+  }
+
+  function pintarMarcoDeSeleccion(c, r, f) {
+    const b = rectEnPantalla(r, f);
+    c.fillStyle = "rgba(17,17,17,0.06)";
+    c.fillRect(b.x0, b.y0, b.x1 - b.x0, b.y1 - b.y0);
+    trazarRecuadro(c, b, true);
+  }
+
+  function pintarMarcasDeEdicion(f) {
     g.save();
     g.setTransform(DPR, 0, 0, DPR, 0, 0);
     g.globalAlpha = 1;
     g.globalCompositeOperation = "source-over";
-    for (const el of seleccionados()) {
-      const b = caja(el);
-      let x0 = f.ox + b.x0 * f.k - MARGEN_SEL_PX, x1 = f.ox + b.x1 * f.k + MARGEN_SEL_PX;
-      let y0 = f.oy + b.y0 * f.k - MARGEN_SEL_PX, y1 = f.oy + b.y1 * f.k + MARGEN_SEL_PX;
-      if (x1 - x0 < LADO_MIN_SEL_PX) { const c = (x0 + x1) / 2; x0 = c - LADO_MIN_SEL_PX / 2; x1 = c + LADO_MIN_SEL_PX / 2; }
-      if (y1 - y0 < LADO_MIN_SEL_PX) { const c = (y0 + y1) / 2; y0 = c - LADO_MIN_SEL_PX / 2; y1 = c + LADO_MIN_SEL_PX / 2; }
-      // Blanco por debajo y negro punteado encima: se lee sobre cualquier
-      // color de la escena.
-      g.setLineDash([]);
-      g.lineWidth = 3;
-      g.strokeStyle = "rgba(255,255,255,0.85)";
-      g.strokeRect(x0, y0, x1 - x0, y1 - y0);
-      g.setLineDash([4, 3]);
-      g.lineWidth = 1;
-      g.strokeStyle = "#111";
-      g.strokeRect(x0, y0, x1 - x0, y1 - y0);
-    }
+    pintarSeleccion(g, f);
+    if (gesto && gesto.h.pintar) gesto.h.pintar(g, f);
     g.restore();
   }
 
   // ===============================================================
-  // Historial: instantáneas de la lista de elementos. Con unos cientos de
-  // elementos copiar la lista entera por paso es barato, y mucho más simple
-  // que saber invertir cada operación.
+  // ENTRADA · Gestos de puntero. Al apretar se elige uno según lo que hay
+  // bajo el puntero (tirador, elemento o vacío), y desde ahí el despachador
+  // de eventos sólo le pasa el movimiento, sin saber cuál es. Cada gesto es
+  // un objeto con
+  //   mover(m)         el puntero se movió (m en coordenadas del marco)
+  //   terminar(movio)  se soltó; movio dice si pasó el umbral de arrastre
+  //   pintar(c, f)     opcional: lo que dibuja encima de la escena
+  // Agregar un gesto nuevo (rotar, por ejemplo) es una función más y una
+  // línea en iniciarGesto.
   // ===============================================================
-  const HISTORIAL_MAX = 50;
-  const pasado = [], futuro = [];
 
-  function instantanea() {
-    return JSON.parse(JSON.stringify(escena.elementos));
+  // Arrastrar la selección.
+  function gestoMover(m0) {
+    const antes = historial.foto();
+    const trasladar = prepararTraslado(seleccionados(), escena);
+    return {
+      mover: function (m) { if (trasladar) trasladar(m.x - m0.x, m.y - m0.y); },
+      terminar: function (movio) { if (movio && trasladar) historial.registrar(antes); }
+    };
   }
 
-  // `antes` es la instantánea tomada antes del cambio que se confirma.
-  function confirmarCambio(antes) {
-    pasado.push(antes);
-    if (pasado.length > HISTORIAL_MAX) pasado.shift();
-    futuro.length = 0;
+  // Arrastrar el tirador: el factor es cuánto se alejó el puntero del centro
+  // de la selección respecto de donde lo agarró, así que no salta al
+  // empezar aunque no se lo haya tomado justo en la esquina.
+  function gestoEscalar(m0) {
+    const antes = historial.foto();
+    const escalado = prepararEscalado(seleccionados(), escena);
+    const p = escalado && escalado.pivote;
+    const d0 = p ? Math.hypot(m0.x - p.x, m0.y - p.y) : 0;
+    return {
+      mover: function (m) {
+        if (d0 > 0) escalado.aplicar(Math.hypot(m.x - p.x, m.y - p.y) / d0);
+      },
+      terminar: function (movio) { if (movio && d0 > 0) historial.registrar(antes); }
+    };
   }
 
-  function deshacer() {
-    if (!pasado.length) return;
-    futuro.push(instantanea());
-    escena.elementos = pasado.pop();
-    depurarSeleccion();
-    pedirDibujo();
+  // Marco de selección: elige todo lo que toca, incluso lo tapado. Con
+  // Mayús suma a lo que ya estaba seleccionado. La selección se actualiza
+  // mientras se arrastra, para ver qué va a quedar adentro.
+  function gestoMarco(m0, sumar) {
+    const base = sumar ? new Set(seleccion) : new Set();
+    let rect = null;
+    seleccion = new Set(base);
+    return {
+      mover: function (m) {
+        rect = rectEntre(m0, m);
+        seleccion = new Set(base);
+        for (const el of elementosEnRect(escena.elementos, rect)) seleccion.add(el.id);
+      },
+      terminar: function () { rect = null; },
+      pintar: function (c, f) { if (rect) pintarMarcoDeSeleccion(c, rect, f); }
+    };
   }
 
-  function rehacer() {
-    if (!futuro.length) return;
-    pasado.push(instantanea());
-    escena.elementos = futuro.pop();
-    depurarSeleccion();
-    pedirDibujo();
+  // Elige el gesto y, si el clic era sobre un elemento, actualiza la
+  // selección. null si el clic no empieza ningún gesto.
+  function iniciarGesto(e, m) {
+    if (tocaTirador(e.clientX, e.clientY)) return gestoEscalar(m);
+    const el = elementoEn(escena.elementos, m.x, m.y, m.px);
+    if (!el) return gestoMarco(m, e.shiftKey);
+    if (e.shiftKey) {
+      if (seleccion.has(el.id)) { seleccion.delete(el.id); return null; }
+      seleccion.add(el.id);
+    } else if (!seleccion.has(el.id)) {
+      // Un clic sobre algo ya seleccionado conserva la selección: así se
+      // arrastra un grupo entero tomándolo de cualquiera de sus elementos.
+      seleccion = new Set([el.id]);
+    }
+    return gestoMover(m);
   }
 
-  // ===============================================================
-  // Operaciones de la etapa 2
-  // ===============================================================
-  function eliminarSeleccion() {
-    const borrar = seleccionados().filter(function (el) { return permite(el, "eliminar"); });
-    if (!borrar.length) return;
-    const antes = instantanea();
-    const ids = new Set(borrar.map(function (el) { return el.id; }));
-    escena.elementos = escena.elementos.filter(function (el) { return !ids.has(el.id); });
-    confirmarCambio(antes);
-    depurarSeleccion();
-    pedirDibujo();
-  }
-
-  // ===============================================================
-  // Puntero: seleccionar y arrastrar
-  // ===============================================================
-  const UMBRAL_ARRASTRE_PX = 3;   // por debajo, fue un clic y no un arrastre
-  let arrastre = null;
+  // { id, cx0, cy0, movio, h }: el puntero que lo empezó, dónde, si ya pasó
+  // el umbral de arrastre, y el gesto.
+  let gesto = null;
 
   function aMarco(e) {
     const f = encajeVentana();
@@ -568,96 +995,122 @@
     return !!escena && vista === "vector";
   }
 
-  function empezarArrastre(e, m) {
-    const movibles = seleccionados().filter(function (el) { return permite(el, "mover"); });
-    if (!movibles.length) return;
-    // Rango del desplazamiento para que ningún centro salga del marco (o,
-    // si ya estaba afuera, como una copia fantasma de la bandada, que no se
-    // aleje más). Se limita el desplazamiento del grupo y no cada elemento,
-    // para que el grupo no se deforme contra un borde.
-    let dxMin = -Infinity, dxMax = Infinity, dyMin = -Infinity, dyMax = Infinity;
-    for (const el of movibles) {
-      dxMin = Math.max(dxMin, Math.min(0, el.x) - el.x);
-      dxMax = Math.min(dxMax, Math.max(escena.ancho, el.x) - el.x);
-      dyMin = Math.max(dyMin, Math.min(0, el.y) - el.y);
-      dyMax = Math.min(dyMax, Math.max(escena.alto, el.y) - el.y);
-    }
-    arrastre = {
-      id: e.pointerId,
-      x0: m.x, y0: m.y, cx0: e.clientX, cy0: e.clientY,
-      origenes: movibles.map(function (el) { return { el: el, x: el.x, y: el.y }; }),
-      dxMin: dxMin, dxMax: dxMax, dyMin: dyMin, dyMax: dyMax,
-      antes: instantanea(),
-      movio: false
-    };
-    if (lienzo.setPointerCapture) lienzo.setPointerCapture(e.pointerId);
+  function cursorEn(e) {
+    if (tocaTirador(e.clientX, e.clientY)) return "nwse-resize";
+    const m = aMarco(e);
+    return elementoEn(escena.elementos, m.x, m.y, m.px) ? "move" : "default";
   }
 
   lienzo.addEventListener("pointerdown", function (e) {
-    if (e.button !== 0 || !editable() || arrastre) return;
-    const m = aMarco(e);
-    const el = elementoEn(m.x, m.y, m.px);
-    if (!el) {
-      if (!e.shiftKey) seleccion.clear();
-      pedirDibujo();
-      return;
+    if (e.button !== 0 || !editable() || gesto) return;
+    terminarRueda();
+    const h = iniciarGesto(e, aMarco(e));
+    if (h) {
+      gesto = { id: e.pointerId, cx0: e.clientX, cy0: e.clientY, movio: false, h: h };
+      if (lienzo.setPointerCapture) lienzo.setPointerCapture(e.pointerId);
     }
-    if (e.shiftKey) {
-      if (seleccion.has(el.id)) {
-        seleccion.delete(el.id);
-        pedirDibujo();
-        return;
-      }
-      seleccion.add(el.id);
-    } else if (!seleccion.has(el.id)) {
-      // Un clic sobre algo ya seleccionado conserva la selección: así se
-      // arrastra un grupo entero tomándolo de cualquiera de sus elementos.
-      seleccion = new Set([el.id]);
-    }
-    empezarArrastre(e, m);
     pedirDibujo();
   });
 
   lienzo.addEventListener("pointermove", function (e) {
     if (!editable()) return;
-    if (!arrastre) {
-      const m = aMarco(e);
-      lienzo.style.cursor = elementoEn(m.x, m.y, m.px) ? "move" : "default";
-      return;
-    }
-    if (e.pointerId !== arrastre.id) return;
-    if (!arrastre.movio &&
-        Math.hypot(e.clientX - arrastre.cx0, e.clientY - arrastre.cy0) < UMBRAL_ARRASTRE_PX) return;
-    arrastre.movio = true;
-    const m = aMarco(e);
-    const dx = Math.min(arrastre.dxMax, Math.max(arrastre.dxMin, m.x - arrastre.x0));
-    const dy = Math.min(arrastre.dyMax, Math.max(arrastre.dyMin, m.y - arrastre.y0));
-    for (const o of arrastre.origenes) { o.el.x = o.x + dx; o.el.y = o.y + dy; }
+    if (!gesto) { lienzo.style.cursor = cursorEn(e); return; }
+    if (e.pointerId !== gesto.id) return;
+    if (!gesto.movio &&
+        Math.hypot(e.clientX - gesto.cx0, e.clientY - gesto.cy0) < UMBRAL_ARRASTRE_PX) return;
+    gesto.movio = true;
+    gesto.h.mover(aMarco(e));
     pedirDibujo();
   });
 
-  function terminarArrastre(e) {
-    if (!arrastre || e.pointerId !== arrastre.id) return;
-    if (arrastre.movio) confirmarCambio(arrastre.antes);
-    arrastre = null;
+  function terminarGesto(e) {
+    if (!gesto || e.pointerId !== gesto.id) return;
+    gesto.h.terminar(gesto.movio);
+    gesto = null;
+    pedirDibujo();
   }
-  lienzo.addEventListener("pointerup", terminarArrastre);
-  lienzo.addEventListener("pointercancel", terminarArrastre);
-
-  function mostrarFaltantes(faltan) {
-    if (faltan.length === CAPAS.length) {
-      vacioEl.classList.add("visible");
-      return;
-    }
-    if (faltan.length) {
-      pieBase = "falta: " + faltan.map(function (k) { return NOMBRES[k]; }).join(", ") +
-        "   ·   11 / 11  ·  ←";
-    }
-    actualizarPie();
-  }
+  lienzo.addEventListener("pointerup", terminarGesto);
+  lienzo.addEventListener("pointercancel", terminarGesto);
 
   // ===============================================================
-  // IndexedDB
+  // ENTRADA · Rueda: escala la selección respecto de su centro, con el
+  // mismo escalado que el tirador. Una ráfaga de rueda (eventos separados
+  // por menos de RUEDA_PAUSA_MS) es un solo paso del historial.
+  // ===============================================================
+  let rueda = null;   // { escalado, antes, k, temporizador }
+
+  function terminarRueda() {
+    if (!rueda) return;
+    clearTimeout(rueda.temporizador);
+    if (rueda.k !== 1) historial.registrar(rueda.antes);
+    rueda = null;
+  }
+
+  lienzo.addEventListener("wheel", function (e) {
+    // Ctrl+rueda es el zoom del navegador: no se lo quitamos.
+    if (!editable() || gesto || e.ctrlKey) return;
+    if (!rueda) {
+      const escalado = prepararEscalado(seleccionados(), escena);
+      if (!escalado) return;
+      rueda = { escalado: escalado, antes: historial.foto(), k: 1, temporizador: 0 };
+    }
+    e.preventDefault();
+    const delta = e.deltaY * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 400 : 1);
+    rueda.k = rueda.escalado.aplicar(rueda.k * Math.exp(-delta * RUEDA_K));
+    clearTimeout(rueda.temporizador);
+    rueda.temporizador = setTimeout(terminarRueda, RUEDA_PAUSA_MS);
+    pedirDibujo();
+  }, { passive: false });
+
+  // ===============================================================
+  // ENTRADA · Teclado
+  // ===============================================================
+  window.addEventListener("keydown", function (e) {
+    // Cualquier tecla cierra la ráfaga de rueda: deshacer justo después de
+    // escalar con la rueda tiene que deshacer el escalado.
+    terminarRueda();
+    const ctrl = e.ctrlKey || e.metaKey;
+    const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+    if (e.key === "ArrowLeft") {
+      location.href = "experiencia.html#10";
+    } else if (e.key === "Home") {
+      // En la demo no se borra nada: la base es de la instalación.
+      if (DEMO) { location.href = "experiencia.html#0"; return; }
+      borrarCapturas().then(function () { location.href = "experiencia.html#0"; });
+    } else if (k === "v" && !ctrl && !e.repeat) {
+      if (gesto) return;
+      vista = vista === "vector" ? "png" : "vector";
+      lienzo.style.cursor = "default";
+      pedirDibujo();
+    } else if (!editable() || gesto) {
+      // Con los PNG a la vista o en medio de un gesto, nada edita.
+      return;
+    } else if (e.key === "Delete" || e.key === "Backspace") {
+      e.preventDefault();
+      if (!e.repeat) eliminarSeleccion();
+    } else if (e.key === "Escape") {
+      seleccion.clear();
+      pedirDibujo();
+    } else if (ctrl && k === "c") {
+      e.preventDefault();
+      copiarSeleccion();
+    } else if (ctrl && k === "v") {
+      e.preventDefault();
+      if (!e.repeat) pegarPortapapeles();
+    } else if (ctrl && k === "z") {
+      e.preventDefault();
+      if (e.shiftKey) rehacer(); else deshacer();
+    } else if (ctrl && k === "y") {
+      e.preventDefault();
+      rehacer();
+    }
+  });
+
+  window.addEventListener("resize", ajustarLienzo);
+  window.addEventListener("hashchange", function () { location.reload(); });
+
+  // ===============================================================
+  // DATOS · IndexedDB
   // ===============================================================
   function abrirBase() {
     return new Promise(function (ok, mal) {
@@ -697,7 +1150,7 @@
   }
 
   // ===============================================================
-  // Demo: registros de captura sintéticos, en el mismo formato que
+  // DATOS · Demo: registros de captura sintéticos, en el mismo formato que
   // guardan las copias, para que pasen por el mismo camino de conversión.
   // Semilla fija: la demo es siempre la misma escena.
   // ===============================================================
@@ -756,8 +1209,20 @@
   }
 
   // ===============================================================
-  // Arranque
+  // DATOS · Arranque
   // ===============================================================
+  function mostrarFaltantes(faltan) {
+    if (faltan.length === CAPAS.length) {
+      vacioEl.classList.add("visible");
+      return;
+    }
+    if (faltan.length) {
+      pieBase = "falta: " + faltan.map(function (k) { return NOMBRES[k]; }).join(", ") +
+        "   ·   11 / 11  ·  ←";
+    }
+    actualizarPie();
+  }
+
   function cargar() {
     if (DEMO) {
       const regs = registrosDemo();
@@ -791,41 +1256,6 @@
   // Enganche de diagnóstico (consola o un harness de Node): la página no lo
   // usa.
   window.__escena = function () { return escena; };
-
-  window.addEventListener("resize", ajustarLienzo);
-  window.addEventListener("hashchange", function () { location.reload(); });
-
-  window.addEventListener("keydown", function (e) {
-    const ctrl = e.ctrlKey || e.metaKey;
-    const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
-    if (e.key === "ArrowLeft") {
-      location.href = "experiencia.html#10";
-    } else if (e.key === "Home") {
-      // En la demo no se borra nada: la base es de la instalación.
-      if (DEMO) { location.href = "experiencia.html#0"; return; }
-      borrarCapturas().then(function () { location.href = "experiencia.html#0"; });
-    } else if (k === "v" && !ctrl && !e.repeat) {
-      if (arrastre) return;
-      vista = vista === "vector" ? "png" : "vector";
-      lienzo.style.cursor = "default";
-      pedirDibujo();
-    } else if (!editable() || arrastre) {
-      // Con los PNG a la vista o en medio de un arrastre, nada edita.
-      return;
-    } else if (e.key === "Delete" || e.key === "Backspace") {
-      e.preventDefault();
-      if (!e.repeat) eliminarSeleccion();
-    } else if (e.key === "Escape") {
-      seleccion.clear();
-      pedirDibujo();
-    } else if (ctrl && k === "z") {
-      e.preventDefault();
-      if (e.shiftKey) rehacer(); else deshacer();
-    } else if (ctrl && k === "y") {
-      e.preventDefault();
-      rehacer();
-    }
-  });
 })();
 </script>
 </body>

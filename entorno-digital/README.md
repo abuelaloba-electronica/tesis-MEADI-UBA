@@ -31,7 +31,9 @@ espaciadora (sin vuelta atrás, guardado en IndexedDB) y recién entonces pasan 
 la siguiente con →. Desde la 10, → lleva a la 11,
 [`experiencia/composicion.html`](experiencia/composicion.html): los
 elementos de las tres capturas volcados en una sola escena y redibujados en
-vector sobre blanco, de abajo hacia arriba EMG, guante y bandada. Ahí Inicio
+vector sobre blanco, de abajo hacia arriba EMG, guante y bandada, donde se
+pueden seleccionar (con clic o con un marco), mover, agrandar (salvo los
+puntos de la bandada), copiar, pegar y eliminar, con deshacer. Ahí Inicio
 borra las capturas y vuelve a la 0; `composicion.html#demo` muestra una escena
 sintética sin necesidad de capturar. Es la base del editor que se describe en
 [`propuesta_composicion_editable.md`](prototipos/propuesta_composicion_editable.md)

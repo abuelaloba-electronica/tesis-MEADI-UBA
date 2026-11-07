@@ -167,3 +167,118 @@ etapa.
   trazo y no sobre el vacío. 23 de 23.
 - Captura headless de Firefox de `#demo`: idéntica a la de la etapa 1.
 - **Falta**: probarla con el mouse en Chrome.
+
+## Etapa 3: agrandar, seleccionar por área, copiar y pegar
+
+Toma de la etapa 3 de la propuesta el escalado y copiar/pegar, y adelanta de
+la etapa 4 el marco de selección. Quedan para después duplicar, el orden
+(`[` `]`), el clic repetido que baja por la pila y bloquear/ocultar por
+origen.
+
+| Entrada | Acción |
+|---|---|
+| arrastrar en el vacío | marco: selecciona todo lo que toca, aunque esté tapado |
+| Mayús + arrastrar en el vacío | suma lo del marco a la selección |
+| tirador de la esquina, rueda | agranda o achica la selección |
+| Ctrl+C / Ctrl+V | copia la selección / la pega desplazada, encima de todo |
+
+### Por qué cada cambio
+
+**Agrandar es un permiso de tipo, no de origen.** `escalar` está en las filas
+de `anillo`, `disco` y `cuadrilatero` de `PERMITIDAS` y no en la de `punto`.
+Como cada origen tiene sus propios tipos (guante: anillos y discos; EMG:
+cuadriláteros; bandada: puntos), eso es exactamente "el guante y la EMG sí,
+la bandada no", y el código de interacción sigue sin preguntar por tipos ni
+por orígenes: sólo `permite(el, "escalar")`.
+
+**En una selección mixta los puntos se separan, pero no crecen.** Escalar
+multiplica la escala de lo que admite `escalar` y la distancia al centro de
+lo que admite `mover`. Un marco sobre un disco y unos puntos agranda el disco
+y abre la bandada alrededor, sin cambiarle el radio a ningún punto. Si la
+selección es sólo de puntos no aparece el tirador y la rueda no hace nada.
+
+**El centro del escalado es el de la caja de la selección.** Para un solo
+elemento coincide con su centro; para un grupo, todo crece desde el medio
+del grupo, que es lo que se ve marcado con el recuadro conjunto.
+
+**El tirador no salta.** El factor es cuánto se alejó el puntero del centro
+respecto de donde lo agarró, no respecto de la esquina exacta: tomarlo un par
+de px adentro no produce un salto al empezar.
+
+**Límites del escalado.** La escala de cada elemento queda entre 0,2 y 8
+veces el tamaño capturado, y ningún centro sale del marco (la misma regla que
+al arrastrar, para no perder elementos fuera de la pantalla). Se acota el
+factor del grupo, no cada elemento, para que el grupo no se deforme contra un
+borde.
+
+**Una ráfaga de rueda es un solo paso de deshacer.** Cada evento de la rueda
+escala un poco; si cada uno fuera un paso, deshacer un escalado costaría
+decenas de Ctrl+Z. Los eventos separados por menos de 350 ms forman un solo
+gesto, que se cierra antes con cualquier tecla o clic: Ctrl+Z justo después
+de girar la rueda deshace el escalado entero.
+
+**El marco toca, no contiene.** Elige todo lo que cruza el rectángulo, con la
+misma idea de la prueba de impacto: un anillo cuenta sólo por su corona (un
+marco trazado en el hueco no lo elige), un cuadrilátero por su polígono (no
+por su caja) y un círculo por su radio real. Alcanza también lo tapado, que
+es la forma directa de llegar a lo que está debajo. La selección se actualiza
+mientras se arrastra, para ver qué va a quedar adentro.
+
+**El portapapeles guarda copias, no referencias.** Copiar y después mover o
+borrar el original no cambia lo que se pega, y cada pegado crea elementos
+con id propio que no comparten ningún objeto con el portapapeles ni con otro
+pegado. Lo pegado va encima de todo, corrido 16 px por cada pegado de la
+misma copia (para que no caiga exactamente encima del anterior), y queda
+seleccionado, listo para arrastrarlo. Es interno y no el del sistema: no hay
+otra aplicación que entienda estos elementos.
+
+**`copiar` es un permiso; `pegar` no.** La propuesta ponía los dos en la
+tabla, pero pegar actúa sobre el portapapeles, no sobre la selección, y el
+portapapeles sólo contiene lo que ya se pudo copiar.
+
+**El pie dice cuánto hay seleccionado y cuánto copiado.** Copiar no cambia
+nada en la pantalla; sin eso no habría forma de saber si funcionó.
+
+**El script se reordenó en capas.** Con tres operaciones más, los `switch`
+por tipo repartidos en el dibujo, la prueba de impacto y la caja iban a
+crecer en cada lugar a la vez. Ahora:
+
+- *Tipos*: cada tipo es una estrategia en `TIPOS` con la misma interfaz
+  (`desdeCaptura`, `dibujar`, `caja`, `toca`, `tocaRect`). Un tipo nuevo es
+  una entrada ahí y su fila en `PERMITIDAS`; no hay que tocar nada más.
+- *Operaciones*: funciones sobre listas de elementos, sin DOM ni estado del
+  editor (`prepararTraslado`, `prepararEscalado`, `copiar`, `pegar`,
+  `eliminar`). Las de los gestos continuos devuelven una transformación
+  preparada que se aplica muchas veces desde el estado inicial, así que el
+  límite se calcula una sola vez y no se acumula error.
+- *Editor*: historial (un objeto con `foto`, `registrar`, `deshacer`,
+  `rehacer`), selección, portapapeles y los comandos del teclado, que pasan
+  por `aplicarCambio` para que cada uno sea un paso de deshacer.
+- *Gestos*: mover, escalar con el tirador y el marco son objetos con la
+  misma interfaz (`mover`, `terminar`, `pintar` opcional). Al apretar,
+  `iniciarGesto` elige uno según lo que hay bajo el puntero; después los
+  eventos de puntero sólo le pasan el movimiento y filtran el umbral de
+  arrastre, sin saber qué gesto es. La vista dibuja lo que el gesto pinte
+  (el rectángulo del marco) sin conocerlo.
+
+### Validación
+
+- `node --check` sobre el script.
+- Una prueba descartable en Node con DOM, canvas, IndexedDB y eventos de
+  puntero, rueda y teclado falsos, sobre una escena de un cuadrilátero, un
+  anillo con el mismo centro, un disco y tres puntos. Verificó, entre otras
+  cosas: el tirador lleva el anillo a escala 2 sin moverle el centro ni
+  tocarle `forma.r`, y se deshace y rehace; un punto solo no muestra tirador
+  ni responde a la rueda; un marco elige los dos puntos de abajo y la rueda
+  no los agranda; Ctrl+C y Ctrl+V los pegan corridos 16 px y luego 32, con
+  ids nuevos y sin compartir objetos; Supr borra lo pegado y Ctrl+Z lo
+  devuelve; un marco sobre el disco y dos puntos agranda el disco, separa los
+  puntos sin cambiarles el radio, y toda la ráfaga de rueda se deshace de un
+  Ctrl+Z; la escala se frena en 8 y en 0,2; un grupo agrandado al máximo no
+  saca ningún centro del marco; un marco dentro del hueco del anillo elige el
+  punto y no el anillo; una franja que cruza los lados del cuadrilátero sin
+  contener vértices lo elige; Mayús+marco suma; con V nada escala ni se
+  copia. 42 de 42.
+- Captura headless de Firefox de `#demo`: idéntica a la de la etapa 1.
+- **Falta**: probarla con el mouse y la rueda en Chrome, y ver si 350 ms de
+  pausa separan bien las ráfagas de una rueda real y de un touchpad.
