@@ -113,3 +113,23 @@ Es definitivo: después ya no se puede seguir editando.
 
 **Si no se confirma en 4 segundos, o se pulsa Esc o la X del aviso, el aviso se va y se sigue editando. Al confirmar, el aviso desaparece y empieza el sonido.**
 
+**En la composición final, abajo a la derecha, un botón flotante para descargar un video de la composición en movimiento con su sonido:**
+
+Descargar obra
+
+**Al pulsarlo espera el comienzo de la próxima vuelta del sonido y graba una vuelta entera. Mientras tanto el botón dice:**
+
+El video empieza en N s
+
+Grabando 0:12 / 1:05
+
+Preparando la descarga…
+
+**Si la grabación se corta (se pausó el sonido o se ocultó la página), el botón lo dice unos segundos:**
+
+No se pudo grabar el video
+
+Se pausó el sonido: no se guardó el video
+
+Se ocultó la página: no se guardó el video
+

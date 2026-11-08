@@ -22,7 +22,7 @@ describe lo que agrega la experiencia.
 | `bandada.html` | 5 | copia de la bandada activa, con captura |
 | `guante_percusion.html` | 7 | copia del guante activo, con captura y grabación del sonido de Helm |
 | `emg_acumulacion.html` | 9 | copia de la EMG activa, con captura |
-| `composicion.html` | 11 | la composición final: editor y modo final con sonido |
+| `composicion.html` | 11 | la composición final: editor, modo final con sonido y descarga del video |
 | `fuentes/` | — | Roboto Light (normal e itálica) y Bold, locales |
 | `Logo_MAEDI+UBA.jpg` | 0 | logo de la maestría |
 
@@ -182,6 +182,7 @@ después se cierra.
 | Qué se puede hacer | seleccionar, mover, agrandar, copiar, pegar, eliminar, deshacer | mirar y escuchar |
 | Sonido | ninguno | la grabación del guante, en loop |
 | Movimiento | sólo el que hace la persona | el que produce el sonido |
+| Exportar | — | el botón "Descargar obra" (§5.6) |
 
 ### 4.1 · La escena en vector
 
@@ -324,6 +325,7 @@ Cada capa usa sólo las de arriba:
 | editor | historial, selección, portapapeles y comandos (`aplicarCambio` hace de cada uno un paso de deshacer) |
 | vista | dibujo de la escena y de las marcas de edición |
 | sonido | decodificar o sintetizar la grabación, reproducirla en loop, analizarla, llevar el cuadro de la animación |
+| video | grabar una vuelta de la animación con su sonido en un lienzo propio y descargarla (§5.6) |
 | entrada | gestos (mover, escalar, marco: objetos con `mover`, `terminar`, `pintar`), rueda, teclado, cierre de la edición |
 | datos | IndexedDB, demo y arranque |
 
@@ -347,8 +349,9 @@ composición?". Es definitivo.
   estaban viendo los PNG (V), se vuelve a la escena en vector: lo que se
   finaliza es la escena.
 
-**En el modo final** no se edita nada (tampoco V). Quedan ← e Inicio. Se
-borran la selección y el portapapeles. El pie conserva "11 / 11 · ←" y, si
+**En el modo final** no se edita nada (tampoco V). Quedan ← e Inicio, y
+con sonido el botón "Descargar obra" (§5.6). Se borran la selección y el
+portapapeles. El pie conserva "11 / 11 · ←" y, si
 hace falta, por qué no suena.
 
 **La composición se guarda** en el mismo almacén, clave `"composicion"`:
@@ -567,10 +570,74 @@ las señales no cambian.
   Es la señal más lenta: el zumbido del FSR y la cola de la reverb son graves.
 
 **El bucle.** `animar()` corre por `requestAnimationFrame` mientras dure el
-modo final con sonido; arma el cuadro, lo deja en `cuadroActual` y repinta.
+modo final con sonido; arma el cuadro, lo deja en `cuadroActual`, repinta y
+le pasa el turno al video (`avanzarVideo`, §5.6).
 Sin sonido no hay cuadro y la composición queda quieta. Costo: repintar la
 escena entera por cuadro; en Brave headless (render por software) la demo, con
 69 elementos, anduvo a 30 fps con el peor cuadro entre 17 y 30 ms.
+
+### 5.6 · Exportar el video
+
+En el modo final con sonido aparece abajo a la derecha, sobre el pie, un
+botón flotante **"Descargar obra"**: graba una vuelta de la composición
+animada, con su sonido, y la descarga como un archivo (en Brave, a
+Descargas). El botón es DOM y no sale en el video, igual que el pie.
+
+**Cómo graba.** En tiempo real, con lo que trae el navegador y sin
+dependencias: `canvas.captureStream()` para la imagen, un
+`MediaStreamAudioDestinationNode` colgado del mismo `AnalyserNode` que va a
+los parlantes para el sonido, y `MediaRecorder` para las dos pistas. El
+sonido es el del grafo, no un micrófono: sale limpio aunque la sala haga
+ruido.
+
+**Un lienzo propio para el video, no el de la pantalla**, por tres razones:
+
+- **Tamaño fijo.** El marco encajado en `VIDEO_ANCHO × VIDEO_ALTO`
+  (1280×720, con lados pares para H.264), y no la ventana ×
+  `devicePixelRatio`. Dibujar y codificar comparten el hilo con la
+  animación: en Brave headless, con render por software, 1280×720 grabó a
+  30 cuadros/s y 1920×1080 a unos 19, que se veían a tirones.
+- **El fondo pintado.** El lienzo de la pantalla es transparente (el blanco
+  lo pone el CSS, §3) y el codificador descarta el alfa: el video salía
+  negro. Pintar el blanco no cambia la mezcla, porque multiply sobre blanco
+  da el color de la fuente: el video se ve igual que la pantalla.
+- **Un reloj propio.** `relojSonido()` descuenta la latencia de salida para
+  que la pantalla vaya con lo que se **oye**. El audio del video, en cambio,
+  se toma del grafo antes de los parlantes: el cuadro del video
+  (`cuadroVideo`) no la descuenta. Las señales del análisis son las mismas
+  que en pantalla.
+
+**Una vuelta exacta.** Al pulsar, el botón espera la próxima costura del
+loop ("El video empieza en N s"), graba la duración de una vuelta
+("Grabando 0:12 / 1:05") y descarga ("Preparando la descarga…"). Arranca
+`VIDEO_ANTICIPO_S` (0,3 s) antes de la costura: la grabación del guante
+empieza con el primer golpe, y arrancar justo ahí le comería el ataque.
+Como dura una vuelta, el archivo también se puede reproducir en loop. La
+costura que se espera es como mínimo el final de la primera vuelta, cuando
+la normalización de las señales (§5.5) ya se asentó. El archivo sale unas
+decenas de ms más corto que la vuelta (~70 ms en headless), porque
+`MediaRecorder` tarda en arrancar. El evento `start` no sirve para
+corregirlo: llega cientos de ms después.
+
+**Cuadros a ritmo fijo.** Se dibuja y se pide un cuadro
+(`captureStream(0)` + `requestFrame()`) a `VIDEO_FPS` (30), al ritmo de
+`performance.now()`. `currentTime` avanza a saltos, de a bloques de audio,
+y daba cuadros irregulares.
+
+**Formato.** El primero de `VIDEO_FORMATOS` que acepte el navegador. Se
+prefiere MP4, que abre cualquier reproductor y trae su duración (el WebM
+de `MediaRecorder` no la trae y no se puede adelantar). Brave 157 graba
+`video/mp4;codecs=avc1,opus` (H.264 + Opus). AAC no lo acepta. El nombre
+es `composicion-AAAA-MM-DD-HHMM.mp4`. La tasa de video tiene un techo de
+6 Mb/s; con gráficos planos sale mucho menos (la demo, ~10 MB por minuto).
+
+**Lo que corta una grabación**, que entonces no se descarga y el botón lo
+dice 5 s: que el sonido se pause, que la página se oculte
+(`requestAnimationFrame` se detiene y el video saldría congelado) o un
+error del grabador. Salir con ← o Inicio a mitad de una grabación la
+pierde. Sin sonido (sin captura del guante o `sonido: null`) el botón no
+aparece, porque el video sería una imagen quieta. Tampoco aparece con el
+sonido en pausa, al recargar en el modo final antes de la primera tecla.
 
 ---
 
@@ -589,6 +656,8 @@ escena entera por cuadro; en Brave headless (render por software) la demo, con
   sin la placa, y graban igual que el guante real.
 - **Enganches de diagnóstico** para la consola: `window.__escena()`;
   `window.__sonido()` (`{ etapa, estado, reloj, duracion, motivo, cuadro }`);
+  `window.__video()` (`{ estado, formato, ancho, alto, ultima }`, con
+  `ultima = { segundos, cuadros, fps }` de la última grabación);
   `window.__efecto(id[, cuadro])`, el efecto de un elemento en el cuadro
   actual o en uno armado a mano, para ajustar reacciones sin esperar a que la
   reproducción pase por un momento.
@@ -600,6 +669,10 @@ escena entera por cuadro; en Brave headless (render por software) la demo, con
   `tools/harness_emg.js` corren también sobre las copias. Para
   `composicion.html` no hay harness en `tools/`: se probó con pruebas
   descartables en Node (DOM, canvas, IndexedDB, eventos y Web Audio falsos).
+  El video se probó con Brave headless manejado por el protocolo de
+  DevTools desde Node: `#demo`, barra espaciadora dos veces, clic en el
+  botón, y el archivo descargado abierto en un `<video>` (duración, tamaño,
+  fondo, pista de audio) y leído caja por caja (cuadros por pista).
 
 ```
 node entorno-digital/tools/harness_midi.js entorno-digital/experiencia/guante_percusion.html
@@ -615,14 +688,16 @@ node entorno-digital/tools/harness_midi.js entorno-digital/experiencia/guante_pe
 - **Medir `LATENCIA_MS`** y ajustar `COLA_MS` a oído en la página del guante.
 - **Mirar el costo de la animación con una escena real**, que puede tener
   bastante más que los 69 elementos de la demo.
+- **El video en la sala**: verlo y oírlo para comprobar la sincronía (en
+  headless no se pudo juzgar), y mirar `__video().ultima.fps` con
+  1920×1080 para decidir si se sube `VIDEO_ANCHO × VIDEO_ALTO`.
 - **Memoria**: 15 minutos decodificados en estéreo a 48 kHz son ~350 MB de
   `Float32Array`. Una sesión típica está muy por debajo; si molestara, se
   decodifica a mono.
 - **Del editor, sin hacer**: duplicar (Ctrl+D), orden (`[` `]`), clic
   repetido que baja por la pila, bloquear u ocultar por origen (`1` `2` `3`),
   exportar PNG (`P`) y el panel de instrucciones (cuyo texto tiene que entrar
-  primero al guion). Opcional: exportar un video de la composición animada
-  con su sonido (`canvas.captureStream()` + la pista de audio).
+  primero al guion).
 
 ---
 
@@ -653,6 +728,21 @@ node entorno-digital/tools/harness_midi.js entorno-digital/experiencia/guante_pe
   resto de la máquina.
 - *Mandar Helm sólo al sink virtual con un loopback a los parlantes*: más
   fácil de entender, pero el loopback suma latencia a los golpes.
+
+**Para exportar el video:**
+
+- *Render cuadro por cuadro*: un `OfflineAudioContext` con el mismo
+  analizador, pausado con `suspend(t)` en cada cuadro, y la imagen y el
+  sonido codificados con WebCodecs. Cuadros exactos, cualquier resolución y
+  más rápido que el tiempo real, pero WebCodecs no arma el archivo: hacía
+  falta un muxer escrito a mano (200-300 líneas) o una librería copiada
+  localmente. Queda para si la grabación en tiempo real se ve mal en la
+  sala.
+- *Grabar la pantalla desde afuera* (OBS, ffmpeg): no toca la página, pero
+  se lleva el pie, no corta en la costura y depende del operador.
+- *Grabar el lienzo de la pantalla*: es transparente (el video salía con
+  fondo negro), mide la ventana × `devicePixelRatio` y su reloj descuenta
+  la latencia de salida.
 
 **Primero se edita, después se escucha.** Sonido y edición nunca conviven:
 el sonido **muestra** la composición y no la cambia. Una operación como
@@ -745,3 +835,10 @@ nombre de su página activa con sufijo `_experiencia` y pasan a
 fáciles de leer en `SALIDA` y en la barra del navegador. La documentación
 dispersa en `prototipos/` se consolidó en `documentacion/`, un archivo por
 tema.
+
+**2026-11-08 · Descargar el video.** En el modo final con sonido, un
+botón flotante graba en tiempo real una vuelta de la composición animada
+con su sonido (`captureStream` + `MediaRecorder`) y la descarga en MP4
+(§5.6). Usa un lienzo propio de 1280×720 con el fondo pintado y un reloj
+sin la latencia de salida. `dibujarEscena` recibe el cuadro como parámetro,
+para que la pantalla y el video dibujen cada uno el suyo.

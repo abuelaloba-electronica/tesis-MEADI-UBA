@@ -49,7 +49,9 @@ agrandar (no los puntos de la bandada), copiar y pegar, eliminar y deshacer.
 La barra espaciadora dos veces cierra la edición (definitivo): la escena se guarda en
 la clave `composicion` y suena en loop la grabación del guante, que mueve la
 escena: anillos y discos vuelven a sonar en su momento, la bandada y la EMG
-siguen el análisis del audio (tabla `REACCIONES`). Todo esto, con sus
+siguen el análisis del audio (tabla `REACCIONES`). Un botón flotante del modo
+final graba en tiempo real una vuelta con su sonido (`captureStream` +
+`MediaRecorder`, MP4) y la descarga. Todo esto, con sus
 decisiones y su historial, está en `entorno-digital/documentacion/experiencia.md`.
 Ahí Inicio borra las capturas y vuelve a la 0, V alterna con los PNG
 originales para diagnóstico y `composicion.html#demo` arma una escena
