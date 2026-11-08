@@ -43,12 +43,61 @@
     font-variant-numeric: tabular-nums;
     white-space: pre;
   }
+
+  /* Aviso de confirmación: el mismo de las pantallas 5, 7 y 9 (la anatomía
+     y los tokens del Alert de Ant Design, escrito a mano). */
+  .aviso {
+    position: fixed;
+    top: 24px; left: 50%;
+    transform: translate(-50%, -8px);
+    width: min(560px, calc(100vw - 32px));
+    box-sizing: border-box;
+    display: flex; gap: 12px; align-items: flex-start;
+    padding: 16px 20px 16px 16px;
+    border: 1px solid #91caff;
+    border-radius: 8px;
+    background: #e6f4ff;
+    color: rgba(0,0,0,0.88);
+    box-shadow: 0 6px 16px rgba(0,0,0,0.08), 0 3px 6px -4px rgba(0,0,0,0.12);
+    font-size: 14px; line-height: 1.57;
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.25s ease, transform 0.25s ease;
+    z-index: 20;
+  }
+  .aviso.visible { opacity: 1; pointer-events: auto; transform: translate(-50%, 0); }
+  .aviso-icono {
+    flex-shrink: 0;
+    width: 22px; height: 22px; margin-top: 1px;
+    border-radius: 50%;
+    background: #1677ff; color: #fff;
+    font: bold 14px/22px Georgia, serif; text-align: center;
+  }
+  .aviso-cuerpo { flex: 1; }
+  .aviso-titulo { font-size: 16px; line-height: 1.5; margin-bottom: 4px; }
+  .aviso-texto { white-space: pre-line; }
+  .aviso-cerrar {
+    flex-shrink: 0;
+    width: auto; margin: 0;
+    border: none; background: transparent; cursor: pointer;
+    font-size: 20px; line-height: 1; padding: 0 2px;
+    color: rgba(0,0,0,0.45);
+  }
+  .aviso-cerrar:hover { color: rgba(0,0,0,0.88); }
 </style>
 </head>
 <body>
 <canvas id="escena"></canvas>
 <div id="vacio">No hay composiciones capturadas.</div>
 <div id="pie">11 / 11  ·  ←</div>
+<div id="aviso" class="aviso" role="status">
+  <span class="aviso-icono">i</span>
+  <div class="aviso-cuerpo">
+    <div class="aviso-titulo">¿Finalizar la composición?</div>
+    <div class="aviso-texto">Pulsa otra vez la barra espaciadora para confirmar.
+Es definitivo: después ya no se puede seguir editando.</div>
+  </div>
+  <button id="avisoCerrar" class="aviso-cerrar" title="Cerrar" aria-label="Cerrar">×</button>
+</div>
 
 <script>
 (function () {
@@ -63,7 +112,19 @@
   //     elementos: [...], version, fecha }
   // con clave "bandada", "guante" o "emg". El del guante es version 2 y
   // suma `sonido` (la grabación de Helm y sus eventos, o null; ver
-  // prototipos/cambios_experiencia_sonido_v1.md): todavía no se usa acá.
+  // prototipos/cambios_experiencia_sonido_v1.md).
+  //
+  // Dos modos (ver prototipos/cambios_experiencia_sonido_v2.md):
+  //   edición  al entrar: se edita en silencio, como abajo
+  //   final    la barra espaciadora pulsada dos veces (la primera pide
+  //            confirmación) cierra la edición, sin vuelta atrás: guarda la
+  //            escena en la clave "composicion", borra las marcas de edición
+  //            y reproduce en loop la grabación del guante. Si la página se
+  //            recarga, vuelve directo a este modo. Sólo quedan ← e Inicio.
+  //            Con sonido, la escena se mueve con él (ver REACCIONES y
+  //            prototipos/cambios_experiencia_sonido_v3.md): los anillos y
+  //            discos del guante vuelven a sonar en su momento, y la bandada
+  //            y la EMG siguen el análisis de lo que suena.
   //
   // v2 (ver prototipos/cambios_experiencia_composicion_v2.md): los
   // `elementos` de las tres capturas se vuelcan en una sola lista ordenada,
@@ -85,7 +146,9 @@
   //   Ctrl+C / Ctrl+V       copia la selección / la pega desplazada, encima
   //   Supr, Retroceso       elimina la selección
   //   Ctrl+Z                deshace; Ctrl+Mayús+Z o Ctrl+Y rehace
-  //   Esc                   deselecciona
+  //   Esc                   deselecciona (con el aviso a la vista, sólo lo cancela)
+  //   barra espaciadora ×2  finaliza la composición (antes de CONFIRMAR_MS;
+  //                         cualquier edición en el medio cancela el aviso)
   //   ←       vuelve a experiencia.html#10
   //   Inicio  (operador) borra las capturas y vuelve a la pantalla 0
   //   V       diagnóstico: alterna entre la escena en vector y los PNG
@@ -95,16 +158,21 @@
   //           ven los PNG la edición queda en pausa: no reflejan los cambios.
   //
   // composicion.html#demo arma una escena sintética con los cuatro tipos de
-  // elemento, sin leer ni borrar la base: sirve para trabajar el editor sin
-  // recorrer las tres páginas con el hardware.
+  // elemento, sin leer ni escribir la base: sirve para trabajar el editor sin
+  // recorrer las tres páginas con el hardware. Su guante trae tiempos y un
+  // sonido sintético (clics y un zumbido para el FSR), y su modo final no se
+  // guarda: al recargar vuelve a la edición.
   //
   // El script va en capas, de la más pura a la más atada al DOM; cada una
   // usa sólo las de arriba:
-  //   modelo   geometría · tipos · construcción · permisos · operaciones
-  //            (funciones sobre listas de elementos, sin DOM ni estado)
+  //   modelo   geometría · tipos · construcción · permisos · reacciones ·
+  //            operaciones (funciones sobre listas de elementos, sin DOM ni
+  //            estado)
   //   editor   historial · selección · portapapeles · comandos
   //   vista    dibujo de la escena y de las marcas de edición
-  //   entrada  gestos de puntero, rueda y teclado
+  //   sonido   decodificar o sintetizar la grabación, reproducirla en loop,
+  //            analizarla y llevar el cuadro de la animación
+  //   entrada  gestos de puntero, rueda, teclado y cierre de la edición
   //   datos    IndexedDB, demo y arranque
   // ---------------------------------------------------------------
 
@@ -131,6 +199,12 @@
   const RUEDA_K = 0.0015;          // factor de escala por px de rueda: exp(-k·Δ)
   const RUEDA_PAUSA_MS = 350;      // una ráfaga de rueda es un solo paso de deshacer
 
+  // Cierre de la edición y sonido.
+  const CONFIRMAR_MS = 4000;       // plazo para la segunda barra espaciadora, como en 5, 7 y 9
+  const FUNDIDO_INICIO_S = 0.005;  // fundidos de la costura del loop: el del inicio es
+  const FUNDIDO_FIN_S = 0.05;      // mínimo para no ablandar el primer golpe
+  const TASA_HZ = 48000;           // de la decodificación y de la demo (la de PipeWire)
+
   const DPR = Math.max(1, window.devicePixelRatio || 1);
   const lienzo = document.getElementById("escena");
   const g = lienzo.getContext("2d");
@@ -148,6 +222,16 @@
   // Así un cambio de tamaño de ventana no toca los elementos.
   let escena = null;
   let vista = "vector";             // "vector" | "png"
+  // "edicion" → "confirmando" (aviso a la vista) → "final", sin vuelta
+  // atrás. Si no se confirma, de "confirmando" se vuelve a "edicion".
+  let etapa = "edicion";
+  let hayCapturas = false;          // sin capturas no hay nada que finalizar
+  let notaGuardado = "";            // para el pie, si falló guardar la composición
+  // Modo final con sonido: efectoDe(el, cuadro) de la escena (ver
+  // prepararReacciones) y el cuadro de la animación en curso. Mientras
+  // cuadroActual es null, la escena se dibuja quieta.
+  let reacciones = null;
+  let cuadroActual = null;
   let pieBase = "11 / 11  ·  ←";
 
   // ===============================================================
@@ -253,6 +337,9 @@
   //   tocaRect(el, r)             si cruza el rectángulo r
   // Nada fuera de esta sección pregunta por un tipo concreto: un tipo nuevo
   // es una entrada en TIPOS y su fila en PERMITIDAS.
+  //
+  // Opcional, para cualquier tipo: `tiempos`, cuándo sonó el elemento en la
+  // grabación del guante (ver tiemposDe).
   // ===============================================================
   let proximoId = 1;
   function nuevoId() { return proximoId++; }
@@ -411,7 +498,24 @@
   function convertirElemento(e, origen, f) {
     if (!e || typeof e !== "object" || !propio(TIPOS, e.tipo)) return null;
     const desde = TIPOS[e.tipo].desdeCaptura;
-    return desde ? desde(e, origen, f) : null;
+    const el = desde ? desde(e, origen, f) : null;
+    const tiempos = el && tiemposDe(e);
+    if (tiempos) el.tiempos = tiempos;
+    return el;
+  }
+
+  // Los tiempos que la página del guante anota en ms desde el inicio de su
+  // grabación: `t` en un anillo (cuándo sonó su nota), `t0` y `t1` en un
+  // disco (de cruzar FSR_ON a bajar de FSR_OFF). Son datos del elemento y no
+  // de su tipo, así que no pasan por desdeCaptura: van en `tiempos`, igual
+  // para cualquier tipo. Ninguna operación los toca y copiaProfunda los
+  // arrastra, así que una copia pegada suena con su original. Un valor roto
+  // se descarta; `t0` y `t1` sólo van juntos. null si no queda ninguno.
+  function tiemposDe(e) {
+    const t = {};
+    if (finito(e.t) && e.t >= 0) t.t = e.t;
+    if (finito(e.t0, e.t1) && e.t0 >= 0 && e.t1 >= e.t0) { t.t0 = e.t0; t.t1 = e.t1; }
+    return Object.keys(t).length ? t : null;
   }
 
   function imagenDeRespaldo(origen, m, f) {
@@ -485,6 +589,182 @@
   // se aplica a éstos y deja quietos a los demás.
   function admiten(els, op) {
     return els.filter(function (el) { return permite(el, op); });
+  }
+
+  // ===============================================================
+  // MODELO · Reacciones al sonido, en el modo final.
+  //
+  // La animación es una capa visual, no una edición: en cada cuadro cada
+  // elemento recibe un efecto { dx, dy, escala, alpha, encima } que
+  // dibujarElemento aplica sobre su x, y, escala y alpha sin escribirlos.
+  // La composición guardada no cambia, y lo que la persona movió o agrandó
+  // se anima desde donde lo dejó.
+  //
+  // Igual que con los permisos, el dibujo no pregunta por tipos sino qué
+  // reacciones tiene el elemento: un tipo nuevo, o uno que no se quiera
+  // animar, es una fila de REACCIONES.
+  //
+  // El cuadro es lo que cambia en cada frame:
+  //   { tMs, durMs, seg, senal: { envolvente, graves, agudos } }
+  //   tMs    dónde va la reproducción dentro de la vuelta, en ms de la
+  //          grabación (ya corregido por la latencia): se compara con los
+  //          `tiempos` de los elementos
+  //   durMs  lo que dura una vuelta
+  //   seg    segundos continuos, para lo que no depende de la vuelta
+  //   senal  el análisis de lo que suena, cada señal entre 0 y 1
+  // ===============================================================
+  const REACCIONES = {
+    // a) Por eventos: los elementos del guante vuelven a contar su historia
+    //    al ritmo en que se hicieron.
+    anillo:       [{ r: "golpe", aumento: 0.25, durMs: 200 }],
+    disco:        [{ r: "inflar" }],
+    // b) Por análisis del audio: los que no tienen relación con el sonido.
+    punto:        [{ r: "abrir", senal: "envolvente", ganancia: 0.03 },
+                   { r: "temblar", senal: "agudos", px: 1.5 }],
+    cuadrilatero: [{ r: "respirar", senal: "graves", ganancia: 0.05 }],
+    imagen:       []
+  };
+
+  // El disco de la página del guante: su radio y su alpha siguen el pico de
+  // la fuerza suavizada con `tau`. Copiado de allá (R_FSR_MIN, R_FSR_MAX,
+  // ALPHA_MIN, TAU): si cambia allá, hay que cambiarlo acá.
+  const DISCO_GUANTE = { rMin: 0.05, rMax: 0.14, alphaMin: 0.08, tau: 0.03 };
+  const PASO_CURVA_MS = 10;
+
+  // Rehace, a partir de los CC grabados, lo que hizo la página del guante
+  // con la presión entre t0 y t1: la fuerza es el último CC, se suaviza y el
+  // disco sigue su pico, que nunca baja. Devuelve el pico cada
+  // PASO_CURVA_MS, o null si no hay CC (se grabó sin puerto MIDI).
+  function curvaDeInflado(t0, t1, eventos) {
+    const ccs = eventos.filter(function (e) {
+      return e && e.tipo === "cc" && finito(e.t, e.valor) && e.t <= t1;
+    });
+    const pasos = Math.max(1, Math.ceil((t1 - t0) / PASO_CURVA_MS));
+    const picos = new Float32Array(pasos + 1);
+    const k = 1 - Math.exp(-PASO_CURVA_MS / 1000 / DISCO_GUANTE.tau);
+    let fuerza = 0, suave = 0, pico = 0, j = 0, hubo = false;
+    for (let n = 0; n <= pasos; n++) {
+      const t = Math.min(t1, t0 + n * PASO_CURVA_MS);
+      while (j < ccs.length && ccs[j].t <= t) {
+        if (ccs[j].t >= t0) hubo = true;
+        fuerza = acotar(ccs[j++].valor / 127, 0, 1);
+      }
+      if (n > 0) suave += (fuerza - suave) * k;
+      pico = Math.max(pico, suave);
+      picos[n] = pico;
+    }
+    return hubo && pico > 0 ? picos : null;
+  }
+
+  // Cuánto del tamaño y del alpha estampados tiene el disco a los tMs: el
+  // radio y el alpha que da el pico de ese momento, relativos a los que da
+  // el pico final (así al llegar a t1 queda exactamente como se estampó).
+  // Sin curva, una rampa pareja de t0 a t1 hasta la presión máxima.
+  function infladoEn(tMs, t0, t1, picos) {
+    const D = DISCO_GUANTE;
+    const radio = function (p) { return D.rMin + p * (D.rMax - D.rMin); };
+    const alpha = function (p) { return D.alphaMin + p * (1 - D.alphaMin); };
+    const fin = picos ? picos[picos.length - 1] : 1;
+    let p;
+    if (tMs >= t1) p = fin;
+    else if (picos) p = picos[Math.min(picos.length - 1, Math.floor((tMs - t0) / PASO_CURVA_MS))];
+    else p = fin * (tMs - t0) / Math.max(1, t1 - t0);
+    return { escala: radio(p) / radio(fin), alpha: alpha(p) / alpha(fin) };
+  }
+
+  // Cada reacción suma lo suyo al efecto `ef`. `p` es su fila de REACCIONES
+  // y `aux` lo que se preparó una vez para toda la escena.
+  const REACCION = {
+    // El anillo se vuelve a golpear cuando la reproducción pasa por su `t`:
+    // late (1 → 1 + aumento → 1) y suelta el mismo anillo de impacto que se
+    // expande y se desvanece en la página del guante. Después de la costura
+    // del loop sigue: un golpe del final de la grabación termina de latir al
+    // principio de la vuelta siguiente.
+    golpe: function (el, p, ef, cuadro) {
+      if (!el.tiempos || !finito(el.tiempos.t)) return;
+      let dt = cuadro.tMs - el.tiempos.t;
+      if (dt < 0) dt += cuadro.durMs;
+      if (dt < 0 || dt >= p.durMs) return;
+      const edad = dt / p.durMs;
+      ef.escala *= 1 + p.aumento * Math.sin(Math.PI * edad);
+      ef.encima = function (c) {
+        c.globalAlpha = (1 - edad) * 0.55;
+        c.strokeStyle = el.estilo.color;
+        c.lineWidth = 2 / el.escala;
+        c.beginPath();
+        c.arc(0, 0, el.forma.r * (1 + 1.2 * edad), 0, TAU);
+        c.stroke();
+      };
+    },
+
+    // El disco no existe antes de su `t0`; entre `t0` y `t1` se infla con la
+    // curva de la presión grabada y después queda. Cada vuelta empieza sin
+    // él, como empezó el dibujo.
+    inflar: function (el, p, ef, cuadro, aux) {
+      const t = el.tiempos;
+      if (!t || !finito(t.t0, t.t1)) return;
+      if (cuadro.tMs < t.t0) { ef.escala = 0; return; }
+      const f = infladoEn(cuadro.tMs, t.t0, t.t1, aux.curva(t.t0, t.t1));
+      ef.escala *= f.escala;
+      ef.alpha *= f.alpha;
+    },
+
+    // Se aleja del centro de los de su origen en proporción a la señal: la
+    // bandada se abre y se cierra entera, unos pocos px.
+    abrir: function (el, p, ef, cuadro, aux) {
+      const c = aux.centro(el.origen);
+      const v = cuadro.senal[p.senal] * p.ganancia;
+      ef.dx += (el.x - c.x) * v;
+      ef.dy += (el.y - c.y) * v;
+    },
+
+    // Temblor mínimo, con fase y frecuencia propias de cada elemento (sacadas
+    // del id, para que no tiemblen todos juntos ni al azar en cada cuadro).
+    temblar: function (el, p, ef, cuadro) {
+      const v = cuadro.senal[p.senal] * p.px;
+      if (!v) return;
+      const fase = el.id * 2.39996, w = 40 + (el.id * 7) % 13;
+      ef.dx += v * Math.sin(cuadro.seg * w + fase);
+      ef.dy += v * Math.sin(cuadro.seg * (w + 3.1) + fase * 1.7);
+    },
+
+    respirar: function (el, p, ef, cuadro) {
+      ef.escala *= 1 + cuadro.senal[p.senal] * p.ganancia;
+    }
+  };
+
+  function reaccionesDe(el) {
+    return propio(REACCIONES, el.tipo) ? REACCIONES[el.tipo] : [];
+  }
+
+  // Prepara una vez, para una escena que ya no cambia (la del modo final),
+  // lo que las reacciones necesitan de toda la escena: el centro de cada
+  // origen y la curva de cada presión (las copias pegadas de un disco
+  // comparten la de su original). Devuelve efectoDe(el, cuadro).
+  function prepararReacciones(elementos, eventos) {
+    const sumas = {};
+    for (const el of elementos) {
+      const s = sumas[el.origen] || (sumas[el.origen] = { x: 0, y: 0, n: 0 });
+      s.x += el.x; s.y += el.y; s.n++;
+    }
+    const centros = {};
+    Object.keys(sumas).forEach(function (k) {
+      centros[k] = { x: sumas[k].x / sumas[k].n, y: sumas[k].y / sumas[k].n };
+    });
+    const curvas = new Map();
+    const aux = {
+      centro: function (origen) { return centros[origen]; },
+      curva: function (t0, t1) {
+        const clave = t0 + "|" + t1;
+        if (!curvas.has(clave)) curvas.set(clave, curvaDeInflado(t0, t1, eventos || []));
+        return curvas.get(clave);
+      }
+    };
+    return function efectoDe(el, cuadro) {
+      const ef = { dx: 0, dy: 0, escala: 1, alpha: 1, encima: null };
+      for (const p of reaccionesDe(el)) REACCION[p.r](el, p, ef, cuadro, aux);
+      return ef;
+    };
   }
 
   // ===============================================================
@@ -731,19 +1011,41 @@
   // Cada elemento se dibuja con su propio modo de fusión: los anillos y el
   // disco del guante multiplican sobre lo que tengan debajo, sea del guante
   // o de la EMG, igual que entre ellos dentro de su captura.
-  function dibujarElemento(c, el) {
+  //
+  // `ef`, en el modo final, es el efecto de sus reacciones al sonido (ver
+  // MODELO · Reacciones): se suma a la posición y multiplica la escala y el
+  // alpha, sin escribir nada en el elemento. `encima` dibuja algo más (el
+  // anillo de impacto) en sus coordenadas, con su escala de la escena y sin
+  // la del efecto.
+  function dibujarElemento(c, el, ef) {
     const est = el.estilo;
-    c.save();
-    c.translate(el.x, el.y);
-    if (el.escala !== 1) c.scale(el.escala, el.escala);
-    c.globalAlpha = est.alpha;
-    c.globalCompositeOperation = est.modo || "source-over";
-    TIPOS[el.tipo].dibujar(c, el, recursos);
-    c.restore();
+    const x = el.x + (ef ? ef.dx : 0), y = el.y + (ef ? ef.dy : 0);
+    const s = el.escala * (ef ? ef.escala : 1);
+    const modo = est.modo || "source-over";
+    if (s > 0) {
+      c.save();
+      c.translate(x, y);
+      if (s !== 1) c.scale(s, s);
+      c.globalAlpha = Math.min(1, est.alpha * (ef ? ef.alpha : 1));
+      c.globalCompositeOperation = modo;
+      TIPOS[el.tipo].dibujar(c, el, recursos);
+      c.restore();
+    }
+    if (ef && ef.encima) {
+      c.save();
+      c.translate(x, y);
+      if (el.escala !== 1) c.scale(el.escala, el.escala);
+      c.globalCompositeOperation = modo;
+      ef.encima(c);
+      c.restore();
+    }
   }
 
   function dibujarEscena(c) {
-    for (const el of escena.elementos) dibujarElemento(c, el);
+    const efectoDe = etapa === "final" && cuadroActual ? reacciones : null;
+    for (const el of escena.elementos) {
+      dibujarElemento(c, el, efectoDe ? efectoDe(el, cuadroActual) : null);
+    }
   }
 
   // Diagnóstico: los PNG originales apilados como en la v1, cada uno
@@ -785,7 +1087,7 @@
       dibujarPNG(g);
     } else {
       dibujarEscena(g);
-      pintarMarcasDeEdicion(f);
+      if (etapa !== "final") pintarMarcasDeEdicion(f);
     }
   }
 
@@ -807,7 +1109,12 @@
   function actualizarPie() {
     const partes = [];
     if (DEMO) partes.push("demo");
-    if (vista === "png") {
+    if (notaGuardado) partes.push(notaGuardado);
+    if (etapa === "final") {
+      // Sólo lo que el operador necesita saber: por qué no suena.
+      const estado = estadoSonido();
+      if (estado) partes.push(estado);
+    } else if (vista === "png") {
       const hay = CAPAS.some(function (k) { return capturas[k] && capturas[k].bitmap; });
       partes.push(hay ? "PNG originales, edición en pausa (V)" : "sin PNG para comparar (V)");
     } else {
@@ -912,6 +1219,256 @@
   }
 
   // ===============================================================
+  // SONIDO · La grabación del guante, en loop, en el modo final.
+  //
+  // Web Audio sólo para reproducir y para medir: la grabación se decodifica
+  // a un AudioBuffer, así su duración es exacta (el WebM de Chrome no la
+  // trae) y el reloj de la reproducción, que es también el de la animación,
+  // es el de AudioContext.currentTime y no el de requestAnimationFrame. La
+  // única síntesis es la de la demo.
+  //
+  // Se prepara al cargar, en un OfflineAudioContext, que no necesita gesto:
+  // al confirmar el sonido arranca en el acto. El AudioContext de verdad, en
+  // cambio, se crea recién dentro del manejador de la barra espaciadora que
+  // confirma, porque sin un gesto el navegador no lo deja sonar.
+  // ===============================================================
+
+  // Promesa del AudioBuffer listo para el loop, o de null si no hay sonido.
+  let bufferSonido = Promise.resolve(null);
+  // Por qué no hay sonido ("" mientras se prepara o si lo hay).
+  let motivoSinSonido = "";
+  // La reproducción en curso; fuente es null hasta que el buffer está listo.
+  const sonido = { ctx: null, fuente: null, analizador: null, inicio: 0, duracion: 0 };
+  // De la captura del guante: los eventos (para la curva de cada presión) y
+  // el corrimiento medido entre un evento y su sonido en la grabación.
+  let eventosSonido = [];
+  let latenciaMs = 0;
+
+  function prepararSonido(captura) {
+    const r = captura && captura.registro;
+    const s = r && r.version >= 2 ? r.sonido : null;
+    function sin(motivo) { motivoSinSonido = motivo; return Promise.resolve(null); }
+    if (!r) return sin("sin captura del guante");
+    if (!s) return sin("la captura del guante no tiene sonido");
+    eventosSonido = Array.isArray(s.eventos) ? s.eventos : [];
+    latenciaMs = finito(s.latenciaMs) ? s.latenciaMs : 0;
+    if (typeof OfflineAudioContext === "undefined") return sin("sin Web Audio");
+    let buffer;
+    if (typeof Blob !== "undefined" && s.audio instanceof Blob) {
+      buffer = s.audio.arrayBuffer().then(function (datos) {
+        return new OfflineAudioContext(2, 1, TASA_HZ).decodeAudioData(datos);
+      });
+    } else if (DEMO && Array.isArray(s.eventos) && finito(s.duracion)) {
+      buffer = sintetizarDemo(s);
+    } else {
+      return sin("la captura del guante no tiene sonido");
+    }
+    return buffer.then(function (buf) {
+      if (!buf || !buf.length) return sin("la grabación está vacía");
+      return suavizarCostura(buf);
+    }, function (err) {
+      return sin("no se pudo decodificar la grabación (" + (err && err.message || err) + ")");
+    });
+  }
+
+  // La grabación termina en la cola de la reverb y empieza con el primer
+  // golpe: el salto del loop casi no existe, pero una muestra que no sea
+  // cero en el borde suena como un clic. Fundidos cortos en los dos
+  // extremos, sobre el buffer, que es nuestro.
+  function suavizarCostura(buf) {
+    const nIni = Math.min(buf.length, Math.round(FUNDIDO_INICIO_S * buf.sampleRate));
+    const nFin = Math.min(buf.length, Math.round(FUNDIDO_FIN_S * buf.sampleRate));
+    for (let c = 0; c < buf.numberOfChannels; c++) {
+      const d = buf.getChannelData(c);
+      for (let i = 0; i < nIni; i++) d[i] *= i / nIni;
+      for (let i = 0; i < nFin; i++) d[d.length - 1 - i] *= i / nFin;
+    }
+    return buf;
+  }
+
+  // Sonido de la demo, a partir de sus eventos, como si los hubiera tocado
+  // Helm: cada nota es un clic de ruido filtrado (más agudo para el dedo 1)
+  // y los CC del FSR suben y bajan un zumbido grave. Ruido con semilla: la
+  // demo suena siempre igual.
+  function sintetizarDemo(s) {
+    const oac = new OfflineAudioContext(2, Math.ceil(s.duracion * TASA_HZ), TASA_HZ);
+    const ruido = oac.createBuffer(1, TASA_HZ / 2, TASA_HZ);
+    const d = ruido.getChannelData(0);
+    let x = 1;
+    for (let i = 0; i < d.length; i++) { x = (x * 16807) % 2147483647; d[i] = x / 1073741823.5 - 1; }
+
+    const salida = oac.createGain();
+    salida.gain.value = 0.4;
+    salida.connect(oac.destination);
+
+    const zumbido = oac.createOscillator();
+    zumbido.type = "sawtooth";
+    zumbido.frequency.value = 82;
+    const grave = oac.createBiquadFilter();
+    grave.type = "lowpass";
+    grave.frequency.value = 320;
+    const nivel = oac.createGain();
+    nivel.gain.value = 0;
+    zumbido.connect(grave); grave.connect(nivel); nivel.connect(salida);
+    zumbido.start(0);
+
+    for (const ev of s.eventos) {
+      if (!ev || !finito(ev.t)) continue;
+      const t = ev.t / 1000;
+      if (ev.tipo === "nota") {
+        const fuente = oac.createBufferSource();
+        fuente.buffer = ruido;
+        const filtro = oac.createBiquadFilter();
+        filtro.type = "bandpass";
+        filtro.frequency.value = ev.dedo ? 1600 : 700;
+        filtro.Q.value = 1.5;
+        const env = oac.createGain();
+        env.gain.setValueAtTime(0, t);
+        env.gain.linearRampToValueAtTime(3 * (finito(ev.vel) ? ev.vel : 90) / 127, t + 0.002);
+        env.gain.setTargetAtTime(0, t + 0.002, 0.06);
+        fuente.connect(filtro); filtro.connect(env); env.connect(salida);
+        fuente.start(t);
+        fuente.stop(t + 0.5);
+      } else if (ev.tipo === "cc" && finito(ev.valor)) {
+        nivel.gain.setTargetAtTime(0.5 * ev.valor / 127, t, 0.08);
+      }
+    }
+    return oac.startRendering();
+  }
+
+  function iniciarSonido() {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC || sonido.ctx) return;
+    const ctx = new AC();
+    sonido.ctx = ctx;
+    // El pie avisa si el navegador lo dejó en pausa (al recargar en el modo
+    // final no hubo gesto: arranca con la primera tecla o clic).
+    ctx.onstatechange = pedirDibujo;
+    bufferSonido.then(function (buf) {
+      if (!buf) { ctx.close(); sonido.ctx = null; pedirDibujo(); return; }
+      const fuente = ctx.createBufferSource();
+      fuente.buffer = buf;
+      fuente.loop = true;
+      const analizador = ctx.createAnalyser();
+      analizador.fftSize = 2048;
+      // El suavizado lo hace seguir(), con ataque y caída propios.
+      analizador.smoothingTimeConstant = 0;
+      fuente.connect(analizador);
+      analizador.connect(ctx.destination);
+      // Un margen corto para que el arranque no se coma el primer golpe.
+      const inicio = ctx.currentTime + 0.05;
+      fuente.start(inicio);
+      sonido.fuente = fuente;
+      sonido.analizador = analizador;
+      sonido.inicio = inicio;
+      sonido.duracion = buf.duration;
+      reacciones = prepararReacciones(escena.elementos, eventosSonido);
+      requestAnimationFrame(animar);
+    });
+  }
+
+  function reanudarSonido() {
+    if (sonido.ctx && sonido.ctx.state === "suspended") sonido.ctx.resume();
+  }
+
+  // Dónde va la reproducción dentro de la vuelta, en s; null sin sonido. Es
+  // el reloj de la animación: con source.loop la vuelta dura exactamente
+  // buf.duration, así que el módulo nunca se desfasa. Se le resta lo que
+  // tarda el audio en salir por los parlantes, para que la imagen vaya con
+  // lo que se oye y no con lo que se acaba de procesar.
+  function relojSonido() {
+    if (!sonido.fuente) return null;
+    const ctx = sonido.ctx;
+    const salida = (finito(ctx.baseLatency) ? ctx.baseLatency : 0) +
+                   (finito(ctx.outputLatency) ? ctx.outputLatency : 0);
+    const t = ctx.currentTime - salida - sonido.inicio;
+    return t <= 0 ? 0 : t % sonido.duracion;
+  }
+
+  // ---------------------------------------------------------------
+  // Análisis de lo que suena, para las reacciones de la bandada y la EMG.
+  // Cada señal sale del AnalyserNode, se suaviza con un ataque rápido y una
+  // caída más lenta, y se normaliza por su propio máximo reciente (que cae
+  // muy despacio): así va de 0 a 1 sin importar a qué volumen se grabó. El
+  // piso evita que, en un silencio largo, el ruido de fondo se agrande hasta
+  // parecer una señal.
+  // ---------------------------------------------------------------
+  const SENALES = {
+    // RMS de la forma de onda: cada golpe, incluidas la distorsión y la cola.
+    envolvente: { ataqueS: 0.01, caidaS: 0.25, piso: 0.003 },
+    // Energía por bandas del espectro (amplitud media de los bins).
+    graves:     { desdeHz: 20, hastaHz: 250, ataqueS: 0.02, caidaS: 0.3, piso: 1e-4 },
+    agudos:     { desdeHz: 3000, hastaHz: 10000, ataqueS: 0.01, caidaS: 0.15, piso: 1e-4 }
+  };
+  const REFERENCIA_CAIDA_S = 30;
+
+  const analisis = { tiempo: null, frec: null, nivel: {}, ref: {}, ultimo: null };
+
+  function seguir(nombre, crudo, dt) {
+    const p = SENALES[nombre];
+    const antes = analisis.nivel[nombre] || 0;
+    const tau = crudo > antes ? p.ataqueS : p.caidaS;
+    const nivel = antes + (crudo - antes) * (1 - Math.exp(-dt / tau));
+    analisis.nivel[nombre] = nivel;
+    const ref = Math.max(nivel, (analisis.ref[nombre] || 0) * Math.exp(-dt / REFERENCIA_CAIDA_S), p.piso);
+    analisis.ref[nombre] = ref;
+    return acotar(nivel / ref, 0, 1);
+  }
+
+  function energiaDeBanda(frec, desdeHz, hastaHz, tasa, fft) {
+    const k0 = Math.max(1, Math.round(desdeHz * fft / tasa));
+    const k1 = Math.min(frec.length - 1, Math.round(hastaHz * fft / tasa));
+    let suma = 0;
+    for (let k = k0; k <= k1; k++) suma += Math.pow(10, frec[k] / 10);   // dB → potencia
+    return k1 >= k0 ? Math.sqrt(suma / (k1 - k0 + 1)) : 0;
+  }
+
+  // Las tres señales, 0-1, para un cuadro que llega `dt` s después del
+  // anterior. Con dt = 0 (el contexto en pausa) no cambian.
+  function medir(dt) {
+    const an = sonido.analizador;
+    if (!analisis.tiempo) {
+      analisis.tiempo = new Float32Array(an.fftSize);
+      analisis.frec = new Float32Array(an.frequencyBinCount);
+    }
+    an.getFloatTimeDomainData(analisis.tiempo);
+    an.getFloatFrequencyData(analisis.frec);
+    let suma = 0;
+    for (let i = 0; i < analisis.tiempo.length; i++) suma += analisis.tiempo[i] * analisis.tiempo[i];
+    const tasa = sonido.ctx.sampleRate, fft = an.fftSize;
+    const senal = { envolvente: seguir("envolvente", Math.sqrt(suma / analisis.tiempo.length), dt) };
+    ["graves", "agudos"].forEach(function (nombre) {
+      const p = SENALES[nombre];
+      senal[nombre] = seguir(nombre, energiaDeBanda(analisis.frec, p.desdeHz, p.hastaHz, tasa, fft), dt);
+    });
+    return senal;
+  }
+
+  // Un cuadro por frame mientras dure el modo final con sonido. El reloj es
+  // el del audio: si el contexto está en pausa la imagen queda quieta en el
+  // mismo punto, y arranca con él.
+  function animar() {
+    if (etapa !== "final" || !sonido.fuente) { cuadroActual = null; return; }
+    const ahora = sonido.ctx.currentTime;
+    const dt = analisis.ultimo === null ? 0 : acotar(ahora - analisis.ultimo, 0, 0.1);
+    analisis.ultimo = ahora;
+    const durMs = sonido.duracion * 1000;
+    // tMs en el tiempo de la grabación: el sonido de un evento llega
+    // latenciaMs después de su `t`, así que la imagen va ese tanto atrás.
+    let tMs = (relojSonido() * 1000 - latenciaMs) % durMs;
+    if (tMs < 0) tMs += durMs;
+    cuadroActual = { tMs: tMs, durMs: durMs, seg: ahora, senal: medir(dt) };
+    pintar();
+    requestAnimationFrame(animar);
+  }
+
+  function estadoSonido() {
+    if (motivoSinSonido) return "sin sonido: " + motivoSinSonido;
+    if (sonido.ctx && sonido.ctx.state === "suspended") return "sonido en pausa: pulsa una tecla o haz clic";
+    return "";
+  }
+
+  // ===============================================================
   // ENTRADA · Gestos de puntero. Al apretar se elige uno según lo que hay
   // bajo el puntero (tirador, elemento o vacío), y desde ahí el despachador
   // de eventos sólo le pasa el movimiento, sin saber cuál es. Cada gesto es
@@ -994,7 +1551,7 @@
   }
 
   function editable() {
-    return !!escena && vista === "vector";
+    return !!escena && vista === "vector" && etapa !== "final";
   }
 
   function cursorEn(e) {
@@ -1004,7 +1561,9 @@
   }
 
   lienzo.addEventListener("pointerdown", function (e) {
+    if (etapa === "final") { reanudarSonido(); return; }
     if (e.button !== 0 || !editable() || gesto) return;
+    cancelarConfirmacion();
     terminarRueda();
     const h = iniciarGesto(e, aMarco(e));
     if (h) {
@@ -1054,6 +1613,7 @@
     if (!rueda) {
       const escalado = prepararEscalado(seleccionados(), escena);
       if (!escalado) return;
+      cancelarConfirmacion();
       rueda = { escalado: escalado, antes: historial.foto(), k: 1, temporizador: 0 };
     }
     e.preventDefault();
@@ -1065,8 +1625,60 @@
   }, { passive: false });
 
   // ===============================================================
+  // ENTRADA · Cierre de la edición: la barra espaciadora pulsada dos veces,
+  // como en las pantallas 5, 7 y 9. La primera sólo muestra el aviso; la
+  // segunda, antes de CONFIRMAR_MS, pasa al modo final. Mientras el aviso
+  // está a la vista se puede seguir editando, pero cualquier edición lo
+  // cancela: el aviso pregunta por la composición tal como estaba.
+  // ===============================================================
+  const avisoEl = document.getElementById("aviso");
+  let temporizadorConfirmar = 0;
+  // La escritura de la composición en curso: ← e Inicio esperan a que
+  // termine, para no perderla ni borrarla a medio escribir. Nunca rechaza.
+  let guardado = Promise.resolve();
+
+  document.getElementById("avisoCerrar").addEventListener("click", cancelarConfirmacion);
+
+  function pedirConfirmacion() {
+    etapa = "confirmando";
+    avisoEl.classList.add("visible");
+    temporizadorConfirmar = setTimeout(cancelarConfirmacion, CONFIRMAR_MS);
+  }
+
+  function cancelarConfirmacion() {
+    if (etapa !== "confirmando") return;
+    clearTimeout(temporizadorConfirmar);
+    etapa = "edicion";
+    avisoEl.classList.remove("visible");
+  }
+
+  // Definitivo. Corre dentro del manejador de la tecla: el AudioContext se
+  // crea primero, mientras dura el gesto.
+  function finalizar() {
+    clearTimeout(temporizadorConfirmar);
+    etapa = "final";
+    iniciarSonido();
+    avisoEl.classList.remove("visible");
+    seleccion.clear();
+    portapapeles.plantillas = [];
+    vista = "vector";
+    lienzo.style.cursor = "default";
+    guardado = guardarComposicion().then(function () {}, function (err) {
+      notaGuardado = "no se pudo guardar la composición (" + (err && err.message || err) + ")";
+      pedirDibujo();
+    });
+    pedirDibujo();
+  }
+
+  function irA(destino) {
+    guardado.then(function () { location.href = destino; });
+  }
+
+  // ===============================================================
   // ENTRADA · Teclado
   // ===============================================================
+  const MODIFICADORES = ["Shift", "Control", "Alt", "Meta", "AltGraph", "CapsLock"];
+
   window.addEventListener("keydown", function (e) {
     // Cualquier tecla cierra la ráfaga de rueda: deshacer justo después de
     // escalar con la rueda tiene que deshacer el escalado.
@@ -1074,12 +1686,37 @@
     const ctrl = e.ctrlKey || e.metaKey;
     const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
     if (e.key === "ArrowLeft") {
-      location.href = "experiencia.html#10";
-    } else if (e.key === "Home") {
+      irA("experiencia.html#10");
+      return;
+    }
+    if (e.key === "Home") {
       // En la demo no se borra nada: la base es de la instalación.
       if (DEMO) { location.href = "experiencia.html#0"; return; }
-      borrarCapturas().then(function () { location.href = "experiencia.html#0"; });
-    } else if (k === "v" && !ctrl && !e.repeat) {
+      guardado.then(borrarCapturas).then(function () { location.href = "experiencia.html#0"; });
+      return;
+    }
+    if (etapa === "final") {
+      // Nada edita. Una tecla sólo despierta el sonido si el navegador lo
+      // dejó en pausa (al recargar en este modo no hubo gesto).
+      if (e.code === "Space" || e.key === " ") e.preventDefault();
+      reanudarSonido();
+      return;
+    }
+    if (e.code === "Space" || e.key === " ") {
+      e.preventDefault();
+      // Sin e.repeat: mantener la barra apretada no puede confirmar sola. En
+      // medio de un arrastre tampoco: el gesto quedaría a medio aplicar.
+      if (e.repeat || gesto || !escena || !hayCapturas) return;
+      if (etapa === "confirmando") finalizar(); else pedirConfirmacion();
+      return;
+    }
+    if (etapa === "confirmando") {
+      if (MODIFICADORES.indexOf(e.key) >= 0) return;
+      cancelarConfirmacion();
+      // Esc sólo cancela: no deselecciona.
+      if (e.key === "Escape") return;
+    }
+    if (k === "v" && !ctrl && !e.repeat) {
       if (gesto) return;
       vista = vista === "vector" ? "png" : "vector";
       lienzo.style.cursor = "default";
@@ -1124,21 +1761,76 @@
     });
   }
 
-  // Devuelve { clave: registro } con las capturas que existan.
-  function leerCapturas() {
+  // Devuelve { capturas: { clave: registro }, composicion } con las
+  // capturas que existan y la composición finalizada (o null).
+  function leerBase() {
     return abrirBase().then(function (db) {
       return new Promise(function (ok, mal) {
         const tx = db.transaction("capturas", "readonly");
         const almacen = tx.objectStore("capturas");
-        const leidas = {};
+        const leidas = { capturas: {}, composicion: null };
         CAPAS.forEach(function (clave) {
           const p = almacen.get(clave);
-          p.onsuccess = function () { if (p.result && p.result.imagen) leidas[clave] = p.result; };
+          p.onsuccess = function () { if (p.result && p.result.imagen) leidas.capturas[clave] = p.result; };
         });
+        const pc = almacen.get(CLAVE_COMPOSICION);
+        pc.onsuccess = function () { leidas.composicion = pc.result || null; };
         tx.oncomplete = function () { db.close(); ok(leidas); };
         tx.onerror = function () { db.close(); mal(tx.error); };
       });
     });
+  }
+
+  // La composición finalizada va en el mismo almacén que las capturas, así
+  // que Inicio (clear) la borra con ellas. Registro:
+  //   { version: 1, ancho, alto, elementos, fuentes, fecha }
+  // `elementos` son los de la escena tal cual (con sus `tiempos`); `fuentes`
+  // anota la `fecha` de cada captura usada, para saber si sigue valiendo.
+  const CLAVE_COMPOSICION = "composicion";
+
+  function fuentesDe(caps) {
+    const f = {};
+    CAPAS.forEach(function (k) { if (caps[k]) f[k] = caps[k].registro.fecha; });
+    return f;
+  }
+
+  function guardarComposicion() {
+    if (DEMO) return Promise.resolve();
+    const registro = {
+      version: 1,
+      ancho: escena.ancho,
+      alto: escena.alto,
+      elementos: copiaProfunda(escena.elementos),
+      fuentes: fuentesDe(capturas),
+      fecha: Date.now()
+    };
+    return abrirBase().then(function (db) {
+      return new Promise(function (ok, mal) {
+        const tx = db.transaction("capturas", "readwrite");
+        tx.objectStore("capturas").put(registro, CLAVE_COMPOSICION);
+        tx.oncomplete = function () { db.close(); ok(); };
+        tx.onerror = tx.onabort = function () { db.close(); mal(tx.error); };
+      });
+    });
+  }
+
+  // La escena de una composición guardada, o null si no sirve. Sólo vale si
+  // se hizo con las mismas capturas que hay ahora: si se volvió a capturar
+  // alguna pantalla (otra `fecha`, o una captura que falta o sobra), es otro
+  // recorrido, y se vuelve a la edición con la escena reconstruida. Los
+  // tiempos de sus anillos y discos son de la grabación con que se hizo.
+  function escenaGuardada(comp, caps) {
+    if (!comp || !(comp.version >= 1) || !Array.isArray(comp.elementos) ||
+        !finito(comp.ancho, comp.alto) || !comp.fuentes) return null;
+    const actuales = fuentesDe(caps);
+    const claves = Object.keys(actuales);
+    if (claves.length !== Object.keys(comp.fuentes).length) return null;
+    for (const k of claves) if (comp.fuentes[k] !== actuales[k]) return null;
+    const elementos = comp.elementos.filter(function (el) {
+      return el && propio(TIPOS, el.tipo) && finito(el.x, el.y, el.escala, el.id) && el.forma && el.estilo;
+    });
+    for (const el of elementos) proximoId = Math.max(proximoId, el.id + 1);
+    return { ancho: comp.ancho, alto: comp.alto, elementos: elementos };
   }
 
   function borrarCapturas() {
@@ -1181,16 +1873,31 @@
         }) });
     }
 
-    // Guante: anillos de los dos dedos y un disco del FSR, en multiply.
-    const guante = [];
+    // Guante: anillos de los dos dedos y un disco del FSR, en multiply, con
+    // los tiempos y los eventos que anotaría la página del guante. Los
+    // tiempos no salen de azar(): así la escena es la misma de antes.
+    const guante = [], eventos = [];
     for (let i = 0; i < 12; i++) {
       const r = menor * entre(0.03, 0.12);
+      const t = i * 520 + (i * 37 % 11) * 25;
+      const vel = 60 + (i * 23) % 60;
       guante.push({ tipo: "anillo", dedo: i % 2, x: entre(0.1, 0.9) * W, y: entre(0.1, 0.9) * H,
         r: r, grosor: Math.max(1, r * 0.35), color: i % 2 ? "#ff8c1a" : "#ffde21",
-        alpha: entre(0.5, 0.95), modo: "multiply" });
+        alpha: entre(0.5, 0.95), modo: "multiply", t: t });
+      eventos.push({ t: t, tipo: "nota", nota: 52 + i % 2 * 7, vel: vel, dedo: i % 2 });
     }
+    // El FSR, apretado de 2,4 s a 4,2 s: el CC1 sube en rampa y vuelve a 0.
+    const P0 = 2400, P1 = 4200;
     guante.push({ tipo: "disco", x: W * 0.62, y: H * 0.45, r: menor * 0.1,
-      color: "#0000ff", alpha: 0.55, modo: "multiply" });
+      color: "#0000ff", alpha: 0.55, modo: "multiply", t0: P0, t1: P1 });
+    for (let t = P0, v = 20; t < P1; t += 150, v = Math.min(110, v + 15)) {
+      eventos.push({ t: t, tipo: "cc", valor: v });
+    }
+    eventos.push({ t: P1, tipo: "cc", valor: 0 });
+    eventos.sort(function (a, b) { return a.t - b.t; });
+    // Duración: el último evento más la cola (COLA_MS en la página del guante).
+    const sonidoDemo = { audio: null, duracion: (eventos[eventos.length - 1].t + 2000) / 1000,
+      eventos: eventos, latenciaMs: 0 };
 
     // Bandada: puntos negros, más un pájaro partido por el borde izquierdo
     // con su copia fantasma del lado derecho, como los deja el campo
@@ -1207,7 +1914,10 @@
     function registro(elementos) {
       return { ancho: W, alto: H, dpr: DPR, elementos: elementos, version: 1, fecha: 0 };
     }
-    return { emg: registro(emg), guante: registro(guante), bandada: registro(bandada) };
+    const regGuante = registro(guante);
+    regGuante.version = 2;
+    regGuante.sonido = sonidoDemo;
+    return { emg: registro(emg), guante: regGuante, bandada: registro(bandada) };
   }
 
   // ===============================================================
@@ -1225,16 +1935,18 @@
     actualizarPie();
   }
 
+  // Llena `capturas` y resuelve la composición guardada (o null). La demo
+  // no lee la base: nunca tiene composición guardada.
   function cargar() {
     if (DEMO) {
       const regs = registrosDemo();
       CAPAS.forEach(function (k) { capturas[k] = { registro: regs[k], bitmap: null }; });
-      return Promise.resolve();
+      return Promise.resolve(null);
     }
-    return leerCapturas()
+    return leerBase()
       .then(function (leidas) {
         return Promise.all(CAPAS.map(function (clave) {
-          const r = leidas[clave];
+          const r = leidas.capturas[clave];
           if (!r) return null;
           capturas[clave] = { registro: r, bitmap: null };
           // El PNG ya no hace falta para la escena; se decodifica para el
@@ -1242,22 +1954,49 @@
           return createImageBitmap(r.imagen).then(function (bmp) {
             capturas[clave].bitmap = bmp;
           }, function () { /* PNG ilegible: la escena sigue con los elementos */ });
-        }));
+        })).then(function () { return leidas.composicion; });
       })
       .catch(function (err) {
         vacioEl.textContent = "No se pudieron leer las capturas (" + (err && err.message || err) + ").";
+        return null;
       });
   }
 
-  cargar().then(function () {
-    escena = construirEscena(capturas);
+  cargar().then(function (composicion) {
+    hayCapturas = CAPAS.some(function (k) { return capturas[k]; });
+    // Se prepara ya, en los dos modos: al confirmar tiene que estar listo.
+    bufferSonido = prepararSonido(capturas.guante);
+    const guardada = escenaGuardada(composicion, capturas);
+    if (guardada) {
+      escena = guardada;
+      etapa = "final";
+      // Sin gesto: lo más probable es que el navegador lo deje en pausa
+      // hasta la primera tecla o clic (el pie lo dice).
+      iniciarSonido();
+    } else {
+      escena = construirEscena(capturas);
+    }
     ajustarLienzo();
     mostrarFaltantes(CAPAS.filter(function (k) { return !capturas[k]; }));
   });
 
-  // Enganche de diagnóstico (consola o un harness de Node): la página no lo
-  // usa.
+  // Enganches de diagnóstico (consola o un harness de Node): la página no
+  // los usa.
   window.__escena = function () { return escena; };
+  window.__sonido = function () {
+    return { etapa: etapa, estado: sonido.ctx ? sonido.ctx.state : null,
+             reloj: relojSonido(), duracion: sonido.duracion, motivo: motivoSinSonido,
+             cuadro: cuadroActual };
+  };
+  // El efecto de las reacciones sobre un elemento en el cuadro actual (o
+  // en `cuadro`, si se pasa uno), sin `encima`.
+  window.__efecto = function (id, cuadro) {
+    const c = cuadro || cuadroActual;
+    const el = escena && escena.elementos.find(function (e) { return e.id === id; });
+    if (!el || !c || !reacciones) return null;
+    const ef = reacciones(el, c);
+    return { dx: ef.dx, dy: ef.dy, escala: ef.escala, alpha: ef.alpha, onda: !!ef.encima };
+  };
 })();
 </script>
 </body>

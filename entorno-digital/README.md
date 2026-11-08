@@ -34,9 +34,15 @@ la siguiente con →. Desde la 10, → lleva a la 11,
 elementos de las tres capturas volcados en una sola escena y redibujados en
 vector sobre blanco, de abajo hacia arriba EMG, guante y bandada, donde se
 pueden seleccionar (con clic o con un marco), mover, agrandar (salvo los
-puntos de la bandada), copiar, pegar y eliminar, con deshacer. Ahí Inicio
+puntos de la bandada), copiar, pegar y eliminar, con deshacer. La barra
+espaciadora pulsada dos veces cierra la edición sin vuelta atrás: la
+composición se guarda y suena en loop lo que se grabó de Helm en la 7, y se
+mueve con ese sonido: los anillos y discos del guante vuelven a sonar en su
+momento, y la bandada y la EMG siguen el análisis del audio (ver
+[`cambios_experiencia_sonido_v2.md`](prototipos/cambios_experiencia_sonido_v2.md)
+y [`..._v3.md`](prototipos/cambios_experiencia_sonido_v3.md)). Ahí Inicio
 borra las capturas y vuelve a la 0; `composicion.html#demo` muestra una escena
-sintética sin necesidad de capturar. Es la base del editor que se describe en
+sintética, con un sonido sintético, sin necesidad de capturar. Es la base del editor que se describe en
 [`propuesta_composicion_editable.md`](prototipos/propuesta_composicion_editable.md)
 (la v1, que apilaba los PNG, quedó en `prototipos/composicion_v1.html`).
 

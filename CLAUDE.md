@@ -46,8 +46,12 @@ La pantalla 11, `composicion.html`, vuelca los `elementos` de las tres capturas
 en una sola escena y los redibuja en vector (EMG abajo, guante, bandada
 arriba), y ya permite seleccionar (con clic o con un marco), mover,
 agrandar (no los puntos de la bandada), copiar y pegar, eliminar y deshacer: es el editor
-de `prototipos/propuesta_composicion_editable.md`, que se construye por etapas;
-ahí Inicio borra las capturas y vuelve a la 0, V alterna con los PNG
+de `prototipos/propuesta_composicion_editable.md`, que se construye por etapas.
+La barra espaciadora dos veces cierra la edición (definitivo): la escena se guarda en
+la clave `composicion` y suena en loop la grabación del guante
+(`prototipos/cambios_experiencia_sonido_v2.md`), que mueve la escena: anillos y discos
+vuelven a sonar en su momento, la bandada y la EMG siguen el análisis del audio
+(tabla `REACCIONES`, `prototipos/cambios_experiencia_sonido_v3.md`). Ahí Inicio borra las capturas y vuelve a la 0, V alterna con los PNG
 originales para diagnóstico y `composicion.html#demo` arma una escena
 sintética sin capturar. Las copias no cambian la
 física: un ajuste en una página activa hay que portarlo a mano a su copia.
