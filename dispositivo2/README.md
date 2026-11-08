@@ -32,7 +32,7 @@ así que se captura el **pico** de cada golpe.
   loop alcanza a muestrear. **El pulldown va de 100 kΩ, no de 1 MΩ**: con el
   capacitor, 1 MΩ daría τ = 120 ms y bloquearía el retrigger unos 300 ms. La
   justificación completa está en
-  [`entorno-digital/documentacion_percusion_guante.md`](../entorno-digital/documentacion_percusion_guante.md).
+  [`entorno-digital/documentacion/guante.md`](../entorno-digital/documentacion/guante.md).
 - Sensor de fuerza: FSR al pin **A4**, con resistencia de pulldown de 10K a GND
   ([referencia](https://learn.adafruit.com/force-sensitive-resistor-fsr/using-an-fsr))
 - La LilyPad USB expone nueve sew tabs de I/O (`2, 3, 9, 10, 11, A2, A3, A4,
@@ -62,7 +62,7 @@ por Web Serial (Chrome o Edge de escritorio), que reenvía los golpes y la
 presión a Helm por MIDI. Las versiones anteriores, con voz propia de Web Audio
 o con la primera salida MIDI, están archivadas en
 [`entorno-digital/prototipos/`](../entorno-digital/prototipos/). Ver
-[`entorno-digital/documentacion_percusion_guante.md`](../entorno-digital/documentacion_percusion_guante.md).
+[`entorno-digital/documentacion/guante.md`](../entorno-digital/documentacion/guante.md).
 
 ## Archivos del sketch
 

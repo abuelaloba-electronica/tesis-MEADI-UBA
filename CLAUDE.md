@@ -35,23 +35,23 @@ sin romper nada.
 
 **La experiencia completa** vive en `entorno-digital/experiencia/`:
 `experiencia.html` son las pantallas de texto (0–4, 6, 8 y 10, ← →), y las pantallas
-5, 7 y 9 son copias `_experiencia` de las tres páginas activas (sus
+5, 7 y 9 son copias de las tres páginas activas (`bandada.html`,
+`guante_percusion.html`, `emg_acumulacion.html`; sus
 instrucciones están en la pantalla de texto anterior: 4, 6 y 8), con Retroceso para borrar, barra espaciadora dos veces para capturar
 (la primera pide confirmación; definitiva: PNG transparente + lista de `elementos` en IndexedDB) y → para seguir.
 La copia del guante además graba lo que suena en Helm (sólo la fuente
 `MAEDI-Helm-grabacion` que arma `tools/audio_helm.sh`, nunca un micrófono) y
-lo guarda con la captura (`version: 2`, campo `sonido`); ver
-`prototipos/propuesta_sonido_composicion.md` y `prototipos/cambios_experiencia_sonido_v1.md`.
+lo guarda con la captura (`version: 2`, campo `sonido`).
 La pantalla 11, `composicion.html`, vuelca los `elementos` de las tres capturas
 en una sola escena y los redibuja en vector (EMG abajo, guante, bandada
-arriba), y ya permite seleccionar (con clic o con un marco), mover,
-agrandar (no los puntos de la bandada), copiar y pegar, eliminar y deshacer: es el editor
-de `prototipos/propuesta_composicion_editable.md`, que se construye por etapas.
+arriba), y permite seleccionar (con clic o con un marco), mover,
+agrandar (no los puntos de la bandada), copiar y pegar, eliminar y deshacer.
 La barra espaciadora dos veces cierra la edición (definitivo): la escena se guarda en
-la clave `composicion` y suena en loop la grabación del guante
-(`prototipos/cambios_experiencia_sonido_v2.md`), que mueve la escena: anillos y discos
-vuelven a sonar en su momento, la bandada y la EMG siguen el análisis del audio
-(tabla `REACCIONES`, `prototipos/cambios_experiencia_sonido_v3.md`). Ahí Inicio borra las capturas y vuelve a la 0, V alterna con los PNG
+la clave `composicion` y suena en loop la grabación del guante, que mueve la
+escena: anillos y discos vuelven a sonar en su momento, la bandada y la EMG
+siguen el análisis del audio (tabla `REACCIONES`). Todo esto, con sus
+decisiones y su historial, está en `entorno-digital/documentacion/experiencia.md`.
+Ahí Inicio borra las capturas y vuelve a la 0, V alterna con los PNG
 originales para diagnóstico y `composicion.html#demo` arma una escena
 sintética sin capturar. Las copias no cambian la
 física: un ajuste en una página activa hay que portarlo a mano a su copia.
@@ -83,17 +83,25 @@ hardware. Al tocar la física, respetar esa frontera.
 
 **Versionado por copia.** Una variante nueva es un archivo nuevo
 (`..._v2.html`, `..._v3.html`, `..._v4a...`), no una reescritura del anterior:
-las versiones previas se conservan para poder comparar el comportamiento. Cada
-salto de versión deja un `entorno-digital/prototipos/cambios_<tema>_vN.md` que
-explica **por qué** cambió cada cosa, no sólo qué cambió.
+las versiones previas se conservan para poder comparar el comportamiento.
+
+**Un documento vigente por tema.** `entorno-digital/documentacion/` tiene un
+solo `.md` por tema (`experiencia.md`, `bandada.md`, `guante.md`, `emg.md`):
+el comportamiento actual, **por qué** es así, cómo probarlo, lo pendiente y,
+al final, un historial de versiones. Cada cambio actualiza el documento para
+que siga describiendo lo implementado, y cada salto de versión suma su
+entrada al historial (qué cambió y por qué). No se crean `cambios_*_vN.md`
+sueltos: lo que deja de ser cierto se reescribe o pasa al historial. Una
+visualización nueva estrena su documento ahí.
 
 **Sufijo `_dispositivo`.** `prototipo_x.html` simula el sensor con controles
 manuales; `prototipo_x_dispositivo.html` es la misma visualización leyendo el
 hardware real por USB. Las versiones simuladas siguen siendo útiles: son la
 única forma de trabajar sin la placa en la mano.
 
-**`entorno-digital/prototipos/` es histórico.** Versiones anteriores y
-propuestas de visualizaciones cuyo dispositivo todavía no existe. En
+**`entorno-digital/prototipos/` es histórico.** Versiones anteriores (su
+historia está en el documento de su tema) y la propuesta del estiramiento,
+cuyo dispositivo todavía no existe. En
 `entorno-digital/` queda sólo la versión activa de cada dispositivo. No editar
 salvo pedido expreso; el trabajo activo vive en `entorno-digital/`.
 
@@ -107,8 +115,8 @@ No hay suite de tests. Tres técnicas, en orden de costo:
    Corre la simulación real sin navegador: extrae el `<script>` del HTML, lo
    evalúa con stubs mínimos de DOM y canvas, y maneja el reloj a mano para
    simular minutos en segundos. Mide interceptando `ctx.arc()`. Es lo que
-   detectó los tres bugs de comportamiento de la bandada v4 (ver
-   `entorno-digital/prototipos/cambios_bandada_v4.md`, sección Validación).
+   detectó los tres bugs de comportamiento de la bandada v4 (ver el
+   historial de `entorno-digital/documentacion/bandada.md`).
 
    ```
    node entorno-digital/tools/harness.js entorno-digital/bandada_prototipo_v5a_dispositivo.html --perfil=despertar
@@ -140,7 +148,7 @@ No hay suite de tests. Tres técnicas, en orden de costo:
    en paralelo y recibe los golpes por Web MIDI): para ellas está
    `entorno-digital/tools/harness_midi.js`, que con un `MIDIAccess` falso
    verifica notas colgadas, retrigger, CC del FSR, pánico y el reparto de la
-   intensidad en tramos de la escala. En la copia `_experiencia` verifica
+   intensidad en tramos de la escala. En la copia de la experiencia verifica
    también la grabación del sonido, con `mediaDevices`, `MediaRecorder` e
    IndexedDB falsos (en la activa esa sección dice "no aplica").
 
@@ -196,14 +204,10 @@ Verificación de sintaxis rápida: extraer el `<script>` a un `.js` y correr
 |---|---|
 | el acelerómetro, su textil y su tira de LEDs | `dispositivo1/README.md` |
 | el guante de percusión y la fuerza | `dispositivo2/README.md` |
-| cualquier visualización | `entorno-digital/README.md` |
-| la bandada (física, señal, constantes de ajuste) | `entorno-digital/README.md` + `entorno-digital/prototipos/cambios_bandada_v4.md` |
-| la bandada v5a (arranque quieto, campo continuo, encuadre) | `entorno-digital/prototipos/cambios_bandada_v5.md` |
-| el guante: circuito, audio, variantes | `entorno-digital/documentacion_percusion_guante.md` |
-| el guante con Helm por MIDI | `entorno-digital/prototipos/cambios_percusion_guante_midi.md` (y `..._midi_v2.md`, el FSR como disco) |
-| la acumulación EMG v3 (cuadriláteros, lector del dispositivo3) | `entorno-digital/prototipos/cambios_emg_acumulacion_v3.md` |
-| la acumulación EMG v4 (centro que se muda, familias de color) | `entorno-digital/prototipos/cambios_emg_acumulacion_v4.md` |
-| la experiencia completa (pantallas, captura, navegación) | el guion `entorno-digital/experiencia-interactiva-guion.md` |
-| la composición final (capturas transparentes, `elementos`) | `entorno-digital/prototipos/cambios_experiencia_composicion.md` |
-| la composición editable (escena en vector, operaciones, etapas) | `entorno-digital/prototipos/propuesta_composicion_editable.md` + `entorno-digital/prototipos/cambios_experiencia_composicion_v2.md` |
-| visualizaciones sin hardware todavía (EMG, estiramiento) | `entorno-digital/prototipos/propuesta_*.md` |
+| cualquier visualización (índice, harness, archivadas) | `entorno-digital/README.md` |
+| la bandada (física, señal, constantes de ajuste, versiones) | `entorno-digital/documentacion/bandada.md` |
+| el guante: circuito, MIDI y Helm, anillos y disco, versiones | `entorno-digital/documentacion/guante.md` |
+| la acumulación EMG: figura, familias, lector y calibración, versiones | `entorno-digital/documentacion/emg.md` |
+| la experiencia completa: pantallas, captura, composición editable, sonido | `entorno-digital/documentacion/experiencia.md` |
+| el texto y el orden de las pantallas | el guion `entorno-digital/experiencia-interactiva-guion.md` |
+| la visualización del estiramiento (sin hardware todavía) | `entorno-digital/prototipos/propuesta_estiramiento_lineas.md` |

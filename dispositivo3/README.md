@@ -100,9 +100,9 @@ emite `E:0`.
     lecturas o alargar `ASENTAMIENTO_MS`.
 - La página que lo consume es
   `entorno-digital/prototipo_emg_acumulacion_v4_dispositivo.html`
-  (cuadriláteros superpuestos; el lector serie es el de la v3, ver
-  `entorno-digital/prototipos/cambios_emg_acumulacion_v3.md`, sección
-  "Calibración con la primera sesión real"). Se recalibró contra
+  (cuadriláteros superpuestos; el lector serie y su calibración con la
+  primera sesión real están en `entorno-digital/documentacion/emg.md`,
+  sección "La señal"). Se recalibró contra
   `salida.txt` con `entorno-digital/tools/harness_emg.js`; falta volver a
   probarla con la placa.
 - **Si se cambia el formato de las líneas `E:` o `L:`, hay que actualizar el

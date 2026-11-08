@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ---------------------------------------------------------------
 # Ruteo de audio para grabar Helm desde la página del guante
-# (ver prototipos/propuesta_sonido_composicion.md, punto 1).
+# (ver documentacion/experiencia.md, sección 5.2).
 #
 # Crea en PipeWire:
 #   maedi_helm      sink virtual (MAEDI-Helm): lo que entra acá se graba
@@ -13,7 +13,7 @@
 #
 # La entrada por defecto del sistema no se toca: la página busca la fuente
 # de Helm por su nombre, no pide "el micrófono" (ver
-# tools/diagnostico_audio.html y la propuesta).
+# tools/diagnostico_audio.html y documentacion/experiencia.md).
 #
 # Helm 0.9.0 en esta máquina sale por ALSA, y PipeWire lo muestra como el
 # flujo `alsa_playback.helm`. Los enlaces se pierden al cerrar Helm, así que

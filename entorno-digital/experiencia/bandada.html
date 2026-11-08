@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Experiencia · 7 · Bandada v5a (MAEDI)</title>
+<title>Experiencia · 5 · Bandada v5a (MAEDI)</title>
 <style>
   /* Roboto Light, local en fuentes/ (sin CDN: la página se abre por file://). */
   @font-face {
@@ -1495,7 +1495,7 @@
       // velocidad se pierde el amortiguamiento del boids clásico de Reynolds.
       // Frenar en proporción a cuánto falta girar reduce el radio de giro
       // (r ≈ v/ω) y amortigua la oscilación de todo el grupo. (Diagnóstico y
-      // corrección de v3; ver cambios_bandada_v3.md.)
+      // corrección de v3; ver documentacion/bandada.md.)
       targetSpeed *= lerp(1.0, 0.4, Math.abs(bank));
 
       const prevSpeed = Math.hypot(b.vx, b.vy);

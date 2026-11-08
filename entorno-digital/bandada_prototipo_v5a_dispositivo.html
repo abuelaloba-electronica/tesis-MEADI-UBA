@@ -1412,7 +1412,7 @@
       // velocidad se pierde el amortiguamiento del boids clásico de Reynolds.
       // Frenar en proporción a cuánto falta girar reduce el radio de giro
       // (r ≈ v/ω) y amortigua la oscilación de todo el grupo. (Diagnóstico y
-      // corrección de v3; ver cambios_bandada_v3.md.)
+      // corrección de v3; ver documentacion/bandada.md.)
       targetSpeed *= lerp(1.0, 0.4, Math.abs(bank));
 
       const prevSpeed = Math.hypot(b.vx, b.vy);

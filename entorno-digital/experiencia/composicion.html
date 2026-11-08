@@ -106,15 +106,15 @@ Es definitivo: después ya no se puede seguir editando.</div>
   // ---------------------------------------------------------------
   // Pantalla 11 de la experiencia: la composición de las tres capturas.
   //
-  // Cada página _experiencia, al pulsar la barra espaciadora, guarda en
+  // Cada página de los dispositivos, al pulsar la barra espaciadora, guarda en
   // IndexedDB ("experiencia", almacén "capturas") un registro
   //   { imagen: PNG transparente, ancho, alto (px CSS), dpr,
   //     elementos: [...], version, fecha }
   // con clave "bandada", "guante" o "emg". El del guante es version 2 y
   // suma `sonido` (la grabación de Helm y sus eventos, o null; ver
-  // prototipos/cambios_experiencia_sonido_v1.md).
+  // documentacion/experiencia.md, sección 5.3).
   //
-  // Dos modos (ver prototipos/cambios_experiencia_sonido_v2.md):
+  // Dos modos (ver documentacion/experiencia.md, sección 4.4):
   //   edición  al entrar: se edita en silencio, como abajo
   //   final    la barra espaciadora pulsada dos veces (la primera pide
   //            confirmación) cierra la edición, sin vuelta atrás: guarda la
@@ -122,11 +122,11 @@ Es definitivo: después ya no se puede seguir editando.</div>
   //            y reproduce en loop la grabación del guante. Si la página se
   //            recarga, vuelve directo a este modo. Sólo quedan ← e Inicio.
   //            Con sonido, la escena se mueve con él (ver REACCIONES y
-  //            prototipos/cambios_experiencia_sonido_v3.md): los anillos y
+  //            documentacion/experiencia.md, sección 5.5): los anillos y
   //            discos del guante vuelven a sonar en su momento, y la bandada
   //            y la EMG siguen el análisis de lo que suena.
   //
-  // v2 (ver prototipos/cambios_experiencia_composicion_v2.md): los
+  // v2 (ver documentacion/experiencia.md, sección 4): los
   // `elementos` de las tres capturas se vuelcan en una sola lista ordenada,
   // la escena, y se redibujan en vector en un único canvas, donde cada uno
   // se puede seleccionar y modificar venga del dispositivo que venga.
@@ -154,7 +154,7 @@ Es definitivo: después ya no se puede seguir editando.</div>
   //   V       diagnóstico: alterna entre la escena en vector y los PNG
   //           originales. Si la escena está bien construida, al alternar no
   //           se mueve nada (salvo el multiply del guante sobre la EMG, que
-  //           los PNG no tienen: ver el registro de cambios). Mientras se
+  //           los PNG no tienen: ver documentacion/experiencia.md). Mientras se
   //           ven los PNG la edición queda en pausa: no reflejan los cambios.
   //
   // composicion.html#demo arma una escena sintética con los cuatro tipos de

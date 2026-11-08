@@ -21,8 +21,8 @@
 //   - eleccion de puerto, incluido Helm abierto DESPUES que la pagina
 //   - costo de dibujo constante (el mismo test que harness_golpes.js)
 //
-// Y en la copia _experiencia, que ademas graba lo que suena en Helm (ver
-// prototipos/propuesta_sonido_composicion.md, punto 2), con
+// Y en la copia de la experiencia (experiencia/guante_percusion.html), que ademas graba lo que suena en Helm (ver
+// documentacion/experiencia.md, sección 5.3), con
 // navigator.mediaDevices, MediaRecorder e IndexedDB falsos:
 //
 //   - que pida SOLO la fuente MAEDI-Helm-grabacion, por deviceId exacto y sin
@@ -142,7 +142,7 @@ function elementoFalso(id) {
     appendChild: function (h) { el.hijos.push(h); return h; },
     getContext: function () { return el._ctx || (el._ctx = ctx2dFalso()); },
     getBoundingClientRect: function () { return { top: 0, left: 0, width: 100, height: 100 }; },
-    // La captura de las copias _experiencia compone un PNG.
+    // La captura de las copias de la experiencia compone un PNG.
     toBlob: function (cb) { cb(new Blob([new Uint8Array(64)], { type: "image/png" })); }
   };
   Object.defineProperty(el, "innerHTML", {
@@ -890,7 +890,7 @@ async function probarGrabacion() {
   verificar("el costo por frame no crece con el historial (lienzo persistente)",
             pFin <= pIni + 2, "de " + pIni.toFixed(2) + " a " + pFin.toFixed(2));
 
-  // --- 8. Grabacion del sonido de Helm (copias _experiencia) -----------
+  // --- 8. Grabacion del sonido de Helm (copia de la experiencia) ------
   console.log("");
   if (!GRABA) {
     console.log("Grabacion del sonido: no aplica (esta pagina no graba)");
