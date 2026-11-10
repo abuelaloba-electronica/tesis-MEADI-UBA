@@ -9,7 +9,7 @@ Cada golpe **suena** en **Helm**, un sintetizador que corre en paralelo y
 recibe los golpes por MIDI, y **deja un anillo** en el lienzo. La intensidad
 del golpe elige la nota dentro de una escala y el tamaño del anillo. La
 presión del FSR **modula el sonido** (mueve los parámetros de Helm asignados a
-la rueda de modulación) y dibuja su propia marca, un **disco azul**.
+la rueda de modulación) y dibuja su propia marca, un **disco relleno**.
 
 | Archivo | Qué es |
 |---|---|
@@ -33,11 +33,20 @@ dispositivo2 ──USB serie──→ página (Web Serial) ──→ dibujo
                                └─ Web MIDI ──puerto MIDI──→ Helm ──→ parlantes
 ```
 
-- **Los dos dedos dejan anillos huecos** en dos tonos de amarillo (dedo 0
-  `#FFDE21`, dedo 1 naranja `#FF8C1A`), compuestos con `multiply`: se
-  oscurecen donde se cruzan, como tinta acumulándose.
-- **El FSR deja un disco azul** por presión, que crece mientras se aprieta y
-  se estampa al soltar.
+- **Los dos dedos dejan anillos huecos** de dos colores, compuestos con
+  `multiply`: se oscurecen donde se cruzan, como tinta acumulándose.
+- **El FSR deja un disco relleno** por presión, que crece mientras se aprieta
+  y se estampa al soltar.
+
+| | Página activa | Copia de la experiencia (§7) |
+|---|---|---|
+| dedo 0 | amarillo `#FFDE21` | amarillo limón `#eef202` |
+| dedo 1 | naranja `#FF8C1A` | gris cálido `#847575` |
+| FSR | azul `#0000FF` | negro azulado `#151923` |
+
+La copia usa la paleta elegida con
+[`../tools/paleta_colores.html`](../tools/paleta_colores.html); la página
+activa conserva la anterior.
 - **La página no suena**: traduce golpes y presión a mensajes MIDI. El sonido
   (síntesis, distorsión, delay, reverb) lo pone el patch de Helm.
 
@@ -226,8 +235,10 @@ vivo se vea igual que estampado y no haya salto al soltar.
 
 Cada golpe deja un anillo hueco de grosor `0,35·r`. La **forma** codifica qué
 sensor produjo la marca (anillo = golpe, disco = presión) y el **tono**, qué
-dedo; los tonos son vecinos a propósito, porque los dos dedos son el mismo
-gesto. El selector ofrece otros dos pares de amarillos. La intensidad
+dedo. En la página activa los tonos son vecinos (amarillo y naranja), porque
+los dos dedos son el mismo gesto; en la copia, el par de la paleta nueva
+(amarillo limón y gris cálido) se separa más. El selector ofrece además otros
+pares de amarillo y naranja. La intensidad
 continua (no la nota) da el **tamaño** (`0,08` a `0,10 · min(W,H)`) y la
 **opacidad** (piso 0,08): un anillo más grande es un golpe más fuerte, y por
 lo tanto una nota más aguda.
@@ -239,7 +250,7 @@ hasta 2,2 veces el radio y se desvanece en `ANILLO_DUR` (200 ms).
 cerca de él y no al azar. Un redoble dibuja una constelación y los golpes
 espaciados se dispersan.
 
-### 4.3 · El FSR: un disco azul por presión
+### 4.3 · El FSR: un disco por presión
 
 ```
 fuerza > 0,06           → empieza la presión: se elige una posición al azar
@@ -316,6 +327,10 @@ espaciadora dos veces, captura, → a `experiencia.html#8`; ver
 
 - **El fondo lo pinta el CSS**: `pintarFondo()` limpia `#acum` en lugar de
   pintar `#faf6f0`, y se captura `#acum`.
+- **La paleta nueva** (§1): `colorDedo` arranca en `#eef202` / `#847575`, que
+  es la primera opción del selector, y `COLOR_FSR` es `#151923`. Las barras
+  del panel (`#hit0Fill`, `#hit1Fill`, `#forceFillBar`) usan los mismos
+  colores. Siguen en `multiply` y con la opacidad por intensidad.
 - **Los elementos de la captura**: cada anillo y cada disco estampado se
   anota en `elementos` en el momento de estamparlo, con `modo: "multiply"`.
 - **Graba lo que suena en Helm** (sólo la fuente `MAEDI-Helm-grabacion`,
@@ -412,3 +427,13 @@ overlay pasó a `multiply` y la tecla F, a una rampa.
 espaciadora (2026-10-28); instrucciones movidas a la pantalla 6 (2026-11-02);
 fondo por CSS y lista de `elementos` (2026-11-03); confirmación con la
 segunda pulsación y **grabación del sonido de Helm** (2026-11-07).
+
+**Copia: paleta nueva** (`experiencia/guante_percusion.html`, 2026-11-09).
+Sólo cambian los colores: dedo 0 `#FFDE21` → `#eef202` (amarillo limón),
+dedo 1 `#FF8C1A` → `#847575` (gris cálido) y el FSR `#0000FF` → `#151923`
+(negro azulado), también en las barras del panel. El par nuevo es la primera
+opción del selector y la de arranque; las tres anteriores se conservan. La
+paleta se eligió con `tools/paleta_colores.html`, que previsualiza el guante
+y la EMG solos y superpuestos en la composición. La página activa no se
+tocó. Las capturas guardan el color de cada elemento, así que las anteriores
+conservan los suyos. `harness_midi.js` da la misma salida que antes.

@@ -124,9 +124,15 @@ captura.
 **El aviso** copia a mano la anatomía y los tokens del Alert de Ant Design
 (ícono, título, texto, X), sin depender de un CDN en la sala.
 
-**El fondo lo pinta el CSS, no el canvas.** Es la única diferencia buscada
-con las páginas activas. Para superponer las capturas, cada PNG tiene que
-ser transparente donde no hay dibujo:
+**Los colores del guante y de la EMG** son la otra diferencia buscada: las
+copias usan la paleta elegida con
+[`../tools/paleta_colores.html`](../tools/paleta_colores.html), que
+previsualiza las dos visualizaciones solas y superpuestas como en la 11
+(detalle en [`guante.md`](guante.md) §1 y [`emg.md`](emg.md) §1.3). Las
+páginas activas conservan la anterior.
+
+**El fondo lo pinta el CSS, no el canvas.** Para superponer las capturas,
+cada PNG tiene que ser transparente donde no hay dibujo:
 
 - bandada: `draw()` hace `clearRect` en lugar del `fillRect` blanco;
 - guante: `pintarFondo()` limpia en lugar de pintar `#faf6f0`. Los anillos
@@ -644,7 +650,8 @@ sonido en pausa, al recargar en el modo final antes de la primera tecla.
 ## 6 · Probar sin recorrer todo
 
 - **`composicion.html#demo`** arma una escena sintética con semilla fija
-  (cuadriláteros de dos familias, anillos de los dos dedos, un disco, una
+  (cuadriláteros de dos familias de la paleta nueva, anillos de los dos
+  dedos y un disco con sus colores nuevos, una
   nube de puntos y un pájaro partido entre los bordes) por el mismo camino de
   conversión que las capturas reales. Su guante trae tiempos (un anillo cada
   ~0,5 s, el disco de 2,4 a 4,2 s) y un sonido **sintetizado a partir de los
@@ -842,3 +849,12 @@ con su sonido (`captureStream` + `MediaRecorder`) y la descarga en MP4
 (§5.6). Usa un lienzo propio de 1280×720 con el fondo pintado y un reloj
 sin la latencia de salida. `dibujarEscena` recibe el cuadro como parámetro,
 para que la pantalla y el video dibujen cada uno el suyo.
+
+**2026-11-09 · Paleta nueva.** Las copias del guante y de la EMG cambian de
+colores con una paleta elegida en `tools/paleta_colores.html`, que muestra
+las dos visualizaciones solas y superpuestas en la composición. Guante:
+anillos amarillo limón `#eef202` y gris cálido `#847575`, disco negro
+azulado `#151923`. EMG: cinco familias derivadas de cinco colores base. La
+física, el `multiply` y las opacidades no cambian. `#demo` usa los colores
+nuevos. Las capturas guardan el color de cada elemento, así que no hubo que
+migrar IndexedDB: la paleta alcanza a las capturas posteriores.

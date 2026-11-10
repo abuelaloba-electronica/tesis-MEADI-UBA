@@ -26,7 +26,7 @@ que envía. El navegador no se enteró y no tiene que enterarse.
 | Dispositivo | Placa | Sensores / actuadores | Emite | Frecuencia | Lo consume |
 |---|---|---|---|---|---|
 | `dispositivo1` | Adafruit Flora V3 (ATmega32u4) | LSM6DSO32 por I2C (acelerómetro, ±4 g); tira de 13 LEDs WS2812B en D6 | `A:<x>,<y>,<z>` en g | ~33/s | `entorno-digital/bandada_prototipo_v5a_dispositivo.html` (las v4a/v4b anteriores, archivadas en `prototipos/`) |
-| `dispositivo2` | LilyPad Arduino USB (ATmega32u4, 8 MHz) | 2 piezos de guante (A2, A3) + FSR (A4) | `F:<0-1023>` y `G:<dedo>,<pico>` | ~50/s y por golpe | `entorno-digital/prototipo_percusion_guante_a_midi_v2_dispositivo.html` (sonido en Helm; el FSR como disco azul). Las versiones anteriores, archivadas en `prototipos/` |
+| `dispositivo2` | LilyPad Arduino USB (ATmega32u4, 8 MHz) | 2 piezos de guante (A2, A3) + FSR (A4) | `F:<0-1023>` y `G:<dedo>,<pico>` | ~50/s y por golpe | `entorno-digital/prototipo_percusion_guante_a_midi_v2_dispositivo.html` (sonido en Helm; el FSR como disco relleno). Las versiones anteriores, archivadas en `prototipos/` |
 | `dispositivo3` | LilyPad Arduino USB (ATmega32u4, 8 MHz) | AD8232 en la pantorrilla (A2, leads-off en 2 y 3) | `E:<amplitud MAV>` y `L:<0\|1>` | 50/s y al cambiar | `entorno-digital/prototipo_emg_acumulacion_v4_dispositivo.html` (cuadriláteros superpuestos que cambian de lugar y de color cada 1-5; la v3, la v2 y la fractura v1, en `prototipos/`) |
 
 Las páginas ignoran en silencio cualquier línea que no reconozcan, así que los
@@ -57,8 +57,9 @@ Ahí Inicio borra las capturas y vuelve a la 0, V alterna con los PNG
 originales para diagnóstico y `composicion.html#demo` arma una escena
 sintética sin capturar. Las copias no cambian la
 física: un ajuste en una página activa hay que portarlo a mano a su copia.
-La única diferencia buscada es el fondo: en las copias lo pinta el CSS y no el
-canvas, para que la captura salga transparente.
+Las diferencias buscadas son el fondo (en las copias lo pinta el CSS y no el
+canvas, para que la captura salga transparente) y, en el guante y la EMG, la
+paleta elegida con `entorno-digital/tools/paleta_colores.html`.
 
 **El guion manda sobre el contenido.** `entorno-digital/experiencia-interactiva-guion.md`
 es la fuente del texto y del orden de las pantallas, y tiene que quedar siempre

@@ -70,6 +70,7 @@ que portarlo a mano a su copia en `experiencia/`. Detalle en
 | [`tools/harness_emg.js`](tools/harness_emg.js) | reproduce una captura del Monitor Serial del `dispositivo3` contra la página EMG |
 | [`tools/audio_helm.sh`](tools/audio_helm.sh) | ruteo de Helm en PipeWire para grabarlo desde el navegador |
 | [`tools/diagnostico_audio.html`](tools/diagnostico_audio.html) | comprueba que el navegador ve y graba la fuente de Helm |
+| [`tools/paleta_colores.html`](tools/paleta_colores.html) | elige y previsualiza los colores del guante y de la EMG (solos y en la composición) y genera un prompt para aplicarlos |
 
 Cómo usar cada harness: en el documento de su visualización.
 

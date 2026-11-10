@@ -2192,8 +2192,8 @@ Es definitivo: después ya no se puede seguir editando.</div>
     const W = window.innerWidth, H = window.innerHeight, menor = Math.min(W, H);
 
     // EMG: cuadriláteros irregulares de dos familias, superpuestos al centro.
-    const tonos = ["#f2a7a1", "#e9b44c", "#f07a5f", "#c2306f",
-                   "#7fa7d9", "#5b8ccf", "#3a6bb5", "#28488f"];
+    const tonos = ["#ff8080", "#ff4040", "#cc0000", "#990000",
+                   "#d4cd80", "#beb340", "#867b00", "#655c00"];
     const emg = [];
     for (let i = 0; i < 14; i++) {
       const cx = W / 2 + entre(-0.28, 0.28) * W, cy = H / 2 + entre(-0.25, 0.25) * H;
@@ -2214,14 +2214,14 @@ Es definitivo: después ya no se puede seguir editando.</div>
       const t = i * 520 + (i * 37 % 11) * 25;
       const vel = 60 + (i * 23) % 60;
       guante.push({ tipo: "anillo", dedo: i % 2, x: entre(0.1, 0.9) * W, y: entre(0.1, 0.9) * H,
-        r: r, grosor: Math.max(1, r * 0.35), color: i % 2 ? "#ff8c1a" : "#ffde21",
+        r: r, grosor: Math.max(1, r * 0.35), color: i % 2 ? "#847575" : "#eef202",
         alpha: entre(0.5, 0.95), modo: "multiply", t: t });
       eventos.push({ t: t, tipo: "nota", nota: 52 + i % 2 * 7, vel: vel, dedo: i % 2 });
     }
     // El FSR, apretado de 2,4 s a 4,2 s: el CC1 sube en rampa y vuelve a 0.
     const P0 = 2400, P1 = 4200;
     guante.push({ tipo: "disco", x: W * 0.62, y: H * 0.45, r: menor * 0.1,
-      color: "#0000ff", alpha: 0.55, modo: "multiply", t0: P0, t1: P1 });
+      color: "#151923", alpha: 0.55, modo: "multiply", t0: P0, t1: P1 });
     for (let t = P0, v = 20; t < P1; t += 150, v = Math.min(110, v + 15)) {
       eventos.push({ t: t, tipo: "cc", valor: v });
     }

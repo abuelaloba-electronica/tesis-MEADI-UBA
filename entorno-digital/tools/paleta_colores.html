@@ -1,0 +1,1196 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Paleta de colores (MAEDI)</title>
+<style>
+  /* Roboto Light, la misma de la experiencia (sin CDN: se abre por file://). */
+  @font-face {
+    font-family: "Roboto"; font-style: normal; font-weight: 300;
+    src: local("Roboto Light"), local("Roboto-Light"), url("../experiencia/fuentes/roboto-latin-300-normal.woff2") format("woff2");
+  }
+  @font-face {
+    font-family: "Roboto"; font-style: normal; font-weight: 700;
+    src: local("Roboto Bold"), local("Roboto-Bold"), url("../experiencia/fuentes/roboto-latin-700-normal.woff2") format("woff2");
+  }
+  :root {
+    --ink: #222;
+    --suave: #777;
+    --tenue: #999;
+    --line: #ddd;
+    --panel: #fff;
+    --fondo: #f1f0ee;
+    --accent: #c22a44;
+  }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: var(--fondo);
+    color: var(--ink);
+    font-family: "Roboto", -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+    font-weight: 300;
+  }
+  button, input, select, textarea { font-family: inherit; font-weight: inherit; color: inherit; }
+  body { display: grid; grid-template-columns: 350px 1fr; overflow: hidden; }
+
+  /* ----- Panel de controles ----- */
+  #panel {
+    height: 100vh; overflow-y: auto; box-sizing: border-box;
+    background: var(--panel); border-right: 1px solid var(--line);
+    padding: 16px 18px 40px; font-size: 12px;
+  }
+  h1 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; margin: 0 0 2px; font-weight: 700; color: #555; }
+  .subtitle { font-size: 10.5px; color: var(--tenue); margin: 0 0 6px; line-height: 1.4; }
+  details { border-top: 1px solid var(--line); padding: 10px 0 6px; }
+  summary { cursor: pointer; font-size: 11px; font-weight: 700; color: #555; text-transform: uppercase; letter-spacing: 0.05em; list-style: none; }
+  summary::-webkit-details-marker { display: none; }
+  summary::before { content: "▸ "; color: var(--tenue); }
+  details[open] > summary::before { content: "▾ "; }
+  .sub { font-size: 10.5px; font-weight: 700; color: #666; margin: 12px 0 6px; }
+  .row { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
+  .row > .lbl { flex: 1; color: #555; font-size: 11.5px; }
+  .note { font-size: 10.5px; color: var(--tenue); line-height: 1.45; margin: 6px 0; }
+  .radios { display: flex; flex-direction: column; gap: 3px; margin: 4px 0 8px; font-size: 11.5px; color: #555; }
+  .radios label, .check { display: flex; gap: 6px; align-items: center; cursor: pointer; }
+  .check { font-size: 11.5px; color: #555; margin: 5px 0; }
+  input[type=range] { width: 100%; }
+  input[type=number] { width: 90px; padding: 3px 5px; border: 1px solid #ccc; border-radius: 5px; font-size: 11.5px; }
+  select { padding: 3px 4px; border: 1px solid #ccc; border-radius: 5px; font-size: 11.5px; background: #fff; }
+
+  button {
+    padding: 5px 9px; font-size: 11.5px; border: 1px solid #aaa; background: #fff;
+    border-radius: 6px; cursor: pointer;
+  }
+  button:hover:not(:disabled) { background: #f2f2f2; }
+  button:disabled { opacity: 0.4; cursor: default; }
+  button.ancho { width: 100%; margin-top: 6px; }
+  button.primario { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 700; }
+  button.primario:hover:not(:disabled) { background: var(--accent); filter: brightness(1.07); }
+  button.mini { padding: 1px 6px; font-size: 11px; line-height: 1.3; }
+  .botones { display: flex; flex-wrap: wrap; gap: 5px; margin: 6px 0; }
+
+  /* Campo de color: muestra nativa + hex editable */
+  .campo-color { display: flex; align-items: center; gap: 5px; }
+  .campo-color input[type=color] { width: 30px; height: 24px; padding: 0; border: 1px solid #bbb; border-radius: 5px; background: none; cursor: pointer; }
+  .campo-color input[type=text] { width: 68px; padding: 3px 5px; border: 1px solid #ccc; border-radius: 5px; font-size: 11px; font-variant-numeric: tabular-nums; text-transform: lowercase; }
+  .campo-color input[type=text].mal { border-color: var(--accent); background: #fdecef; }
+
+  /* Editor de familias / base */
+  .familia { border: 1px solid var(--line); border-radius: 8px; padding: 7px 8px; margin: 7px 0; background: #fcfcfc; }
+  .familia-cab { display: flex; gap: 4px; align-items: center; margin-bottom: 6px; }
+  .familia-cab input { flex: 1; min-width: 0; padding: 3px 5px; border: 1px solid #ccc; border-radius: 5px; font-size: 11.5px; }
+  .tonos { display: flex; flex-wrap: wrap; gap: 5px; align-items: flex-end; }
+  .tono { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+  .tono input[type=color] { width: 30px; height: 26px; padding: 0; border: 1px solid #bbb; border-radius: 5px; background: none; cursor: pointer; }
+  .tono button { padding: 0 5px; font-size: 10px; line-height: 1.3; border-color: #ddd; color: #888; }
+  .base-fila { display: flex; gap: 6px; align-items: center; margin: 5px 0; }
+  .base-fila .num { width: 14px; color: var(--tenue); font-size: 11px; }
+
+  textarea#prompt {
+    width: 100%; box-sizing: border-box; height: 220px; margin-top: 6px;
+    font-family: ui-monospace, "DejaVu Sans Mono", monospace; font-size: 10.5px; line-height: 1.4;
+    border: 1px solid #ccc; border-radius: 6px; padding: 6px; resize: vertical;
+  }
+  #copiado { font-size: 10.5px; color: #2e9e5b; margin-left: 6px; }
+
+  /* ----- Zona de previsualización ----- */
+  #main { height: 100vh; display: flex; flex-direction: column; min-width: 0; }
+  #pestanas { display: flex; gap: 4px; padding: 12px 18px 0; border-bottom: 1px solid var(--line); background: var(--fondo); }
+  #pestanas button {
+    border: 1px solid var(--line); border-bottom: none; border-radius: 8px 8px 0 0;
+    background: #e7e5e2; padding: 7px 16px; font-size: 12px; color: #666;
+  }
+  #pestanas button.activa { background: #fff; color: var(--ink); font-weight: 700; }
+  #pestanas .espacio { flex: 1; }
+  #pestanas .info { align-self: center; font-size: 10.5px; color: var(--tenue); }
+  #contenido { flex: 1; overflow-y: auto; padding: 16px 18px 24px; min-height: 0; }
+  #marco { width: 100%; height: min(62vh, 640px); display: flex; align-items: center; justify-content: center; }
+  #lienzo { display: block; box-shadow: 0 2px 14px rgba(0,0,0,0.12); border-radius: 2px; }
+  .titulo-lamina { font-size: 11px; font-weight: 700; color: #555; text-transform: uppercase; letter-spacing: 0.05em; margin: 20px 0 4px; }
+  #lamina { margin-top: 4px; }
+  #laminaGuante { display: block; border-radius: 4px; }
+
+  .fila-lamina { display: flex; align-items: center; gap: 10px; margin: 8px 0; }
+  .fila-lamina .nombre { width: 90px; font-size: 11.5px; color: #555; flex-shrink: 0; }
+  .celdas { display: flex; flex-wrap: wrap; gap: 8px; }
+  .celda { width: 70px; }
+  .apilado { position: relative; width: 70px; height: 52px; border-radius: 4px; overflow: hidden; border: 1px solid rgba(0,0,0,0.06); }
+  .apilado div { position: absolute; width: 40px; height: 32px; }
+  .apilado div:nth-child(1) { left: 4px;  top: 4px; }
+  .apilado div:nth-child(2) { left: 15px; top: 10px; }
+  .apilado div:nth-child(3) { left: 26px; top: 16px; }
+  .solido { height: 10px; border-radius: 0 0 3px 3px; margin-top: 2px; }
+  .hex { font-size: 9.5px; color: var(--tenue); text-align: center; font-variant-numeric: tabular-nums; margin-top: 1px; }
+</style>
+</head>
+<body>
+
+<aside id="panel">
+  <h1>Paleta de colores</h1>
+  <p class="subtitle">Herramienta accesoria (no es parte del recorrido). Elegí los colores del guante y de la acumulación EMG, mirá cómo quedan solos y en la composición, y generá un prompt para aplicarlos en una sesión nueva. Todo se guarda solo en este navegador.</p>
+
+  <details open>
+    <summary>Guante (dispositivo dos)</summary>
+    <div class="row"><span class="lbl">Dedo 0 (anillo)</span><span id="cDedo0"></span></div>
+    <div class="row"><span class="lbl">Dedo 1 (anillo)</span><span id="cDedo1"></span></div>
+    <div class="row"><span class="lbl">FSR (disco)</span><span id="cFsr"></span></div>
+    <div class="row"><span class="lbl">Fondo de la página</span><span id="cFondoGuante"></span></div>
+    <div class="sub">Pares que ofrece hoy la página</div>
+    <div class="botones" id="presetsGuante"></div>
+    <div class="note">Anillos y disco se dibujan en <i>multiply</i>: donde se superponen se oscurecen, y en la composición tiñen los cuadriláteros de abajo. La opacidad la pone la intensidad del golpe (8 % a 100 %).</div>
+  </details>
+
+  <details open>
+    <summary>Acumulación EMG (dispositivo tres)</summary>
+    <div class="sub">Modelo de color</div>
+    <div class="radios">
+      <label><input type="radio" name="modo" value="familias"> Familias de tonos (el actual)</label>
+      <label><input type="radio" name="modo" value="base"> Base de 3 a 5 colores, uno por conjunto</label>
+    </div>
+
+    <div id="bloqueFamilias">
+      <div class="note">Cada conjunto de 1 a 5 cuadriláteros usa una familia; dentro de ella, la intensidad de la contracción elige el tono (ordenados de suave a intenso). La primera familia es la del arranque.</div>
+      <div id="editorFamilias"></div>
+      <button class="ancho" id="agregarFamilia">+ Familia</button>
+    </div>
+
+    <div id="bloqueBase">
+      <div class="note">Cada conjunto de 1 a 5 cuadriláteros usa uno de estos colores. El primero es el del arranque.</div>
+      <div id="editorBase"></div>
+      <div class="botones">
+        <button id="agregarBase">+ Color</button>
+        <button id="baseDesdeFamilias" title="El cuarto tono de cada familia actual">Tomar de las familias</button>
+      </div>
+      <div class="sub">Qué hace la intensidad de la contracción</div>
+      <div class="radios">
+        <label><input type="radio" name="intensidad" value="nada"> Nada: todo el conjunto del mismo color</label>
+        <label><input type="radio" name="intensidad" value="tono"> Tono: 5 tonos derivados del color, de claro a oscuro</label>
+        <label><input type="radio" name="intensidad" value="opacidad"> Opacidad: más intensa, más opaca</label>
+      </div>
+    </div>
+
+    <div class="sub">Sorteo del color de cada conjunto</div>
+    <div class="radios">
+      <label><input type="radio" name="sorteo" value="bolsa"> Bolsa: todos antes de repetir (el actual)</label>
+      <label><input type="radio" name="sorteo" value="azar"> Azar, sólo sin repetir el anterior</label>
+    </div>
+
+    <div class="row"><span class="lbl">Opacidad de cada capa</span><span id="opacidadVal" style="font-variant-numeric:tabular-nums;color:#666"></span></div>
+    <input type="range" id="opacidad" min="0.05" max="0.6" step="0.01">
+    <div class="row"><span class="lbl">Fondo de la página</span><span id="cFondoEmg"></span></div>
+    <button class="ancho" id="restaurarEmg">Restaurar las familias actuales</button>
+  </details>
+
+  <details open>
+    <summary>Composición (pantalla 11)</summary>
+    <div class="row"><span class="lbl">Fondo</span><span id="cFondoComp"></span></div>
+    <label class="check"><input type="checkbox" id="verEmg"> Cuadriláteros (EMG)</label>
+    <label class="check"><input type="checkbox" id="verGuante"> Anillos y discos (guante)</label>
+    <label class="check"><input type="checkbox" id="verBandada"> Puntos de la bandada (sólo referencia, #0a0a0a)</label>
+  </details>
+
+  <details open>
+    <summary>Muestra</summary>
+    <div class="row"><span class="lbl">Pantalla de la sala</span>
+      <select id="viewport">
+        <option value="1280x800">1280 × 800</option>
+        <option value="1440x900">1440 × 900</option>
+        <option value="1920x1080">1920 × 1080</option>
+      </select>
+    </div>
+    <div class="row"><span class="lbl">Semilla</span><input type="number" id="semilla" min="0" step="1"></div>
+    <div class="row"><span class="lbl">Cuadriláteros</span><span id="nCuadsVal" style="color:#666"></span></div>
+    <input type="range" id="nCuads" min="5" max="80" step="1">
+    <div class="row"><span class="lbl">Golpes del guante</span><span id="nGolpesVal" style="color:#666"></span></div>
+    <input type="range" id="nGolpes" min="5" max="120" step="1">
+    <div class="row"><span class="lbl">Presiones del FSR</span><span id="nPresVal" style="color:#666"></span></div>
+    <input type="range" id="nPres" min="0" max="6" step="1">
+    <button class="ancho" id="nuevaMuestra">Nueva muestra</button>
+    <div class="note">Cambiar un color no mueve las figuras: sólo “Nueva muestra” (o la semilla) las reacomoda.</div>
+  </details>
+
+  <details open>
+    <summary>Prompt para aplicar la paleta</summary>
+    <div class="sub">Dónde aplicarla</div>
+    <label class="check"><input type="checkbox" id="destCopias"> Copias de la experiencia (<code>experiencia/</code>)</label>
+    <label class="check"><input type="checkbox" id="destActivas"> Páginas activas (<code>prototipo_…_dispositivo.html</code>)</label>
+    <label class="check"><input type="checkbox" id="reemplazarPresets"> Guante: reemplazar los tres pares del selector (si no, se agrega uno)</label>
+    <button class="ancho primario" id="generar">Generar prompt</button>
+    <textarea id="prompt" readonly placeholder="El prompt aparece acá."></textarea>
+    <div class="botones">
+      <button id="copiar">Copiar</button><span id="copiado"></span>
+    </div>
+  </details>
+
+  <details>
+    <summary>Guardar y restaurar</summary>
+    <div class="botones">
+      <button id="exportar">Exportar JSON</button>
+      <button id="importarBtn">Importar JSON</button>
+      <input type="file" id="importar" accept="application/json,.json" hidden>
+    </div>
+    <button class="ancho" id="restaurarTodo">Restaurar toda la paleta actual</button>
+  </details>
+</aside>
+
+<main id="main">
+  <nav id="pestanas">
+    <button data-tab="guante">Guante</button>
+    <button data-tab="emg">EMG</button>
+    <button data-tab="comp">Composición</button>
+    <span class="espacio"></span>
+    <span class="info" id="info"></span>
+  </nav>
+  <div id="contenido">
+    <div id="marco"><canvas id="lienzo"></canvas></div>
+    <div id="lamina"></div>
+  </div>
+</main>
+
+<script>
+(function () {
+  "use strict";
+
+  // ---------------------------------------------------------------
+  // Herramienta accesoria para elegir la paleta del guante y de la
+  // acumulacion EMG. No lee hardware ni la base de la experiencia: arma
+  // escenas sinteticas con las mismas cuentas de dibujo que las paginas
+  // (experiencia/guante_percusion.html y experiencia/emg_acumulacion.html)
+  // y las apila como composicion.html. Al final genera un prompt para que
+  // una sesion nueva aplique los colores en el codigo.
+  // ---------------------------------------------------------------
+
+  // Paleta vigente en el codigo (noviembre 2026). Es la referencia contra la
+  // que el prompt calcula que cambio.
+  const ACTUAL = {
+    version: 1,
+    guante: { dedo0: "#ffde21", dedo1: "#ff8c1a", fsr: "#0000ff", fondo: "#faf6f0" },
+    emg: {
+      modo: "familias",
+      familias: [
+        { nombre: "cálida",   tonos: ["#f2a7a1", "#e9b44c", "#f07a5f", "#e8692c", "#c2306f", "#7d1d3f"] },
+        { nombre: "azul",     tonos: ["#a9c6e8", "#7fa7d9", "#5b8ccf", "#3a6bb5", "#28488f", "#1b2a5c"] },
+        { nombre: "verde",    tonos: ["#cfe3a0", "#adcf74", "#8ab452", "#68943d", "#4b722f", "#304a20"] },
+        { nombre: "violeta",  tonos: ["#d4b5e3", "#b892d1", "#9a6fbf", "#7c50a6", "#5e3784", "#3b2156"] },
+        { nombre: "turquesa", tonos: ["#a6e0d8", "#6fcabd", "#3fb0a3", "#2a8f88", "#1e6e6c", "#134749"] },
+      ],
+      base: [],
+      intensidad: "nada",
+      sorteo: "bolsa",
+      opacidad: 0.22,
+      fondo: "#fdf7f5",
+    },
+    composicion: { fondo: "#ffffff" },
+  };
+  // Los tres pares del select #colorSelect del guante.
+  const PRESETS_GUANTE = [
+    { nombre: "Amarillo + Naranja", a: "#ffde21", b: "#ff8c1a" },
+    { nombre: "Amarillo + Rojo anaranjado", a: "#ffde21", b: "#ff4a1c" },
+    { nombre: "Amarillo fluo + Naranja", a: "#ecfd18", b: "#ffa500" },
+  ];
+  const BANDADA_COLOR = "#0a0a0a";
+
+  const UI_INICIAL = {
+    tab: "emg", viewport: "1280x800", semilla: 20261109,
+    nCuads: 30, nGolpes: 45, nPres: 2,
+    verEmg: true, verGuante: true, verBandada: false,
+    destCopias: true, destActivas: false, reemplazarPresets: false,
+  };
+
+  const copia = (v) => JSON.parse(JSON.stringify(v));
+  const CLAVE = "maedi-paleta-colores";
+  let paleta = copia(ACTUAL);
+  let ui = copia(UI_INICIAL);
+
+  try {
+    const g = JSON.parse(localStorage.getItem(CLAVE) || "null");
+    if (g && g.paleta && g.paleta.guante && g.paleta.emg) {
+      paleta = Object.assign(copia(ACTUAL), g.paleta);
+      paleta.emg = Object.assign(copia(ACTUAL.emg), g.paleta.emg);
+    }
+    if (g && g.ui) ui = Object.assign(ui, g.ui);
+  } catch (e) { /* sin almacenamiento: arranca con lo actual */ }
+
+  function guardar() {
+    try { localStorage.setItem(CLAVE, JSON.stringify({ paleta: paleta, ui: ui })); } catch (e) {}
+  }
+
+  // ---------------------------------------------------------------
+  // Color
+  // ---------------------------------------------------------------
+  const esHex = (s) => /^#?[0-9a-f]{6}$/i.test(s);
+  const normHex = (s) => ("#" + s.replace("#", "")).toLowerCase();
+  function aRgb(hex) {
+    const n = parseInt(hex.replace("#", ""), 16);
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  }
+  function aHex(rgb) {
+    return "#" + rgb.map((v) => Math.round(Math.min(255, Math.max(0, v))).toString(16).padStart(2, "0")).join("");
+  }
+  function mezclar(a, b, t) {
+    const x = aRgb(a), y = aRgb(b);
+    return aHex([0, 1, 2].map((i) => x[i] + (y[i] - x[i]) * t));
+  }
+  // Modo base + intensidad "tono": cinco tonos del color, de suave a intenso.
+  const MEZCLAS_TONO = [["#ffffff", 0.5], ["#ffffff", 0.25], [null, 0], ["#000000", 0.2], ["#000000", 0.4]];
+  function derivarTonos(c) {
+    return MEZCLAS_TONO.map((m) => m[0] ? mezclar(c, m[0], m[1]) : normHex(c));
+  }
+
+  // Grupos de color que usa la simulacion: cada uno es lo que en la pagina
+  // es una "familia". En modo base cada color es un grupo de uno (o de cinco
+  // tonos derivados).
+  function gruposEMG(p) {
+    if (p.emg.modo === "familias") return p.emg.familias;
+    return p.emg.base.map((c, i) => ({
+      nombre: "color " + (i + 1),
+      tonos: p.emg.intensidad === "tono" ? derivarTonos(c) : [normHex(c)],
+    }));
+  }
+
+  // ---------------------------------------------------------------
+  // Azar con semilla (mulberry32, el mismo de registrosDemo en
+  // composicion.html). Dos generadores: uno para la geometria y otro para
+  // los sorteos de color, asi cambiar un color no reacomoda las figuras.
+  // ---------------------------------------------------------------
+  function generador(semilla) {
+    let s = semilla | 0;
+    return function () {
+      s = (s + 0x6D2B79F5) | 0;
+      let t = Math.imul(s ^ (s >>> 15), 1 | s);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  function barajar(a, azar) {
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(azar() * (i + 1));
+      const t = a[i]; a[i] = a[j]; a[j] = t;
+    }
+    return a;
+  }
+
+  // ---------------------------------------------------------------
+  // EMG: portado de emg_acumulacion.html (nuevoCuadrilatero,
+  // mudarUbicacion, siguienteFamilia). Las constantes son las mismas.
+  // ---------------------------------------------------------------
+  const PRESS_THRESHOLD = 0.25;
+  const ALTO_FRAC = 0.5, RATIO = 0.45, DEF = 0.2, ROT_MAX = 35 * Math.PI / 180;
+  const ESQ_RADIO = Math.hypot(RATIO, 1);
+  const ESQ_ANG = [Math.atan2(-1, -RATIO), Math.atan2(-1, RATIO), Math.atan2(1, RATIO), Math.atan2(1, -RATIO)];
+  const JIT = 0.8 * Math.atan(RATIO);
+  const POR_UBICACION_MIN = 1, POR_UBICACION_MAX = 5, DIST_MIN = 0.6;
+
+  function semiAltoEMG(W, H) {
+    let s = (ALTO_FRAC * H) / 2;
+    const max = (W / 2) * 0.9;
+    if (s * RATIO > max) s = max / RATIO;
+    return s;
+  }
+
+  function simularEMG(p, semilla, n) {
+    const rg = generador(semilla), rc = generador(semilla ^ 0x9e3779b9);
+    const grupos = gruposEMG(p);
+    const indices = grupos.map((_, i) => i);
+    const cantidad = () => POR_UBICACION_MIN + Math.floor(rg() * (POR_UBICACION_MAX - POR_UBICACION_MIN + 1));
+    let u = 0, v = 0, gi = 0, ultimoIdx = -1, maxVista = 0.4;
+    let bolsa = barajar(indices.filter((i) => i !== 0), rc);
+    let restantes = cantidad();
+
+    function siguiente() {
+      if (p.emg.sorteo === "azar") {
+        if (grupos.length < 2) return 0;
+        let k = Math.floor(rc() * (grupos.length - 1));
+        if (k >= gi) k += 1;
+        return k;
+      }
+      if (bolsa.length === 0) {
+        bolsa = barajar(indices.slice(), rc);
+        if (bolsa.length > 1 && bolsa[0] === gi) {
+          bolsa[0] = bolsa[bolsa.length - 1];
+          bolsa[bolsa.length - 1] = gi;
+        }
+      }
+      return bolsa.shift();
+    }
+
+    const cuads = [];
+    let conjunto = 0;
+    for (let i = 0; i < n && grupos.length; i++) {
+      // Intensidad media simulada: entre el umbral y un maximo variable.
+      const intensidad = PRESS_THRESHOLD + 0.02 + Math.pow(rg(), 0.8) * 0.6;
+      const theta = (rg() * 2 - 1) * ROT_MAX;
+      const verts = ESQ_ANG.map((ang) => {
+        const r = ESQ_RADIO * (1 + (rg() * 2 - 1) * DEF);
+        const a = ang + (rg() * 2 - 1) * JIT + theta;
+        return [Math.cos(a) * r, Math.sin(a) * r];
+      });
+      maxVista = Math.max(maxVista, intensidad);
+      const norm = Math.min(1, Math.max(0, (intensidad - PRESS_THRESHOLD) / Math.max(0.0001, maxVista - PRESS_THRESHOLD)));
+      const g = grupos[gi];
+      const nT = g.tonos.length;
+      let idx = 0;
+      if (nT > 1) {
+        idx = Math.round(norm * (nT - 1)) + Math.floor(rc() * 3) - 1;
+        idx = Math.min(nT - 1, Math.max(0, idx));
+        if (idx === ultimoIdx) idx = idx < nT - 1 ? idx + 1 : idx - 1;
+      }
+      ultimoIdx = idx;
+      let alpha = p.emg.opacidad;
+      if (p.emg.modo === "base" && p.emg.intensidad === "opacidad") {
+        alpha = Math.min(1, p.emg.opacidad * (0.6 + 0.8 * norm));
+      }
+      cuads.push({ v: verts, cu: u, cv: v, color: g.tonos[idx], alpha: alpha, grupo: g.nombre, conjunto: conjunto });
+
+      restantes -= 1;
+      if (restantes <= 0) {
+        let nu = 0, nv = 0;
+        for (let k = 0; k < 30; k++) {
+          nu = rg() * 2 - 1; nv = rg() * 2 - 1;
+          if (Math.hypot(nu - u, nv - v) >= DIST_MIN) break;
+        }
+        u = nu; v = nv;
+        gi = siguiente();
+        ultimoIdx = -1;
+        restantes = cantidad();
+        conjunto += 1;
+      }
+    }
+    return cuads;
+  }
+
+  function dibujarCuads(c, cuads, W, H) {
+    const semi = semiAltoEMG(W, H);
+    c.globalCompositeOperation = "source-over";
+    for (const q of cuads) {
+      const cx = W / 2 + q.cu * W / 2, cy = H / 2 + q.cv * H / 2;
+      c.globalAlpha = q.alpha;
+      c.fillStyle = q.color;
+      c.beginPath();
+      for (let i = 0; i < 4; i++) {
+        const x = cx + q.v[i][0] * semi, y = cy + q.v[i][1] * semi;
+        if (i === 0) c.moveTo(x, y); else c.lineTo(x, y);
+      }
+      c.closePath();
+      c.fill();
+    }
+    c.globalAlpha = 1;
+  }
+
+  // ---------------------------------------------------------------
+  // Guante: cuentas de dibujarGolpe() y discoFsr() de
+  // guante_percusion.html. Golpes agrupados (como un redoble, a menos de
+  // AGRUPAR_MS) o dispersos, y algunas presiones del FSR intercaladas.
+  // ---------------------------------------------------------------
+  const R_MIN_FRAC = 0.08, R_MAX_FRAC = 0.10, JITTER_FRAC = 0.12, ALPHA_MIN = 0.08;
+  const R_FSR_MIN = 0.05, R_FSR_MAX = 0.14;
+  const alphaDe = (v) => ALPHA_MIN + Math.min(1, Math.max(0, v)) * (1 - ALPHA_MIN);
+  const radioAnillo = (menor, v) => menor * (R_MIN_FRAC + v * (R_MAX_FRAC - R_MIN_FRAC));
+  const radioFsr = (menor, v) => menor * (R_FSR_MIN + v * (R_FSR_MAX - R_FSR_MIN));
+
+  function simularGuante(semilla, W, H, nGolpes, nPres) {
+    const rg = generador(semilla + 101);
+    const menor = Math.min(W, H);
+    const presEn = new Set();
+    for (let i = 0; i < nPres; i++) presEn.add(Math.floor(rg() * nGolpes));
+    const items = [];
+    let ux = 0, uy = 0, hay = false;
+    for (let i = 0; i < nGolpes; i++) {
+      if (presEn.has(i)) {
+        const m = radioFsr(menor, 1) + 10;
+        const pico = 0.3 + rg() * 0.7;
+        items.push({ tipo: "disco", x: m + rg() * Math.max(1, W - 2 * m), y: m + rg() * Math.max(1, H - 2 * m),
+          r: radioFsr(menor, pico), alpha: alphaDe(pico) });
+      }
+      const dedo = rg() < 0.5 ? 0 : 1;
+      const v = rg();
+      const r = radioAnillo(menor, v);
+      const margen = r + 10;
+      const agrupa = hay && rg() < 0.55;
+      let x, y;
+      if (agrupa) {
+        const j = menor * JITTER_FRAC;
+        x = ux + (rg() * 2 - 1) * j; y = uy + (rg() * 2 - 1) * j;
+      } else {
+        x = margen + rg() * Math.max(1, W - margen * 2);
+        y = margen + rg() * Math.max(1, H - margen * 2);
+      }
+      x = Math.min(W - margen, Math.max(margen, x));
+      y = Math.min(H - margen, Math.max(margen, y));
+      ux = x; uy = y; hay = true;
+      items.push({ tipo: "anillo", dedo: dedo, x: x, y: y, r: r, grosor: Math.max(1, r * 0.35), alpha: alphaDe(v) });
+    }
+    return items;
+  }
+
+  function colorDeItem(it, p) {
+    if (it.tipo === "disco") return p.guante.fsr;
+    return it.dedo === 0 ? p.guante.dedo0 : p.guante.dedo1;
+  }
+
+  function dibujarGuante(c, items, p) {
+    c.globalCompositeOperation = "multiply";
+    for (const it of items) {
+      c.globalAlpha = it.alpha;
+      c.beginPath();
+      c.arc(it.x, it.y, it.r, 0, Math.PI * 2);
+      if (it.tipo === "disco") { c.fillStyle = colorDeItem(it, p); c.fill(); }
+      else { c.strokeStyle = colorDeItem(it, p); c.lineWidth = it.grosor; c.stroke(); }
+    }
+    c.globalCompositeOperation = "source-over";
+    c.globalAlpha = 1;
+  }
+
+  // Bandada de referencia: puntos negros con la opacidad por profundidad de
+  // la pagina (0,30 a 1), como en registrosDemo().
+  function simularBandada(semilla, W, H) {
+    const rg = generador(semilla + 202);
+    const cx = W * (0.3 + rg() * 0.4), cy = H * (0.3 + rg() * 0.4);
+    const pts = [];
+    for (let i = 0; i < 140; i++) {
+      const z = rg() * 2 - 1;
+      const gx = (rg() + rg() + rg() - 1.5) / 1.5, gy = (rg() + rg() + rg() - 1.5) / 1.5;
+      pts.push({ x: cx + gx * W * 0.16, y: cy + gy * H * 0.12, z: z,
+        r: 4.5 * (0.7 + 0.3 * (z + 1)), alpha: 0.3 + 0.7 * (z + 1) / 2 });
+    }
+    pts.sort((a, b) => a.z - b.z);
+    return pts;
+  }
+  function dibujarBandada(c, pts) {
+    c.globalCompositeOperation = "source-over";
+    c.fillStyle = BANDADA_COLOR;
+    for (const p of pts) {
+      c.globalAlpha = p.alpha;
+      c.beginPath(); c.arc(p.x, p.y, p.r, 0, Math.PI * 2); c.fill();
+    }
+    c.globalAlpha = 1;
+  }
+
+  // ---------------------------------------------------------------
+  // Lienzo principal. Como en las copias de la experiencia, las figuras se
+  // dibujan en una capa transparente (multiply sobre un pixel transparente
+  // deja el color tal cual) y la capa va sobre el fondo, que en las paginas
+  // pone el CSS.
+  // ---------------------------------------------------------------
+  const lienzo = document.getElementById("lienzo");
+  const marco = document.getElementById("marco");
+  const capa = document.createElement("canvas");
+  const DPR = Math.max(1, window.devicePixelRatio || 1);
+
+  function medidas() {
+    const p = ui.viewport.split("x").map(Number);
+    return { W: p[0], H: p[1] };
+  }
+
+  function render() {
+    const { W, H } = medidas();
+    const k = Math.min(marco.clientWidth / W, marco.clientHeight / H) || 0.5;
+    const pw = Math.max(1, Math.round(W * k * DPR)), ph = Math.max(1, Math.round(H * k * DPR));
+    lienzo.width = pw; lienzo.height = ph;
+    lienzo.style.width = Math.round(W * k) + "px";
+    lienzo.style.height = Math.round(H * k) + "px";
+    capa.width = pw; capa.height = ph;
+    const g = lienzo.getContext("2d"), c = capa.getContext("2d");
+    c.setTransform(k * DPR, 0, 0, k * DPR, 0, 0);
+    c.clearRect(0, 0, W, H);
+
+    let fondo;
+    const cuads = simularEMG(paleta, ui.semilla, ui.nCuads);
+    if (ui.tab === "guante") {
+      fondo = paleta.guante.fondo;
+      dibujarGuante(c, simularGuante(ui.semilla, W, H, ui.nGolpes, ui.nPres), paleta);
+    } else if (ui.tab === "emg") {
+      fondo = paleta.emg.fondo;
+      dibujarCuads(c, cuads, W, H);
+    } else {
+      fondo = paleta.composicion.fondo;
+      // Orden de CAPAS en composicion.html: emg, guante, bandada.
+      if (ui.verEmg) dibujarCuads(c, cuads, W, H);
+      if (ui.verGuante) dibujarGuante(c, simularGuante(ui.semilla, W, H, ui.nGolpes, ui.nPres), paleta);
+      if (ui.verBandada) dibujarBandada(c, simularBandada(ui.semilla, W, H));
+    }
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.globalAlpha = 1;
+    g.globalCompositeOperation = "source-over";
+    g.fillStyle = fondo;
+    g.fillRect(0, 0, pw, ph);
+    g.drawImage(capa, 0, 0);
+
+    const conj = cuads.length ? cuads[cuads.length - 1].conjunto + 1 : 0;
+    document.getElementById("info").textContent = W + " × " + H + " · " +
+      (ui.tab === "guante" ? ui.nGolpes + " golpes, " + ui.nPres + " presiones"
+        : cuads.length + " cuadriláteros en " + conj + " conjuntos");
+    renderLamina(cuads);
+  }
+
+  // ---------------------------------------------------------------
+  // Laminas debajo del lienzo
+  // ---------------------------------------------------------------
+  const laminaEl = document.getElementById("lamina");
+
+  function renderLamina(cuads) {
+    laminaEl.textContent = "";
+    if (ui.tab === "guante") laminaGuante();
+    else if (ui.tab === "emg") laminaEMG(cuads);
+    else laminaComp();
+  }
+
+  function titulo(t) {
+    const d = document.createElement("div");
+    d.className = "titulo-lamina"; d.textContent = t;
+    laminaEl.appendChild(d);
+  }
+  function nota(t) {
+    const d = document.createElement("div");
+    d.className = "note"; d.textContent = t;
+    laminaEl.appendChild(d);
+  }
+
+  // Cada dedo y el FSR a cinco intensidades, y una celda con los tres
+  // superpuestos. Escala propia para que entren las seis columnas.
+  function laminaGuante() {
+    titulo("Por intensidad: 0 · 0,25 · 0,5 · 0,75 · 1 · superpuestos");
+    const ancho = Math.min(laminaEl.clientWidth || 800, 900);
+    const etiqueta = 70, celda = Math.min(130, (ancho - etiqueta) / 6);
+    const menor = (celda * 0.46) / R_FSR_MAX;
+    const filas = 3, alto = celda * filas;
+    const cv = document.createElement("canvas");
+    cv.id = "laminaGuante";
+    cv.width = Math.round((etiqueta + celda * 6) * DPR); cv.height = Math.round(alto * DPR);
+    cv.style.width = (etiqueta + celda * 6) + "px"; cv.style.height = alto + "px";
+    const g = cv.getContext("2d");
+    g.setTransform(DPR, 0, 0, DPR, 0, 0);
+    g.fillStyle = paleta.guante.fondo;
+    g.fillRect(0, 0, etiqueta + celda * 6, alto);
+    const tmp = document.createElement("canvas");
+    tmp.width = cv.width; tmp.height = cv.height;
+    const c = tmp.getContext("2d");
+    c.setTransform(DPR, 0, 0, DPR, 0, 0);
+    const vs = [0, 0.25, 0.5, 0.75, 1];
+    const nombres = ["Dedo 0", "Dedo 1", "FSR"];
+    const items = [];
+    for (let f = 0; f < 3; f++) {
+      vs.forEach((v, i) => {
+        const x = etiqueta + celda * (i + 0.5), y = celda * (f + 0.5);
+        if (f < 2) {
+          const r = radioAnillo(menor, v);
+          items.push({ tipo: "anillo", dedo: f, x: x, y: y, r: r, grosor: Math.max(1, r * 0.35), alpha: alphaDe(v) });
+        } else {
+          items.push({ tipo: "disco", x: x, y: y, r: radioFsr(menor, v), alpha: alphaDe(v) });
+        }
+      });
+    }
+    // Superpuestos: disco abajo, los dos anillos cruzados encima, a 0,7.
+    const sx = etiqueta + celda * 5.5, sy = alto / 2, rr = radioAnillo(menor, 0.7);
+    items.push({ tipo: "disco", x: sx, y: sy, r: radioFsr(menor, 0.6), alpha: alphaDe(0.6) });
+    items.push({ tipo: "anillo", dedo: 0, x: sx - rr * 0.45, y: sy - rr * 0.5, r: rr, grosor: rr * 0.35, alpha: alphaDe(0.7) });
+    items.push({ tipo: "anillo", dedo: 1, x: sx + rr * 0.45, y: sy + rr * 0.5, r: rr, grosor: rr * 0.35, alpha: alphaDe(0.7) });
+    dibujarGuante(c, items, paleta);
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.drawImage(tmp, 0, 0);
+    g.setTransform(DPR, 0, 0, DPR, 0, 0);
+    g.fillStyle = "#666";
+    g.font = "300 12px Roboto, sans-serif";
+    nombres.forEach((n, f) => g.fillText(n, 8, celda * (f + 0.5) + 4));
+    laminaEl.appendChild(cv);
+    nota("Los tamaños son relativos entre sí (el disco del FSR llega a 0,14 del lado menor de la pantalla; los anillos, a 0,10). Mientras se golpea, cada anillo además emite un destello del mismo color que se expande y se apaga en 0,2 s.");
+  }
+
+  // Cada tono de cada grupo apilado 1×, 2× y 3× a la opacidad de capa, sobre
+  // el fondo de la pagina, y debajo la muestra solida.
+  function laminaEMG(cuads) {
+    const grupos = gruposEMG(paleta);
+    const usoPorGrupo = {};
+    cuads.forEach((q) => { usoPorGrupo[q.grupo] = (usoPorGrupo[q.grupo] || 0) + 1; });
+    const opac = paleta.emg.modo === "base" && paleta.emg.intensidad === "opacidad";
+    titulo(paleta.emg.modo === "familias" ? "Familias: cada tono a " + pct(paleta.emg.opacidad) + ", apilado 1×, 2× y 3×"
+      : "Colores base" + (paleta.emg.intensidad === "tono" ? " y sus tonos derivados" : "") + (opac ? ": de opacidad mínima a máxima" : ": a " + pct(paleta.emg.opacidad) + ", apilado 1×, 2× y 3×"));
+    grupos.forEach((gr) => {
+      const fila = document.createElement("div");
+      fila.className = "fila-lamina";
+      const nom = document.createElement("div");
+      nom.className = "nombre";
+      nom.textContent = gr.nombre + " (" + (usoPorGrupo[gr.nombre] || 0) + ")";
+      nom.title = "Entre paréntesis: cuántos cuadriláteros de la muestra lo usan";
+      const celdas = document.createElement("div");
+      celdas.className = "celdas";
+      const variantes = opac
+        ? [0, 0.5, 1].map((n) => ({ color: gr.tonos[0], alpha: Math.min(1, paleta.emg.opacidad * (0.6 + 0.8 * n)), rotulo: "int. " + n }))
+        : gr.tonos.map((t) => ({ color: t, alpha: paleta.emg.opacidad, rotulo: t }));
+      variantes.forEach((va) => {
+        const cel = document.createElement("div");
+        cel.className = "celda";
+        const ap = document.createElement("div");
+        ap.className = "apilado";
+        ap.style.background = paleta.emg.fondo;
+        for (let i = 0; i < 3; i++) {
+          const d = document.createElement("div");
+          d.style.background = va.color; d.style.opacity = va.alpha;
+          ap.appendChild(d);
+        }
+        const so = document.createElement("div");
+        so.className = "solido"; so.style.background = va.color;
+        const hx = document.createElement("div");
+        hx.className = "hex"; hx.textContent = va.rotulo;
+        cel.append(ap, so, hx);
+        celdas.appendChild(cel);
+      });
+      fila.append(nom, celdas);
+      laminaEl.appendChild(fila);
+    });
+    nota("En la sala cada cuadrilátero se ve casi siempre así: translúcido y superpuesto con otros, no como la muestra sólida. El primer grupo es el del arranque (el primer conjunto, al centro de la pantalla).");
+  }
+
+  function laminaComp() {
+    nota("Como en composicion.html: los cuadriláteros abajo (normal), el guante encima en multiply —donde un anillo pasa sobre un cuadrilátero, lo oscurece—, y la bandada arriba. En la pantalla 11 cada elemento conserva el color con el que se capturó: una paleta nueva sólo alcanza a las capturas posteriores.");
+  }
+
+  const pct = (v) => Math.round(v * 100) + " %";
+
+  // ---------------------------------------------------------------
+  // Controles
+  // ---------------------------------------------------------------
+  function campoColor(valor, alCambiar) {
+    const caja = document.createElement("span");
+    caja.className = "campo-color";
+    const col = document.createElement("input");
+    col.type = "color"; col.value = normHex(valor);
+    const txt = document.createElement("input");
+    txt.type = "text"; txt.value = normHex(valor); txt.spellcheck = false; txt.maxLength = 7;
+    col.addEventListener("input", () => { txt.value = col.value; txt.classList.remove("mal"); alCambiar(col.value); });
+    txt.addEventListener("input", () => {
+      if (esHex(txt.value.trim())) {
+        const h = normHex(txt.value.trim());
+        col.value = h; txt.classList.remove("mal"); alCambiar(h);
+      } else txt.classList.add("mal");
+    });
+    txt.addEventListener("blur", () => { txt.value = col.value; txt.classList.remove("mal"); });
+    caja.append(col, txt);
+    return caja;
+  }
+
+  function montarColor(id, leer, escribir) {
+    const el = document.getElementById(id);
+    el.textContent = "";
+    el.appendChild(campoColor(leer(), (h) => { escribir(h); cambio(); }));
+  }
+
+  function montarColoresFijos() {
+    montarColor("cDedo0", () => paleta.guante.dedo0, (h) => { paleta.guante.dedo0 = h; });
+    montarColor("cDedo1", () => paleta.guante.dedo1, (h) => { paleta.guante.dedo1 = h; });
+    montarColor("cFsr", () => paleta.guante.fsr, (h) => { paleta.guante.fsr = h; });
+    montarColor("cFondoGuante", () => paleta.guante.fondo, (h) => { paleta.guante.fondo = h; });
+    montarColor("cFondoEmg", () => paleta.emg.fondo, (h) => { paleta.emg.fondo = h; });
+    montarColor("cFondoComp", () => paleta.composicion.fondo, (h) => { paleta.composicion.fondo = h; });
+  }
+
+  const presetsEl = document.getElementById("presetsGuante");
+  PRESETS_GUANTE.forEach((pr) => {
+    const b = document.createElement("button");
+    b.innerHTML = '<span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:' + pr.a +
+      ';margin-right:2px"></span><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:' + pr.b +
+      ';margin-right:5px"></span>' + pr.nombre;
+    b.addEventListener("click", () => {
+      paleta.guante.dedo0 = pr.a; paleta.guante.dedo1 = pr.b;
+      montarColoresFijos(); cambio();
+    });
+    presetsEl.appendChild(b);
+  });
+
+  // Editor de familias
+  const editorFamilias = document.getElementById("editorFamilias");
+  function montarFamilias() {
+    editorFamilias.textContent = "";
+    const fams = paleta.emg.familias;
+    fams.forEach((f, i) => {
+      const card = document.createElement("div");
+      card.className = "familia";
+      const cab = document.createElement("div");
+      cab.className = "familia-cab";
+      const nombre = document.createElement("input");
+      nombre.value = f.nombre;
+      nombre.addEventListener("input", () => { f.nombre = nombre.value; cambio(false); });
+      nombre.addEventListener("change", () => cambio());
+      const subir = boton("↑", "Subir (la primera es la del arranque)", i === 0, () => { fams.splice(i - 1, 0, fams.splice(i, 1)[0]); montarFamilias(); cambio(); });
+      const bajar = boton("↓", "Bajar", i === fams.length - 1, () => { fams.splice(i + 1, 0, fams.splice(i, 1)[0]); montarFamilias(); cambio(); });
+      const quitar = boton("×", "Quitar la familia", fams.length <= 1, () => { fams.splice(i, 1); montarFamilias(); cambio(); });
+      cab.append(nombre, subir, bajar, quitar);
+      const tonos = document.createElement("div");
+      tonos.className = "tonos";
+      f.tonos.forEach((t, j) => {
+        const to = document.createElement("div");
+        to.className = "tono";
+        const col = document.createElement("input");
+        col.type = "color"; col.value = normHex(t); col.title = normHex(t) + " (tono " + (j + 1) + ")";
+        col.addEventListener("input", () => { f.tonos[j] = col.value; col.title = col.value; cambio(); });
+        const x = boton("×", "Quitar el tono", f.tonos.length <= 2, () => { f.tonos.splice(j, 1); montarFamilias(); cambio(); });
+        to.append(col, x);
+        tonos.appendChild(to);
+      });
+      const mas = boton("+", "Agregar un tono al final", false, () => { f.tonos.push(f.tonos[f.tonos.length - 1]); montarFamilias(); cambio(); });
+      mas.style.marginBottom = "18px";
+      tonos.appendChild(mas);
+      card.append(cab, tonos);
+      editorFamilias.appendChild(card);
+    });
+  }
+  function boton(txt, title, deshabilitado, fn) {
+    const b = document.createElement("button");
+    b.className = "mini"; b.textContent = txt; b.title = title; b.disabled = deshabilitado;
+    b.addEventListener("click", fn);
+    return b;
+  }
+  document.getElementById("agregarFamilia").addEventListener("click", () => {
+    const n = paleta.emg.familias.length + 1;
+    paleta.emg.familias.push({ nombre: "familia " + n, tonos: derivarTonos("#888888") });
+    montarFamilias(); cambio();
+  });
+
+  // Editor de base
+  const editorBase = document.getElementById("editorBase");
+  function baseDesdeFamilias() {
+    return paleta.emg.familias.slice(0, 5).map((f) => normHex(f.tonos[Math.min(3, f.tonos.length - 1)]));
+  }
+  function montarBase() {
+    editorBase.textContent = "";
+    const base = paleta.emg.base;
+    base.forEach((c, i) => {
+      const fila = document.createElement("div");
+      fila.className = "base-fila";
+      const num = document.createElement("span");
+      num.className = "num"; num.textContent = i + 1;
+      const x = boton("×", "Quitar (mínimo 3)", base.length <= 3, () => { base.splice(i, 1); montarBase(); cambio(); });
+      fila.append(num, campoColor(c, (h) => { base[i] = h; cambio(); }), x);
+      editorBase.appendChild(fila);
+    });
+    document.getElementById("agregarBase").disabled = base.length >= 5;
+  }
+  document.getElementById("agregarBase").addEventListener("click", () => {
+    if (paleta.emg.base.length >= 5) return;
+    paleta.emg.base.push("#888888"); montarBase(); cambio();
+  });
+  document.getElementById("baseDesdeFamilias").addEventListener("click", () => {
+    paleta.emg.base = baseDesdeFamilias();
+    while (paleta.emg.base.length < 3) paleta.emg.base.push("#888888");
+    montarBase(); cambio();
+  });
+
+  function radios(nombre, leer, escribir) {
+    document.querySelectorAll('input[name="' + nombre + '"]').forEach((r) => {
+      r.checked = r.value === leer();
+      r.addEventListener("change", () => { if (r.checked) { escribir(r.value); refrescarModo(); cambio(); } });
+    });
+  }
+  function refrescarRadios() {
+    [["modo", paleta.emg.modo], ["intensidad", paleta.emg.intensidad], ["sorteo", paleta.emg.sorteo]].forEach((par) => {
+      document.querySelectorAll('input[name="' + par[0] + '"]').forEach((r) => { r.checked = r.value === par[1]; });
+    });
+  }
+  radios("modo", () => paleta.emg.modo, (v) => {
+    paleta.emg.modo = v;
+    if (v === "base" && paleta.emg.base.length < 3) { paleta.emg.base = baseDesdeFamilias(); montarBase(); }
+  });
+  radios("intensidad", () => paleta.emg.intensidad, (v) => { paleta.emg.intensidad = v; });
+  radios("sorteo", () => paleta.emg.sorteo, (v) => { paleta.emg.sorteo = v; });
+  function refrescarModo() {
+    document.getElementById("bloqueFamilias").style.display = paleta.emg.modo === "familias" ? "" : "none";
+    document.getElementById("bloqueBase").style.display = paleta.emg.modo === "base" ? "" : "none";
+  }
+
+  const opacidadEl = document.getElementById("opacidad");
+  opacidadEl.addEventListener("input", () => { paleta.emg.opacidad = parseFloat(opacidadEl.value); cambio(); });
+
+  document.getElementById("restaurarEmg").addEventListener("click", () => {
+    paleta.emg.familias = copia(ACTUAL.emg.familias);
+    montarFamilias(); cambio();
+  });
+
+  // Muestra y composicion
+  function enlazarRango(id, clave, valId) {
+    const el = document.getElementById(id);
+    el.value = ui[clave];
+    document.getElementById(valId).textContent = ui[clave];
+    el.addEventListener("input", () => {
+      ui[clave] = parseInt(el.value, 10);
+      document.getElementById(valId).textContent = ui[clave];
+      cambio();
+    });
+  }
+  enlazarRango("nCuads", "nCuads", "nCuadsVal");
+  enlazarRango("nGolpes", "nGolpes", "nGolpesVal");
+  enlazarRango("nPres", "nPres", "nPresVal");
+  ["verEmg", "verGuante", "verBandada", "destCopias", "destActivas", "reemplazarPresets"].forEach((id) => {
+    const el = document.getElementById(id);
+    el.checked = !!ui[id];
+    el.addEventListener("change", () => { ui[id] = el.checked; cambio(); });
+  });
+  const viewportEl = document.getElementById("viewport");
+  viewportEl.value = ui.viewport;
+  viewportEl.addEventListener("change", () => { ui.viewport = viewportEl.value; cambio(); });
+  const semillaEl = document.getElementById("semilla");
+  semillaEl.value = ui.semilla;
+  semillaEl.addEventListener("change", () => { ui.semilla = parseInt(semillaEl.value, 10) || 0; cambio(); });
+  document.getElementById("nuevaMuestra").addEventListener("click", () => {
+    ui.semilla = Math.floor(Math.random() * 1e9);
+    semillaEl.value = ui.semilla; cambio();
+  });
+
+  // Pestanas
+  const pestanas = document.querySelectorAll("#pestanas button");
+  pestanas.forEach((b) => b.addEventListener("click", () => { ui.tab = b.dataset.tab; cambio(); }));
+
+  function refrescarTodo() {
+    montarColoresFijos(); montarFamilias(); montarBase(); refrescarRadios(); refrescarModo();
+    opacidadEl.value = paleta.emg.opacidad;
+  }
+
+  let promptVigente = false;
+  function cambio(redibujar) {
+    document.getElementById("opacidadVal").textContent = pct(paleta.emg.opacidad);
+    pestanas.forEach((b) => b.classList.toggle("activa", b.dataset.tab === ui.tab));
+    guardar();
+    if (promptVigente) { promptEl.value = generarPrompt(); }
+    if (redibujar !== false) render();
+  }
+
+  // Guardar / restaurar
+  document.getElementById("restaurarTodo").addEventListener("click", () => {
+    paleta = copia(ACTUAL); refrescarTodo(); cambio();
+  });
+  document.getElementById("exportar").addEventListener("click", () => {
+    const blob = new Blob([JSON.stringify(paleta, null, 2)], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "paleta_maedi.json";
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  });
+  const importarEl = document.getElementById("importar");
+  document.getElementById("importarBtn").addEventListener("click", () => importarEl.click());
+  importarEl.addEventListener("change", () => {
+    const f = importarEl.files && importarEl.files[0];
+    if (!f) return;
+    f.text().then((t) => {
+      const p = JSON.parse(t);
+      if (!p.guante || !p.emg) throw new Error("no es una paleta");
+      paleta = Object.assign(copia(ACTUAL), p);
+      paleta.emg = Object.assign(copia(ACTUAL.emg), p.emg);
+      refrescarTodo(); cambio();
+    }).catch((e) => alert("No se pudo importar: " + e.message));
+    importarEl.value = "";
+  });
+
+  // ---------------------------------------------------------------
+  // Prompt
+  // ---------------------------------------------------------------
+  const promptEl = document.getElementById("prompt");
+  const igual = (a, b) => normHex(a) === normHex(b);
+  const lista = (arr) => "[" + arr.map((c) => '"' + normHex(c) + '"').join(", ") + "]";
+
+  function familiasJs(grupos) {
+    return "const FAMILIAS = [\n" + grupos.map((g) =>
+      "  { nombre: " + JSON.stringify(g.nombre) + ", tonos: " + lista(g.tonos) + " },").join("\n") + "\n];";
+  }
+
+  function generarPrompt() {
+    const a = ACTUAL, p = paleta;
+    const G = {
+      dedos: !igual(p.guante.dedo0, a.guante.dedo0) || !igual(p.guante.dedo1, a.guante.dedo1),
+      fsr: !igual(p.guante.fsr, a.guante.fsr),
+      fondo: !igual(p.guante.fondo, a.guante.fondo),
+    };
+    const famsIguales = p.emg.modo === "familias" &&
+      JSON.stringify(p.emg.familias.map((f) => [f.nombre, f.tonos.map(normHex)])) ===
+      JSON.stringify(a.emg.familias.map((f) => [f.nombre, f.tonos.map(normHex)]));
+    const E = {
+      colores: !famsIguales,
+      sorteo: p.emg.sorteo !== a.emg.sorteo,
+      opacidad: Math.abs(p.emg.opacidad - a.emg.opacidad) > 0.001,
+      fondo: !igual(p.emg.fondo, a.emg.fondo),
+    };
+    const C = { fondo: !igual(p.composicion.fondo, a.composicion.fondo) };
+    const cambiaGuante = G.dedos || G.fsr || G.fondo;
+    const cambiaEmg = E.colores || E.sorteo || E.opacidad || E.fondo;
+    if (!cambiaGuante && !cambiaEmg && !C.fondo) {
+      return "La paleta elegida es igual a la que ya está en el código: no hay nada que aplicar.";
+    }
+    if (!ui.destCopias && !ui.destActivas) {
+      return "Elegí al menos un destino (copias de la experiencia o páginas activas) para generar el prompt.";
+    }
+
+    const L = [];
+    const archivos = [];
+    if (cambiaGuante) {
+      if (ui.destCopias) archivos.push("entorno-digital/experiencia/guante_percusion.html (copia de la experiencia, pantalla 7)");
+      if (ui.destActivas) archivos.push("entorno-digital/prototipo_percusion_guante_a_midi_v2_dispositivo.html (página activa del guante)");
+    }
+    if (cambiaEmg) {
+      if (ui.destCopias) archivos.push("entorno-digital/experiencia/emg_acumulacion.html (copia de la experiencia, pantalla 9)");
+      if (ui.destActivas) archivos.push("entorno-digital/prototipo_emg_acumulacion_v4_dispositivo.html (página activa de la EMG)");
+    }
+    if (cambiaGuante || cambiaEmg || C.fondo) archivos.push("entorno-digital/experiencia/composicion.html (colores de la escena #demo" + (C.fondo ? " y fondo" : "") + ")");
+
+    L.push("Aplicá una paleta de colores nueva a las visualizaciones de la experiencia. La elegí con entorno-digital/tools/paleta_colores.html; al final va el JSON completo de la paleta.");
+    L.push("");
+    L.push("Antes de tocar nada leé CLAUDE.md" + (cambiaGuante ? ", entorno-digital/documentacion/guante.md" : "") +
+      (cambiaEmg ? ", entorno-digital/documentacion/emg.md" : "") + " y entorno-digital/documentacion/experiencia.md.");
+    L.push("");
+    L.push("## Archivos a modificar");
+    archivos.forEach((f) => L.push("- " + f));
+    if (ui.destCopias && ui.destActivas) {
+      L.push("La copia y la activa no comparten código: el mismo cambio se porta a mano a las dos. La única diferencia buscada entre ellas es el fondo: en la copia lo pinta el CSS y el canvas queda transparente para la captura.");
+    }
+    L.push("");
+
+    if (cambiaGuante) {
+      L.push("## Guante (anillos de los dedos y disco del FSR)");
+      if (G.dedos) {
+        L.push("- Dedo 0: " + normHex(p.guante.dedo0) + " (antes " + a.guante.dedo0 + "). Dedo 1: " + normHex(p.guante.dedo1) + " (antes " + a.guante.dedo1 + ").");
+        L.push("  - El valor inicial de `colorDedo` (`hexToRgb(...)` de los dos dedos).");
+        if (ui.reemplazarPresets) {
+          L.push("  - En `#colorSelect`, reemplazar las tres opciones por una sola: `<option value=\"" + normHex(p.guante.dedo0) + "," + normHex(p.guante.dedo1) + "\" selected>…</option>` (poné un nombre descriptivo de los dos colores). Si queda una sola opción, evaluar si conviene dejar el select o mostrar sólo las muestras.");
+        } else {
+          L.push("  - En `#colorSelect`, agregar como primera opción `<option value=\"" + normHex(p.guante.dedo0) + "," + normHex(p.guante.dedo1) + "\" selected>…</option>` (nombre descriptivo de los dos colores) y sacarle el `selected` a \"Amarillo + Naranja\". Las otras tres opciones se quedan.");
+        }
+        L.push("  - CSS de las barras del panel: `#hit0Fill` y `#hit1Fill`.");
+      }
+      if (G.fsr) {
+        L.push("- FSR: " + normHex(p.guante.fsr) + " (antes " + a.guante.fsr + "): la constante `COLOR_FSR` y el CSS de `#forceFillBar`.");
+        L.push("  - La nota del panel dice \"El disco relleno azul es siempre el FSR\", y la documentación (guante.md, experiencia.md, la tabla de CLAUDE.md) habla del \"disco azul\": actualizar el nombre del color donde aparezca.");
+      }
+      if (G.fondo) {
+        L.push("- Fondo: " + normHex(p.guante.fondo) + " (antes " + a.guante.fondo + "): `BG_COLOR` y el `background` de `html, body`.");
+      }
+      L.push("- Los anillos y el disco siguen en `multiply` y con la opacidad por intensidad; sólo cambian los colores.");
+      L.push("");
+    }
+
+    if (cambiaEmg) {
+      L.push("## Acumulación EMG (cuadriláteros)");
+      if (E.colores) {
+        if (p.emg.modo === "familias") {
+          L.push("- Reemplazar el arreglo `FAMILIAS` por este (la primera es la del arranque y la de después de \"Limpiar lienzo\"; los tonos van de suave a intenso). El resto del algoritmo no cambia:");
+          L.push("```js"); L.push(familiasJs(p.emg.familias)); L.push("```");
+        } else if (p.emg.intensidad === "tono") {
+          L.push("- Pasar de las familias actuales a una base de " + p.emg.base.length + " colores: " + lista(p.emg.base) + ". Cada color base se convierte en una familia de 5 tonos derivados (mezcla en sRGB con blanco al 50 % y al 25 %, el color base, y con negro al 20 % y al 40 %), de suave a intenso, así que el algoritmo de hoy no cambia: la intensidad sigue eligiendo el tono dentro de la familia. Reemplazar `FAMILIAS` por:");
+          L.push("```js"); L.push(familiasJs(gruposEMG(p))); L.push("```");
+          L.push("  (Los nombres \"color N\" son provisorios; aparecen en el recuadro de estadísticas. Si los querés distintos, preguntame.)");
+        } else {
+          L.push("- Pasar de familias de varios tonos a una base de " + p.emg.base.length + " colores, uno por conjunto (las 1 a 5 figuras que comparten ubicación antes de mudarse). El primero es el del arranque:");
+          L.push("```js"); L.push(familiasJs(gruposEMG(p))); L.push("```");
+          L.push("- Con un solo tono por familia, en `nuevoCuadrilatero` el tono es siempre el 0: saltear el sorteo ±1 y la regla de \"nunca el mismo color que el anterior\" cuando `n === 1` (tal como está, daría `idx = -1`). Corregir el comentario que dice que cada familia tiene 2 o más tonos.");
+          if (p.emg.intensidad === "nada") {
+            L.push("- La intensidad de la contracción ya no influye en el color: todo el conjunto sale del mismo color, con la opacidad de capa.");
+          } else {
+            L.push("- La intensidad modula la opacidad: en `nuevoCuadrilatero`, `alpha: Math.min(1, opacidadCapa * (0.6 + 0.8 * norm))`, con `norm` la intensidad reescalada que ya se calcula ahí. Va en `cuad.alpha`, que ya usan la capa offscreen y `elementosCaptura()`. El slider \"Opacidad de cada capa\" pasa a ser la opacidad media: actualizar su rótulo.");
+          }
+          L.push("- Actualizar la nota del panel (\"…cambia la familia de color; dentro de la familia, la intensidad de la contracción elige el tono…\") para que describa el comportamiento nuevo.");
+        }
+      }
+      if (E.sorteo) {
+        L.push("- Sorteo del color de cada conjunto: en `siguienteFamilia()`, reemplazar la bolsa por un sorteo uniforme entre las familias distintas de la actual (`familiaIdx`); con una sola familia, devuelve 0. La variable `bolsa` y su preparación en `reiniciarUbicacion()` dejan de hacer falta. El primer conjunto sigue siendo el de la familia 0.");
+      }
+      if (E.opacidad) {
+        L.push("- Opacidad por defecto: " + pct(p.emg.opacidad) + " (antes 22 %): `let opacidadCapa`, el `value` del slider `#opacidad` y el texto inicial de `#opacidadVal`.");
+      }
+      if (E.fondo) {
+        L.push("- Fondo: " + normHex(p.emg.fondo) + " (antes " + a.emg.fondo + "): `BG_COLOR` y el `background` de `html, body`.");
+      }
+      if (ui.destActivas && E.colores && p.emg.modo === "base" && p.emg.intensidad !== "tono") {
+        L.push("- Esto cambia el comportamiento del color, no sólo los valores. Antes de editar la página activa, preguntame si corresponde una versión nueva por copia (prototipo_emg_acumulacion_v5_dispositivo.html), según la convención de versionado de CLAUDE.md.");
+      }
+      L.push("");
+    }
+
+    L.push("## Composición (pantalla 11)");
+    L.push("- Las capturas guardan el color de cada elemento: la paleta nueva sólo alcanza a las capturas que se hagan después. No hay que migrar nada de IndexedDB.");
+    if (cambiaGuante || cambiaEmg) {
+      L.push("- En `registrosDemo()` de composicion.html, para que `composicion.html#demo` muestre la paleta nueva:");
+      if (cambiaEmg) L.push("  - `tonos` de los cuadriláteros (hoy cuatro de la familia cálida y cuatro de la azul): " + lista(tonosDemo(p)));
+      if (G.dedos) L.push("  - anillos: \"" + normHex(p.guante.dedo1) + "\" para el dedo 1 y \"" + normHex(p.guante.dedo0) + "\" para el dedo 0 (hoy `i % 2 ? \"#ff8c1a\" : \"#ffde21\"`).");
+      if (G.fsr) L.push("  - disco del FSR: \"" + normHex(p.guante.fsr) + "\".");
+    }
+    if (C.fondo) {
+      L.push("- Fondo de la composición: " + normHex(p.composicion.fondo) + " (antes #fff): el `background` de `html, body` y el `fillStyle = \"#fff\"` con el que la sección VIDEO pinta el fondo de la grabación (el codificador descarta el alfa). Revisá si algún otro `#fff` de composicion.html es el mismo fondo.");
+    }
+    L.push("");
+    L.push("## Documentación");
+    L.push("Actualizá los documentos vigentes para que describan los colores nuevos" +
+      (cambiaGuante ? " (documentacion/guante.md)" : "") + (cambiaEmg ? " (documentacion/emg.md)" : "") +
+      " y documentacion/experiencia.md si nombra colores, con una entrada en el historial de cada uno: qué cambió y por qué (la paleta se eligió con tools/paleta_colores.html). No crear archivos de cambios sueltos.");
+    L.push("");
+    L.push("## Verificación");
+    L.push("- Extraer el script de cada HTML tocado a un .js y correr `node --check`.");
+    if (cambiaEmg) {
+      L.push("- `node entorno-digital/tools/harness_emg.js <página EMG tocada> dispositivo3/salida.txt`: la cantidad de cuadriláteros estampados tiene que ser la misma que antes del cambio (correrlo también antes, para comparar).");
+    }
+    if (cambiaGuante) {
+      L.push("- `node entorno-digital/tools/harness_midi.js <página del guante tocada>`: tiene que pasar igual que antes.");
+    }
+    L.push("- Captura headless con Firefox de cada página y de `composicion.html#demo` para confirmar que renderizan (ver CLAUDE.md).");
+    L.push("");
+    L.push("No hagas commit salvo que te lo pida; si te lo pido, en español y sin tildes. No toques entorno-digital/prototipos/.");
+    L.push("");
+    L.push("## Paleta elegida (JSON)");
+    L.push("```json");
+    L.push(JSON.stringify(exportable(), null, 2));
+    L.push("```");
+    return L.join("\n");
+  }
+
+  // Ocho tonos para la demo: con familias de varios tonos, cuatro repartidos
+  // de cada una de las dos primeras; con un tono por grupo, todos los colores.
+  function tonosDemo(p) {
+    const grupos = gruposEMG(p);
+    if (grupos.every((g) => g.tonos.length === 1)) return grupos.map((g) => g.tonos[0]);
+    const out = [];
+    grupos.slice(0, 2).forEach((g) => {
+      const n = g.tonos.length, k = Math.min(4, n);
+      for (let i = 0; i < k; i++) out.push(g.tonos[Math.round(i * (n - 1) / Math.max(1, k - 1))]);
+    });
+    return out;
+  }
+
+  function exportable() {
+    const p = copia(paleta);
+    if (p.emg.modo === "familias") { delete p.emg.base; delete p.emg.intensidad; }
+    else delete p.emg.familias;
+    return p;
+  }
+
+  document.getElementById("generar").addEventListener("click", () => {
+    promptVigente = true;
+    promptEl.value = generarPrompt();
+    promptEl.scrollTop = 0;
+  });
+  document.getElementById("copiar").addEventListener("click", () => {
+    if (!promptEl.value) { promptVigente = true; promptEl.value = generarPrompt(); }
+    const avisar = () => {
+      const c = document.getElementById("copiado");
+      c.textContent = "Copiado";
+      setTimeout(() => { c.textContent = ""; }, 1500);
+    };
+    const respaldo = () => { promptEl.select(); try { document.execCommand("copy"); avisar(); } catch (e) {} };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(promptEl.value).then(avisar, respaldo);
+    else respaldo();
+  });
+
+  // ---------------------------------------------------------------
+  // Arranque
+  // ---------------------------------------------------------------
+  // paleta_colores.html#guante, #emg o #comp abre esa pestaña.
+  const deHash = location.hash.slice(1);
+  if (["guante", "emg", "comp"].indexOf(deHash) >= 0) ui.tab = deHash;
+  refrescarTodo();
+  let pendiente = 0;
+  window.addEventListener("resize", () => {
+    cancelAnimationFrame(pendiente);
+    pendiente = requestAnimationFrame(render);
+  });
+  cambio();
+  // La fuente puede llegar despues del primer dibujo de la lamina.
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(render);
+})();
+</script>
+</body>
+</html>

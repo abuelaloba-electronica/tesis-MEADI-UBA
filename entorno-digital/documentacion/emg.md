@@ -56,7 +56,7 @@ simulado, el modo automático y la consola.
   nuevo en cada mudanza) el centro se muda. La sesión deja varios abanicos
   repartidos, y con 1 como mínimo aparecen también cuadriláteros sueltos: la
   composición es menos regular.
-- **Arranca en el centro**, con la familia cálida.
+- **Arranca en el centro**, con la primera familia de `FAMILIAS`.
 - La mudanza ocurre **después** de estampar el cuadrilátero que completa el
   grupo.
 - Cada ubicación nueva queda a una distancia mínima de la anterior
@@ -72,10 +72,29 @@ simulado, el modo automático y la consola.
 ### 1.3 · De qué color: familias
 
 Cada ubicación usa una **familia** de tonos de un mismo matiz, ordenados de
-suave a intenso. Son cinco, en `FAMILIAS`: **cálida** (rosa, ocre, coral,
-naranja, magenta, bordó; la del arranque), **azul**, **verde**, **violeta** y
-**turquesa**. Se pueden agregar, quitar o reordenar editando ese arreglo, con
-cualquier cantidad de tonos (2 o más); la primera es la del arranque.
+suave a intenso. Son cinco, en `FAMILIAS`, distintas en la página activa y en
+la copia de la experiencia:
+
+- **Página activa**: **cálida** (rosa, ocre, coral, naranja, magenta, bordó;
+  la del arranque), **azul**, **verde**, **violeta** y **turquesa**, de seis
+  tonos cada una.
+- **Copia de la experiencia** (§4): la paleta elegida con
+  [`../tools/paleta_colores.html`](../tools/paleta_colores.html), cinco
+  colores base (`#ff0000` rojo, `#a89a00` oliva, `#f8f130` amarillo,
+  `#f0a505` ámbar, `#046c65` verde petróleo). Cada uno se abre en cinco tonos
+  mezclándolo en sRGB con blanco al 50 % y al 25 %, el color base, y con
+  negro al 20 % y al 40 %. Se llaman provisoriamente "color 1" a "color 5".
+
+| Familia | Tonos (de suave a intenso) |
+|---|---|
+| color 1 | `#ff8080` `#ff4040` `#ff0000` `#cc0000` `#990000` |
+| color 2 | `#d4cd80` `#beb340` `#a89a00` `#867b00` `#655c00` |
+| color 3 | `#fcf898` `#faf564` `#f8f130` `#c6c126` `#95911d` |
+| color 4 | `#f8d282` `#f4bc44` `#f0a505` `#c08404` `#906303` |
+| color 5 | `#82b6b2` `#43918c` `#046c65` `#035651` `#02413d` |
+
+Se pueden agregar, quitar o reordenar editando ese arreglo, con cualquier
+cantidad de tonos (2 o más); la primera es la del arranque.
 
 - **La intensidad elige el tono dentro de la familia**: la media de la
   contracción, reescalada entre el umbral y la mayor vista en la sesión (para
@@ -99,7 +118,7 @@ salida del harness.
   offscreen** (`capa`): cada frame cuesta un `drawImage` más las piezas que
   están apareciendo, y una sesión larga no se vuelve lenta. Se guardan
   normalizados para reconstruir la capa al redimensionar.
-- "Limpiar lienzo" vuelve al centro y a la familia cálida.
+- "Limpiar lienzo" vuelve al centro y a la primera familia.
 
 ---
 
@@ -198,6 +217,10 @@ captura, → a `experiencia.html#10`; ver [`experiencia.md`](experiencia.md) §3
   los cuadriláteros estampados y nunca se le pintó el fondo, así que el PNG ya
   sale transparente. `congelar()` cierra la contracción en curso y estampa los
   que estaban apareciendo. El canvas visible y su `BG_COLOR` no cambian.
+- **La paleta nueva** (§1.3): las cinco familias "color 1" a "color 5" en
+  lugar de cálida, azul, verde, violeta y turquesa. El algoritmo no cambia:
+  la intensidad elige el tono dentro de la familia y la bolsa sortea las
+  familias.
 - **Los elementos de la captura** son `cuadrilatero`s con sus cuatro
   vértices en px, color, alpha y familia, más los datos normalizados (`v`,
   `cu`, `cv`, `semiAlto`) que permiten rehacerlos a otro tamaño.
@@ -278,3 +301,13 @@ sorteadas por bolsa.
 espaciadora (2026-10-28); instrucciones movidas a la pantalla 8 (2026-11-02);
 captura de la capa offscreen y lista de `elementos` (2026-11-03);
 confirmación con la segunda pulsación (2026-11-07).
+
+**Copia: paleta nueva** (`experiencia/emg_acumulacion.html`, 2026-11-09).
+Las cinco familias de seis tonos (cálida, azul, verde, violeta, turquesa) se
+reemplazan por cinco de cinco tonos derivadas de una base de cinco colores
+(§1.3), elegida con `tools/paleta_colores.html`, que previsualiza la EMG y el
+guante solos y superpuestos en la composición. Sólo cambia `FAMILIAS`: el
+algoritmo, la opacidad (22 %) y el fondo (`#fdf7f5`) quedan igual. La página
+activa no se tocó. `harness_emg.js` estampa la misma cantidad de
+cuadriláteros que antes (con una captura sintética de 95 s, 40 y 0
+descartados, antes y después).

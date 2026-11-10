@@ -181,9 +181,9 @@
     border-radius: 3px;
     background: #999;
   }
-  #forceFillBar { background: #0000FF; }
-  #hit0Fill { background: #FFDE21; }
-  #hit1Fill { background: #FF8C1A; }
+  #forceFillBar { background: #151923; }
+  #hit0Fill { background: #EEF202; }
+  #hit1Fill { background: #847575; }
 
   #midiSelect { width: 100%; margin-top: 8px; }
   #escalaSelect { width: 100%; }
@@ -344,7 +344,7 @@
     </span>
   </div>
   <div id="panelBody">
-  <p class="subtitle">MAEDI — cada golpe deja un anillo amarillo o naranja y cada presión del FSR un disco azul, leyendo el dispositivo real por USB; el sonido lo genera Helm por MIDI</p>
+  <p class="subtitle">MAEDI — cada golpe deja un anillo amarillo o gris y cada presión del FSR un disco negro azulado, leyendo el dispositivo real por USB; el sonido lo genera Helm por MIDI</p>
 
   <div class="section-title">Conexión con el dispositivo</div>
   <button id="connectBtn">Conectar dispositivo (USB)</button>
@@ -395,13 +395,14 @@
   <div class="section-title">Color de los anillos (dedos 0 y 1)</div>
   <div class="color-row">
     <select id="colorSelect">
-      <option value="#FFDE21,#FF8C1A" selected>Amarillo + Naranja</option>
+      <option value="#eef202,#847575" selected>Amarillo limón + Gris cálido</option>
+      <option value="#FFDE21,#FF8C1A">Amarillo + Naranja</option>
       <option value="#FFDE21,#FF4A1C">Amarillo + Rojo anaranjado</option>
       <option value="#ECFD18,#FFA500">Amarillo fluo + Naranja</option>
     </select>
     <div class="swatch-pair"><div id="sw0"></div><div id="sw1"></div><div id="sw2"></div></div>
   </div>
-  <div class="note">Los dos dedos se dibujan como anillos y se distinguen por el tono. El disco relleno azul es siempre el FSR: aparece al empezar a apretar, crece hasta la presión máxima alcanzada y queda estampado al soltar.</div>
+  <div class="note">Los dos dedos se dibujan como anillos y se distinguen por el tono. El disco relleno negro azulado es siempre el FSR: aparece al empezar a apretar, crece hasta la presión máxima alcanzada y queda estampado al soltar.</div>
 
   <hr class="divider">
 
@@ -581,8 +582,8 @@
     const bigint = parseInt(clean, 16);
     return [(bigint >> 16) & 255, (bigint >> 8) & 255, bigint & 255];
   }
-  let colorDedo = [hexToRgb("#FFDE21"), hexToRgb("#FF8C1A")];
-  const COLOR_FSR = "#0000FF";
+  let colorDedo = [hexToRgb("#eef202"), hexToRgb("#847575")];
+  const COLOR_FSR = "#151923";
 
   // Disco del FSR. Radio relativo a min(W,H), con un rango bastante mas
   // amplio que el de los anillos (0.08-0.10): una presion es un gesto lento y
@@ -1380,7 +1381,7 @@
 
     // La version anterior aplicaba aca un efecto global del FSR (filtro CSS
     // blur/contrast/saturate y una tinta violeta acumulada sobre todo el
-    // lienzo). Se quito: ahora el FSR tiene su propia marca, el disco azul, y
+    // lienzo). Se quito: ahora el FSR tiene su propia marca, el disco, y
     // el desenfoque global la borronearia junto con todo lo demas.
 
     ctxO.clearRect(0, 0, W, H);

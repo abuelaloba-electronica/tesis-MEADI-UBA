@@ -415,14 +415,18 @@
   // una familia; dentro de ella, la intensidad media de la contraccion elige
   // el tono, igual que en v3. Cada familia va ordenada de suave a intensa y
   // puede tener cualquier cantidad de tonos (2 o mas). La primera es la
-  // paleta calida de v3 y es la del arranque. Para configurarlas, editar
-  // este arreglo: se pueden agregar, quitar o reordenar familias.
+  // del arranque. Para configurarlas, editar este arreglo: se pueden
+  // agregar, quitar o reordenar familias.
+  // Paleta elegida con tools/paleta_colores.html: cinco colores base
+  // (#ff0000, #a89a00, #f8f130, #f0a505, #046c65), y cada uno se abre en
+  // cinco tonos mezclandolo en sRGB con blanco al 50 % y al 25 %, el color
+  // base, y con negro al 20 % y al 40 %.
   const FAMILIAS = [
-    { nombre: "cálida",   tonos: ["#f2a7a1", "#e9b44c", "#f07a5f", "#e8692c", "#c2306f", "#7d1d3f"] },
-    { nombre: "azul",     tonos: ["#a9c6e8", "#7fa7d9", "#5b8ccf", "#3a6bb5", "#28488f", "#1b2a5c"] },
-    { nombre: "verde",    tonos: ["#cfe3a0", "#adcf74", "#8ab452", "#68943d", "#4b722f", "#304a20"] },
-    { nombre: "violeta",  tonos: ["#d4b5e3", "#b892d1", "#9a6fbf", "#7c50a6", "#5e3784", "#3b2156"] },
-    { nombre: "turquesa", tonos: ["#a6e0d8", "#6fcabd", "#3fb0a3", "#2a8f88", "#1e6e6c", "#134749"] },
+    { nombre: "color 1", tonos: ["#ff8080", "#ff4040", "#ff0000", "#cc0000", "#990000"] },
+    { nombre: "color 2", tonos: ["#d4cd80", "#beb340", "#a89a00", "#867b00", "#655c00"] },
+    { nombre: "color 3", tonos: ["#fcf898", "#faf564", "#f8f130", "#c6c126", "#95911d"] },
+    { nombre: "color 4", tonos: ["#f8d282", "#f4bc44", "#f0a505", "#c08404", "#906303"] },
+    { nombre: "color 5", tonos: ["#82b6b2", "#43918c", "#046c65", "#035651", "#02413d"] },
   ];
 
   // Cada cuantos cuadrilateros se muda el centro: un entero al azar en
@@ -488,7 +492,7 @@
     restantes = sortearCantidad();
   }
 
-  // Arranque (y "Limpiar lienzo"): centro del viewport, familia calida. La
+  // Arranque (y "Limpiar lienzo"): centro del viewport, primera familia. La
   // primera ronda de la bolsa ya la cuenta como usada.
   function reiniciarUbicacion() {
     ubicU = 0; ubicV = 0; familiaIdx = 0;
