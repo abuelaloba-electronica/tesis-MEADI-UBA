@@ -76,7 +76,8 @@ Cada pantalla es una entrada de `PANTALLAS`, una lista de párrafos
 - `paso` + `lista` arman las pantallas de instrucciones: el rótulo "# Paso N"
   en negrita y resaltado, y debajo las instrucciones con viñetas, todo
   alineado a la izquierda en un bloque centrado del ancho de su línea más
-  larga;
+  larga; con `teclado: true` (las tres) se suma debajo el esquema del
+  teclado;
 - la clase `desdibuja` (pantalla 3) desenfoca el texto a los 3 s y lo deja
   así.
 
@@ -95,6 +96,18 @@ visualización.** Al principio cada visualización mostraba un aviso con sus
 instrucciones al entrar. Separarlas en la pantalla anterior (4, 6, 8) deja la
 visualización limpia, sin nada encima mientras la persona explora, y pone
 las tres instrucciones en el mismo formato.
+
+**El esquema del teclado** (pantallas 4, 6 y 8). Un SVG de 330 px que arma
+`teclado()`, debajo de la lista: el teclado inglés de la MacBook Pro 2011
+donde corre la experiencia, en trazo gris claro, con la barra espaciadora y
+delete rellenas del amarillo del resaltador y → con un trazo más oscuro.
+Dice *dónde* están las teclas sin agregar texto, lo que ayuda cuando una
+mano lleva el dispositivo. Copia el teclado real: la tecla de borrar dice
+"delete" (abajo a la derecha, en minúsculas), la barra espaciadora no tiene
+rótulo, y las flechas forman una T invertida, con ← y → enteras. El
+texto de las instrucciones sigue diciendo "Retroceso". Se eligió entre seis
+variantes (tecla dibujada en línea, símbolo como viñeta, leyenda en el pie,
+la tecla que se pulsa, la tecla con el resaltador y este esquema).
 
 ---
 
@@ -905,3 +918,8 @@ Probado en Brave headless con `#demo`: selección, ráfagas de un solo paso,
 casillas con un marco sobre los cuatro tipos (desmarcar círculos y puntos
 los deja intactos), Ctrl+Z, y que ← y Esc con el foco en el panel no navegan
 ni deseleccionan.
+
+**2026-11-10 · Teclado en las instrucciones.** Las pantallas 4, 6 y 8 suman
+debajo de la lista un esquema del teclado de la MacBook Pro 2011 con la
+barra espaciadora y delete en amarillo y → marcada (§2). Es un SVG armado
+en el script, sin imágenes; en 1280×800 entra con la lista más larga (Paso 2).

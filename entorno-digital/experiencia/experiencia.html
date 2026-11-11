@@ -69,6 +69,10 @@
     font-size: 24px; font-style: italic;
   }
   #pantalla .con-paso li::before { content: "•"; position: absolute; left: 0; font-style: normal; }
+  /* Pantallas 4, 6 y 8: esquema del teclado de la MacBook Pro 2011 (inglés)
+     debajo de la lista, con la barra espaciadora y delete en el amarillo del
+     resaltador y → apenas marcada. */
+  #pantalla .teclado { display: block; width: 330px; margin: 1.6em auto 0; }
   #pantalla .nota { font-size: 0.6em; color: var(--suave); margin-top: 2em; }
   #pantalla .logo { display: block; width: min(456px, 100%); margin: 3.5em auto 0; }
   #pie {
@@ -105,7 +109,7 @@
   // párrafos { texto, clase }; con `imagen`, el texto es su descripción, y
   // `resaltar` lista fragmentos del texto a marcar, en orden de aparición;
   // `paso` pone ese rótulo, en negrita y resaltado, arriba de `lista`, que
-  // va con viñetas.
+  // va con viñetas; `teclado` agrega debajo el esquema del teclado.
   // ---------------------------------------------------------------
   const PANTALLAS = {
     0: [
@@ -135,7 +139,7 @@
         "Explora los movimientos de tu mano y lo que traduce la pantalla.",
         "Captura la composición gráfica pulsando dos veces la barra espaciadora.",
         "Para borrar todo e iniciar nuevamente pulsa la tecla Retroceso.",
-      ] },
+      ], teclado: true },
     ],
     6: [
       { paso: "# Paso 2", lista: [
@@ -145,7 +149,7 @@
         "Explora las huellas de tus dedos, los colores, el sonido.",
         "Captura la composición gráfica pulsando dos veces la barra espaciadora.",
         "Para borrar todo e iniciar nuevamente pulsa la tecla Retroceso.",
-      ] },
+      ], teclado: true },
     ],
     8: [
       { paso: "# Paso 3", lista: [
@@ -154,7 +158,7 @@
         "Explora tu esfuerzo muscular a través de la traducción que ves en la pantalla.",
         "Captura la composición gráfica pulsando dos veces la barra espaciadora.",
         "Para borrar todo e iniciar nuevamente pulsa la tecla Retroceso.",
-      ] },
+      ], teclado: true },
     ],
     10: [
       { texto: "Llegaste casi al final de la experiencia, tu cuerpo generó datos para una composición gráfica." },
@@ -225,7 +229,77 @@
       lista.appendChild(li);
     });
     bloque.append(parrafo(par.paso, "paso", [par.paso]), lista);
+    if (par.teclado) bloque.appendChild(teclado());
     return bloque;
+  }
+
+  // Esquema en SVG del teclado inglés de la MacBook Pro 2011, 14,5 unidades
+  // de ancho: fila de funciones a media altura, la tecla delete con su rótulo
+  // abajo a la derecha (como la real) y las flechas en T invertida (← y →
+  // enteras, ↑ y ↓ a media altura). Se marcan las teclas que se usan en la
+  // visualización: la barra espaciadora y delete en amarillo, → con un trazo
+  // más oscuro y un triángulo.
+  function teclado() {
+    const NS = "http://www.w3.org/2000/svg";
+    const u = 22, g = 2.5;    // unidad de tecla y separación, en el viewBox
+    const filas = [
+      { h: 0.55, k: Array(14).fill(14.5 / 14) },
+      { h: 1, k: Array(13).fill(1).concat([["delete", 1.5]]) },
+      { h: 1, k: [1.5].concat(Array(13).fill(1)) },
+      { h: 1, k: [1.75].concat(Array(11).fill(1), [1.75]) },
+      { h: 1, k: [2.25].concat(Array(10).fill(1), [2.25]) },
+      { h: 1, k: [1, 1, 1, 1.25, ["espacio", 5], 1.25, 1, "flechas"] },
+    ];
+    const svg = document.createElementNS(NS, "svg");
+    function nodo(tipo, attrs) {
+      const el = document.createElementNS(NS, tipo);
+      Object.keys(attrs).forEach(function (a) { el.setAttribute(a, attrs[a]); });
+      svg.appendChild(el);
+      return el;
+    }
+    // marca: undefined = tecla común, "acento" = relleno amarillo,
+    // "suave" = trazo más oscuro.
+    function tecla(x, y, w, h, marca) {
+      nodo("rect", {
+        x: x + g / 2, y: y + g / 2, width: w - g, height: h - g, rx: 2.5,
+        fill: marca === "acento" ? "#ECFC2B" : "none",
+        stroke: marca === "acento" ? "none" : (marca === "suave" ? "#777" : "#cfcfcf"),
+        "stroke-width": 1,
+      });
+    }
+    let y = 0;
+    filas.forEach(function (f) {
+      let x = 0;
+      const h = f.h * u;
+      f.k.forEach(function (k) {
+        if (k === "flechas") {
+          tecla(x, y, u, h);
+          tecla(x + u, y, u, h / 2);
+          tecla(x + u, y + h / 2, u, h / 2);
+          tecla(x + 2 * u, y, u, h, "suave");
+          const cx = x + 2.5 * u, cy = y + h / 2;
+          nodo("path", { d: "M" + (cx - 2.5) + " " + (cy - 3.5) + "L" + (cx + 3) + " " + cy +
+                            "L" + (cx - 2.5) + " " + (cy + 3.5) + "Z", fill: "#777" });
+          x += 3 * u;
+          return;
+        }
+        const nombre = Array.isArray(k) ? k[0] : null;
+        const w = (Array.isArray(k) ? k[1] : k) * u;
+        tecla(x, y, w, h, nombre ? "acento" : undefined);
+        if (nombre === "delete") {
+          nodo("text", { x: x + w - 5, y: y + h - 5, "text-anchor": "end", "font-size": 7,
+                         fill: "#111", "font-family": "Helvetica, Arial, sans-serif" })
+            .textContent = "delete";
+        }
+        x += w;
+      });
+      y += h;
+    });
+    svg.setAttribute("viewBox", "0 0 " + 14.5 * u + " " + y);
+    svg.setAttribute("class", "teclado");
+    svg.setAttribute("role", "img");
+    svg.setAttribute("aria-label", "Teclado: barra espaciadora y tecla delete resaltadas");
+    return svg;
   }
 
   // El número de pantalla vive en el hash: recargar no pierde el lugar, y

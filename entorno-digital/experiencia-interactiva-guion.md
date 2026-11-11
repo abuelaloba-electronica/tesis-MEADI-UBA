@@ -44,6 +44,8 @@ Captura la composición gráfica pulsando dos veces la barra espaciadora.
 
 Para borrar todo e iniciar nuevamente pulsa la tecla Retroceso.
 
+**Debajo de la lista, un esquema del teclado de la MacBook Pro con la barra espaciadora y la tecla delete resaltadas en amarillo y la flecha → apenas marcada**
+
 **Pantalla 5\.**
 
 **Visualización del dispositivo uno, sin instrucciones en pantalla**
@@ -66,6 +68,8 @@ Captura la composición gráfica pulsando dos veces la barra espaciadora.
 
 Para borrar todo e iniciar nuevamente pulsa la tecla Retroceso.
 
+**Debajo de la lista, un esquema del teclado de la MacBook Pro con la barra espaciadora y la tecla delete resaltadas en amarillo y la flecha → apenas marcada**
+
 **Pantalla 7\.**
 
 **Visualización del dispositivo dos, sin instrucciones en pantalla**
@@ -85,6 +89,8 @@ Explora tu esfuerzo muscular a través de la traducción que ves en la pantalla.
 Captura la composición gráfica pulsando dos veces la barra espaciadora.
 
 Para borrar todo e iniciar nuevamente pulsa la tecla Retroceso.
+
+**Debajo de la lista, un esquema del teclado de la MacBook Pro con la barra espaciadora y la tecla delete resaltadas en amarillo y la flecha → apenas marcada**
 
 **Pantalla 9\.**
 
