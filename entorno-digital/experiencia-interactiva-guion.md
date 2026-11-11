@@ -98,9 +98,11 @@ Para borrar todo e iniciar nuevamente pulsa la tecla Retroceso.
 
 **Pantalla 10\.**
 
-Llegaste casi al final de la experiencia, tu cuerpo generó datos para una composición gráfica.
+Llegaste casi al final de la experiencia, tu cuerpo generó datos para una composición gráfica y una pieza auditiva.
 
-Para finalizar selecciona las zonas de las composiciones que creas que son las más ricas en cuanto a tus gustos personales para generar tu obra y la máquina las capturará. Al finalizar podrías cambiar la colorimetría si lo deseas.
+Con los datos generados por tu cuerpo, puedes crear una obra o composición gráfica. Selecciona lo que creas más interesante para generar tu obra y la máquina las capturará. Si lo deseas, puedes cambiar la colorimetría, mover, cambiar el tamaño, o rotar los elementos. También puedes copiar y pegar.
+
+Tu obra será una composición gráfica, audible y en movimiento.
 
 **¡Gracias nuevamente por ser parte de esta investigación\!**
 
