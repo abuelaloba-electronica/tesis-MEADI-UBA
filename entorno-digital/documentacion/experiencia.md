@@ -198,7 +198,7 @@ después se cierra.
 | | Modo edición (al entrar) | Modo final |
 |---|---|---|
 | Qué se ve | todos los elementos, con marcas de selección | la composición tal como quedó, sin marcas |
-| Qué se puede hacer | seleccionar, mover, agrandar, cambiar color y opacidad, copiar, pegar, eliminar, deshacer | mirar y escuchar |
+| Qué se puede hacer | seleccionar, mover, agrandar, girar, cambiar color y opacidad, copiar, pegar, eliminar, deshacer | mirar y escuchar |
 | Sonido | ninguno | la grabación del guante, en loop |
 | Movimiento | sólo el que hace la persona | el que produce el sonido |
 | Exportar | — | el botón "Descargar obra" (§5.6) |
@@ -220,14 +220,19 @@ traer una al frente (ver Alternativas descartadas).
 ```js
 { id, origen, tipo,       // "emg" | "guante" | "bandada";  "punto" | "anillo" | "disco" | "cuadrilatero" | "imagen"
   x, y,                   // centro, en coordenadas del marco
-  escala,                 // la transformación que editan las operaciones
-  forma: { ... },         // geometría relativa al centro (r; o los vértices del cuadrilátero)
+  escala, giro,           // la transformación que editan las operaciones (giro en radianes)
+  forma: { ... },         // geometría relativa al centro, sin giro ni escala (r; o los vértices del cuadrilátero)
   estilo: { color, alpha, grosor?, modo? },
   tiempos? }              // { t } o { t0, t1 }, sólo lo que sonó
 ```
 
-Para el cuadrilátero el centro es el promedio de sus vértices. Así mover y
-escalar son la misma cuenta para cualquier tipo (`translate · scale`).
+Para el cuadrilátero el centro es el promedio de sus vértices. Así mover,
+girar y escalar son la misma cuenta para cualquier tipo
+(`translate · rotate · scale`). Todos los elementos nacen con `giro: 0`,
+pero sólo el cuadrilátero lo cambia (§4.2), y por eso sólo su geometría
+(`verticesEnMarco`, `toca`) lo tiene en cuenta: en un círculo no se vería.
+Una composición guardada antes de que existiera el giro no lo trae, y
+`giroDe` lo lee como 0.
 
 **El marco.** Las coordenadas de la escena viven en el tamaño de pantalla de
 la primera captura, y al dibujar ese marco se encaja (*contain*) en la
@@ -262,12 +267,30 @@ ignora en silencio, como las líneas serie que una página no reconoce.
 | arrastrar en el vacío | marco: selecciona todo lo que toca, aunque esté tapado (con Mayús, suma) |
 | clic al vacío, Esc | deselecciona |
 | tirador de la esquina, rueda | agranda o achica la selección |
+| tirador redondo, Mayús+rueda | gira la selección, si tiene algún cuadrilátero (con Mayús, el tirador va de a 15°) |
 | muestra de color (arriba a la izquierda) | abre el panel de color y opacidad de la selección |
 | Ctrl+C / Ctrl+V | copia / pega desplazado, encima de todo |
 | Supr, Retroceso | elimina la selección |
 | Ctrl+Z / Ctrl+Mayús+Z o Ctrl+Y | deshace / rehace |
 | barra espaciadora ×2 | cierra la edición (§4.4) |
 | V | diagnóstico: alterna con los PNG originales |
+
+**Qué admite cada tipo.**
+
+| Tipo (origen) | mover | escalar | rotar | copiar | eliminar | color |
+|---|:-:|:-:|:-:|:-:|:-:|:-:|
+| `punto` (bandada) | sí | — | — | sí | sí | sí |
+| `anillo` (guante) | sí | sí | — | sí | sí | sí |
+| `disco` (guante) | sí | sí | — | sí | sí | sí |
+| `cuadrilatero` (EMG) | sí | sí | sí | sí | sí | sí |
+| `imagen` (respaldo) | — | — | — | — | — | — |
+
+Una operación que el tipo no admite no lo deja afuera de una selección
+mixta: el tipo **acompaña al grupo sin cambiar él mismo**. Al escalar, un
+punto se aleja o se acerca del centro sin crecer; al girar, un punto, un
+anillo o un disco orbita alrededor del centro sin girar sobre sí (en un
+círculo no se notaría). Lo que no admite ni `mover` se queda quieto. La
+`imagen` no admite nada y ni siquiera se puede seleccionar.
 
 **Permisos por tipo, en una tabla.** El código de puntero y teclado nunca
 pregunta por tipos: pregunta `permite(el, op)`.
@@ -277,15 +300,18 @@ const PERMITIDAS = {
   punto:        ["mover", "copiar", "eliminar", "color"],
   anillo:       ["mover", "escalar", "copiar", "eliminar", "color"],
   disco:        ["mover", "escalar", "copiar", "eliminar", "color"],
-  cuadrilatero: ["mover", "escalar", "copiar", "eliminar", "color"],
+  cuadrilatero: ["mover", "escalar", "rotar", "copiar", "eliminar", "color"],
   imagen:       []
 };
 ```
 
 Como cada origen tiene sus propios tipos, `escalar` fuera de la fila de
-`punto` es exactamente "el guante y la EMG se agrandan, la bandada no". Una
-operación nueva (rotar, por ejemplo; así entró `color`) es una entrada en esa tabla, no
-condiciones en el código. `pegar` no es un permiso: actúa sobre el
+`punto` es exactamente "el guante y la EMG se agrandan, la bandada no", y
+`rotar` sólo en la fila de `cuadrilatero` es "gira lo único que no es
+redondo". Una operación nueva (así entraron `color` y `rotar`) es una
+entrada en esa tabla, no condiciones en el código. Los tiradores aparecen
+según la tabla: el de escalar si algo de la selección admite `escalar`, el
+de girar si algo admite `rotar`. `pegar` no es un permiso: actúa sobre el
 portapapeles, que sólo contiene lo que ya se pudo copiar.
 
 Las decisiones que sostienen la interacción:
@@ -311,8 +337,32 @@ Las decisiones que sostienen la interacción:
 - **El escalado** es desde el centro de la caja de la selección, entre 0,2 y
   8 veces el tamaño capturado. El tirador no salta: el factor es cuánto se
   alejó el puntero del centro respecto de donde lo agarró.
+- **El giro** (`prepararGiro`). El tirador es un círculo sobre el centro del
+  lado de arriba del recuadro de la selección, unido a él por un trazo (si
+  no entra arriba de la ventana, va debajo); mientras se gira, una cruz
+  marca el pivote. Un cuadrilátero solo gira sobre su centro, sin correrse;
+  una selección de varios gira entera, rígida, alrededor del centro de su
+  caja. Tampoco salta: el ángulo es cuánto giró el puntero alrededor del
+  pivote desde donde lo agarró, llevado continuo (sin el salto de 180° a
+  −180°) para que una vuelta entera sea una vuelta entera. Con Mayús va de
+  a 15° (`GIRO_PASO`), contados desde el giro con que empezó el gesto. Con
+  la rueda, Mayús+rueda gira 15° por muesca (`RUEDA_GIRO_K`); se lee
+  `deltaX` si `deltaY` viene en 0, porque con Mayús varios navegadores
+  mandan la rueda como desplazamiento horizontal. No hay límite de ángulo.
+- **Girar no saca nada del marco, salvo lo que ya estaba afuera.** Si con el
+  ángulo pedido algún centro que está dentro del marco saldría, el giro se
+  queda en el más cercano que no lo saca. Lo que ya estaba afuera (las
+  copias fantasma de la bandada) gira con el grupo pero no lo limita: un
+  pájaro partido entre dos bordes tiene una parte afuera de cada lado, y
+  cualquier giro aleja del marco a una de las dos, así que con la regla del
+  traslado y el escalado ("puede volver, pero no alejarse más") un marco que
+  las incluyera no giraría nunca. Como gira alrededor del pivote, no se
+  aleja de él.
 - **Una ráfaga de rueda es un solo paso de deshacer** (eventos a menos de
-  350 ms), que se cierra antes con cualquier tecla o clic.
+  350 ms), que se cierra antes con cualquier tecla o clic, o al apretar o
+  soltar Mayús en el medio (pasar de escalar a girar es otra ráfaga). Una
+  tecla modificadora sola no la cierra: Mayús mantenida repite `keydown` en
+  algunos sistemas, y partiría el giro en muchos pasos.
 - **El marco toca, no contiene**, con la misma idea de la prueba de impacto:
   un anillo cuenta por su corona, un cuadrilátero por su polígono. Alcanza lo
   tapado, que es la forma directa de llegar a lo que está debajo.
@@ -374,12 +424,12 @@ Cada capa usa sólo las de arriba:
 
 | Capa | Contenido |
 |---|---|
-| modelo | geometría, `TIPOS` (cada tipo con `desdeCaptura`, `dibujar`, `caja`, `toca`, `tocaRect`), construcción de la escena, `PERMITIDAS`, `REACCIONES` y operaciones puras sobre listas de elementos (`prepararTraslado`, `prepararEscalado`, `copiar`, `pegar`, `eliminar`, `aplicarEstilo`) |
+| modelo | geometría, `TIPOS` (cada tipo con `desdeCaptura`, `dibujar`, `caja`, `toca`, `tocaRect`), construcción de la escena, `PERMITIDAS`, `REACCIONES` y operaciones puras sobre listas de elementos (`prepararTraslado`, `prepararEscalado`, `prepararGiro`, `copiar`, `pegar`, `eliminar`, `aplicarEstilo`) |
 | editor | historial, selección, portapapeles y comandos (`aplicarCambio` hace de cada uno un paso de deshacer) |
 | vista | dibujo de la escena y de las marcas de edición |
 | sonido | decodificar o sintetizar la grabación, reproducirla en loop, analizarla, llevar el cuadro de la animación |
 | video | grabar una vuelta de la animación con su sonido en un lienzo propio y descargarla (§5.6) |
-| entrada | gestos (mover, escalar, marco: objetos con `mover`, `terminar`, `pintar`), rueda, color y opacidad, teclado, cierre de la edición |
+| entrada | gestos (mover, escalar, rotar, marco: objetos con `mover`, `terminar`, `pintar`), rueda, color y opacidad, teclado, cierre de la edición |
 | datos | IndexedDB, demo y arranque |
 
 Un tipo nuevo es una entrada en `TIPOS` y sus filas en `PERMITIDAS` y
@@ -413,7 +463,7 @@ hace falta, por qué no suena.
 { version: 1, ancho, alto, elementos, fuentes: { emg, guante, bandada }, fecha }
 ```
 
-`elementos` son los de la escena con sus `tiempos`; `fuentes`, la `fecha` de
+`elementos` son los de la escena con sus `tiempos` y su `giro`; `fuentes`, la `fecha` de
 cada captura usada. Al cargar, si hay composición guardada **y sus `fuentes`
 coinciden con las capturas actuales**, la página vuelve directo al modo
 final con esa escena. Si alguna captura cambió, es otro recorrido: se ignora
@@ -547,8 +597,8 @@ sonido: {                 // o null
 **Principio: una capa visual, no una edición.** En cada cuadro cada elemento
 recibe un efecto `{ dx, dy, escala, alpha, encima }` que `dibujarElemento`
 aplica sobre su `x`, `y`, `escala` y `alpha` **sin escribirlos**. Por eso la
-composición guardada no cambia, lo que la persona movió o agrandó se anima
-desde donde lo dejó, y una copia pegada de un anillo conserva su `t` y late
+composición guardada no cambia, lo que la persona movió, agrandó o giró se
+anima desde donde lo dejó, y una copia pegada de un anillo conserva su `t` y late
 con su original, como un eco. `encima` es lo que un efecto dibuja además del
 elemento (el anillo de impacto), en las coordenadas del elemento y sin la
 escala del efecto.
@@ -748,7 +798,8 @@ node entorno-digital/tools/harness_midi.js entorno-digital/experiencia/guante_pe
 - **Memoria**: 15 minutos decodificados en estéreo a 48 kHz son ~350 MB de
   `Float32Array`. Una sesión típica está muy por debajo; si molestara, se
   decodifica a mono.
-- **Del editor, sin hacer**: duplicar (Ctrl+D), orden (`[` `]`), clic
+- **Del editor, sin hacer**: girar otros tipos (hoy no hace falta: son
+  redondos), duplicar (Ctrl+D), orden (`[` `]`), clic
   repetido que baja por la pila, bloquear u ocultar por origen (`1` `2` `3`),
   exportar PNG (`P`) y el panel de instrucciones (cuyo texto tiene que entrar
   primero al guion).
@@ -923,3 +974,18 @@ ni deseleccionan.
 debajo de la lista un esquema del teclado de la MacBook Pro 2011 con la
 barra espaciadora y delete en amarillo y → marcada (§2). Es un SVG armado
 en el script, sin imágenes; en 1280×800 entra con la lista más larga (Paso 2).
+
+**2026-11-10 · Girar los cuadriláteros.** Se suma `rotar` a `PERMITIDAS`,
+sólo en la fila de `cuadrilatero`, y un campo `giro` (radianes) a la forma
+común de los elementos: `translate · rotate · scale`. Se gira con un tirador
+redondo sobre el recuadro de la selección (con Mayús, de a 15°) o con
+Mayús+rueda; en una selección mixta lo demás orbita alrededor del mismo
+centro. Lo que ya está fuera del marco no limita el giro, para que las
+copias fantasma de la bandada no lo traben (§4.2). Una tecla modificadora
+sola deja de cerrar la ráfaga de rueda. §4.2 suma la tabla de qué admite
+cada tipo. Probado en Brave headless con `#demo`: un cuadrilátero gira 90°
+sobre su centro, Ctrl+Z lo deshace, tres muescas de Mayús+rueda son 45° y
+un solo paso de deshacer, Mayús en el tirador redondea a 30°, un marco
+sobre toda la escena gira entero (14 cuadriláteros giran, los 69 elementos
+se mueven, ningún otro tipo cambia su `giro`), y el modo final anima sin
+errores.

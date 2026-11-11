@@ -253,6 +253,11 @@ Es definitivo: después ya no se puede seguir editando.</div>
   //                         agranda o achica la selección. Los anillos, discos y
   //                         cuadriláteros cambian de tamaño; los puntos de la
   //                         bandada no: sólo se separan o se juntan.
+  //   tirador redondo o Mayús+rueda
+  //                         gira la selección, si tiene algún cuadrilátero: los
+  //                         cuadriláteros giran y lo demás orbita alrededor del
+  //                         mismo centro (el grupo gira entero). Con Mayús, el
+  //                         tirador va de a GIRO_PASO.
   //   muestra de color      arriba a la izquierda, con algo seleccionado: al
   //                         tocarla, color, opacidad y, con varios
   //                         seleccionados, una casilla por tipo (ver
@@ -314,6 +319,8 @@ Es definitivo: después ya no se puede seguir editando.</div>
   const UMBRAL_ARRASTRE_PX = 3;    // por debajo, fue un clic y no un arrastre
   const RUEDA_K = 0.0015;          // factor de escala por px de rueda: exp(-k·Δ)
   const RUEDA_PAUSA_MS = 350;      // una ráfaga de rueda es un solo paso de deshacer
+  const RUEDA_GIRO_K = Math.PI / 1200; // radianes por px de rueda: 15° por muesca (100 px)
+  const GIRO_PASO = Math.PI / 12;  // 15°: el giro con Mayús va de a este paso
 
   // Cierre de la edición y sonido.
   const CONFIRMAR_MS = 4000;       // plazo para la segunda barra espaciadora, como en 5, 7 y 9
@@ -369,6 +376,16 @@ Es definitivo: después ya no se puede seguir editando.</div>
   }
 
   function acotar(v, min, max) { return Math.min(max, Math.max(min, v)); }
+
+  // El mismo ángulo, en (-π, π].
+  function normalizarAngulo(a) { return a - TAU * Math.round(a / TAU); }
+
+  // (x, y) girado `a` radianes alrededor de (cx, cy). En pantalla (y hacia
+  // abajo), un ángulo positivo gira en el sentido de las agujas del reloj.
+  function girarAlrededor(x, y, cx, cy, a) {
+    const c = Math.cos(a), s = Math.sin(a), dx = x - cx, dy = y - cy;
+    return { x: cx + dx * c - dy * s, y: cy + dx * s + dy * c };
+  }
 
   function propio(obj, clave) { return Object.prototype.hasOwnProperty.call(obj, clave); }
 
@@ -438,15 +455,19 @@ Es definitivo: después ya no se puede seguir editando.</div>
   // MODELO · Tipos de elemento
   //
   // Elemento de escena, con forma común a todos los tipos: un centro (x, y),
-  // una escala (lo que editan las operaciones), la geometría relativa al
-  // centro en `forma` y el aspecto en `estilo`. Mover y escalar son la misma
-  // cuenta para cualquier tipo: translate(x, y) · scale(escala).
+  // una escala y un giro en radianes (lo que editan las operaciones), la
+  // geometría relativa al centro en `forma` y el aspecto en `estilo`. Mover,
+  // girar y escalar son la misma cuenta para cualquier tipo:
+  // translate(x, y) · rotate(giro) · scale(escala). Sólo el cuadrilátero
+  // admite `rotar` (en un círculo no se vería), así que sólo su geometría
+  // (verticesEnMarco, toca) tiene en cuenta el giro. Una composición
+  // guardada antes de que existiera no lo trae: giroDe lo lee como 0.
   //
   // Cada tipo es una estrategia con la misma interfaz:
   //   desdeCaptura(e, origen, f)  elemento de escena desde lo que guardó la
   //                               captura, encajado con f; null si está roto
   //   dibujar(c, el, recursos)    en coordenadas locales (centro en el
-  //                               origen, sin escala)
+  //                               origen, sin giro ni escala)
   //   caja(el)                    rectángulo que ocupa, en el marco
   //   toca(el, mx, my, px)        si (mx, my) lo toca; px es cuánto mide un px
   //                               de pantalla en el marco
@@ -461,9 +482,11 @@ Es definitivo: después ya no se puede seguir editando.</div>
   function nuevoId() { return proximoId++; }
 
   function nuevoElemento(origen, tipo, x, y, forma, estilo) {
-    return { id: nuevoId(), origen: origen, tipo: tipo, x: x, y: y, escala: 1,
+    return { id: nuevoId(), origen: origen, tipo: tipo, x: x, y: y, escala: 1, giro: 0,
              forma: forma, estilo: estilo };
   }
+
+  function giroDe(el) { return finito(el.giro) ? el.giro : 0; }
 
   function alphaDe(e) {
     return finito(e.alpha) ? Math.max(0, Math.min(1, e.alpha)) : 1;
@@ -480,8 +503,10 @@ Es definitivo: después ya no se puede seguir editando.</div>
   }
 
   function verticesEnMarco(el) {
-    const s = el.escala;
-    return el.forma.puntos.map(function (p) { return [el.x + p[0] * s, el.y + p[1] * s]; });
+    const s = el.escala, a = giroDe(el), cos = Math.cos(a), sen = Math.sin(a);
+    return el.forma.puntos.map(function (p) {
+      return [el.x + (p[0] * cos - p[1] * sen) * s, el.y + (p[0] * sen + p[1] * cos) * s];
+    });
   }
 
   // Punto de la bandada y disco del FSR: círculos rellenos que sólo difieren
@@ -575,8 +600,10 @@ Es definitivo: después ya no se puede seguir editando.</div>
         const v = verticesEnMarco(el);
         return unirRects(v.map(function (p) { return { x0: p[0], y0: p[1], x1: p[0], y1: p[1] }; }));
       },
+      // El puntero, llevado a las coordenadas locales: sin giro ni escala.
       toca: function (el, mx, my) {
-        return puntoEnPoligono((mx - el.x) / el.escala, (my - el.y) / el.escala, el.forma.puntos);
+        const l = girarAlrededor(mx, my, el.x, el.y, -giroDe(el));
+        return puntoEnPoligono((l.x - el.x) / el.escala, (l.y - el.y) / el.escala, el.forma.puntos);
       },
       tocaRect: function (el, r) { return poligonoTocaRect(verticesEnMarco(el), r); }
     },
@@ -682,7 +709,10 @@ Es definitivo: después ya no se puede seguir editando.</div>
   // Agrandar (`escalar`) vale para lo que viene del guante (anillos y
   // discos) y de la EMG (cuadriláteros), no para los puntos de la bandada:
   // en una selección mixta los puntos se separan o se juntan con el resto,
-  // pero conservan su radio. Un tipo sin operaciones (la `imagen` de
+  // pero conservan su radio. Girar (`rotar`) vale sólo para los
+  // cuadriláteros, que son lo único que no es redondo: en una selección
+  // mixta lo demás orbita alrededor del mismo centro, sin girar sobre sí
+  // (en un círculo no se notaría). Un tipo sin operaciones (la `imagen` de
   // respaldo) no se puede ni seleccionar. `color` es cambiar el color y la
   // opacidad (estilo.color y estilo.alpha; el modo de fusión no se toca).
   // ===============================================================
@@ -690,7 +720,7 @@ Es definitivo: después ya no se puede seguir editando.</div>
     punto:        ["mover", "copiar", "eliminar", "color"],
     anillo:       ["mover", "escalar", "copiar", "eliminar", "color"],
     disco:        ["mover", "escalar", "copiar", "eliminar", "color"],
-    cuadrilatero: ["mover", "escalar", "copiar", "eliminar", "color"],
+    cuadrilatero: ["mover", "escalar", "rotar", "copiar", "eliminar", "color"],
     imagen:       []
   };
 
@@ -983,6 +1013,65 @@ Es definitivo: después ya no se puede seguir editando.</div>
     };
   }
 
+  // Giro del grupo alrededor de un pivote: el centro del elemento si es uno
+  // solo (gira sobre sí, sin correrse), el de la caja del grupo si son
+  // varios. aplicar(a) suma `a` radianes al giro de lo que admite `rotar` y
+  // hace orbitar `a` alrededor del pivote el centro de lo que admite
+  // `mover`: el grupo gira entero, rígido. Si con `a` algún centro que está
+  // dentro del marco saldría de él, se queda en el ángulo más cercano a `a`,
+  // entre el último aplicado y `a`, que no lo saca; devuelve el ángulo
+  // aplicado. `a` tiene que ser continuo (sin el salto de π a -π), para que
+  // esa búsqueda vaya por el camino corto. null si nada en el grupo se puede
+  // rotar.
+  //
+  // Lo que ya está fuera del marco (las copias fantasma de la bandada) gira
+  // con el grupo pero no lo limita, a diferencia del traslado y el escalado.
+  // Un pájaro partido entre dos bordes tiene una parte afuera de cada lado,
+  // y cualquier giro aleja del marco a una de las dos: con la regla de
+  // "puede volver, pero no alejarse más" no giraría nunca un marco que las
+  // incluya. Gira alrededor del pivote, así que no se aleja de él.
+  function prepararGiro(els, marco) {
+    if (!admiten(els, "rotar").length) return null;
+    const pivote = els.length === 1 ? { x: els[0].x, y: els[0].y } : centroDe(cajaDeGrupo(els));
+    const M = { x0: 0, y0: 0, x1: marco.ancho, y1: marco.alto };
+    const inicio = els.map(function (el) {
+      return { el: el, x: el.x, y: el.y, giro: giroDe(el), limita: dentroDeRect(el.x, el.y, M),
+               mueve: permite(el, "mover"), gira: permite(el, "rotar") };
+    });
+    const EPS = 1e-6;   // el redondeo no puede trabar lo que está justo en el borde
+    function cabe(a) {
+      for (const o of inicio) {
+        if (!o.mueve || !o.limita) continue;
+        const p = girarAlrededor(o.x, o.y, pivote.x, pivote.y, a);
+        if (p.x < -EPS || p.x > M.x1 + EPS || p.y < -EPS || p.y > M.y1 + EPS) return false;
+      }
+      return true;
+    }
+    let valido = 0;
+    return {
+      pivote: pivote,
+      aplicar: function (a) {
+        if (!cabe(a)) {
+          let bien = valido, mal = a;
+          for (let i = 0; i < 20; i++) {
+            const medio = (bien + mal) / 2;
+            if (cabe(medio)) bien = medio; else mal = medio;
+          }
+          a = bien;
+        }
+        valido = a;
+        for (const o of inicio) {
+          if (o.mueve) {
+            const p = girarAlrededor(o.x, o.y, pivote.x, pivote.y, a);
+            o.el.x = p.x; o.el.y = p.y;
+          }
+          if (o.gira) o.el.giro = normalizarAngulo(o.giro + a);
+        }
+        return a;
+      }
+    };
+  }
+
   // Copia de lo que admite `copiar`, en su orden de apilado y sin compartir
   // ningún objeto con la escena: lo que se edite después no la altera.
   function copiar(els) {
@@ -1143,16 +1232,18 @@ Es definitivo: después ya no se puede seguir editando.</div>
   // `ef`, en el modo final, es el efecto de sus reacciones al sonido (ver
   // MODELO · Reacciones): se suma a la posición y multiplica la escala y el
   // alpha, sin escribir nada en el elemento. `encima` dibuja algo más (el
-  // anillo de impacto) en sus coordenadas, con su escala de la escena y sin
-  // la del efecto.
+  // anillo de impacto) en sus coordenadas, con su giro y su escala de la
+  // escena y sin la escala del efecto.
   function dibujarElemento(c, el, ef) {
     const est = el.estilo;
     const x = el.x + (ef ? ef.dx : 0), y = el.y + (ef ? ef.dy : 0);
     const s = el.escala * (ef ? ef.escala : 1);
+    const giro = giroDe(el);
     const modo = est.modo || "source-over";
     if (s > 0) {
       c.save();
       c.translate(x, y);
+      if (giro) c.rotate(giro);
       if (s !== 1) c.scale(s, s);
       c.globalAlpha = Math.min(1, est.alpha * (ef ? ef.alpha : 1));
       c.globalCompositeOperation = modo;
@@ -1162,6 +1253,7 @@ Es definitivo: después ya no se puede seguir editando.</div>
     if (ef && ef.encima) {
       c.save();
       c.translate(x, y);
+      if (giro) c.rotate(giro);
       if (el.escala !== 1) c.scale(el.escala, el.escala);
       c.globalCompositeOperation = modo;
       ef.encima(c);
@@ -1260,14 +1352,17 @@ Es definitivo: después ya no se puede seguir editando.</div>
   }
 
   // ===============================================================
-  // VISTA · Marcas de edición: recuadros de la selección, el tirador de
-  // escalar y lo que dibuje el gesto en curso (el marco de selección).
+  // VISTA · Marcas de edición: recuadros de la selección, los tiradores de
+  // escalar y de girar y lo que dibuje el gesto en curso (el marco de
+  // selección, el pivote del giro).
   // Van en px de pantalla (grosor constante con cualquier encaje), después
   // de la escena y nunca dentro de ella: no van a salir en la exportación.
   // ===============================================================
   const MARGEN_SEL_PX = 4;
   const LADO_MIN_SEL_PX = 12;
   const LADO_TIRADOR_PX = 9;
+  const RADIO_GIRO_PX = 5;         // el tirador de girar es redondo
+  const DIST_GIRO_PX = 22;         // cuánto se separa del recuadro
 
   function rectEnPantalla(r, f) {
     return { x0: f.ox + r.x0 * f.k, y0: f.oy + r.y0 * f.k,
@@ -1298,9 +1393,26 @@ Es definitivo: después ya no se puede seguir editando.</div>
     return { x: b.x1, y: b.y1 };
   }
 
-  function tocaTirador(clientX, clientY) {
-    const t = tiradorDe(seleccionados(), encajeVentana());
-    return !!t && Math.abs(clientX - t.x) <= TOL_TIRADOR_PX && Math.abs(clientY - t.y) <= TOL_TIRADOR_PX;
+  // El de girar, redondo, sobre el centro del lado de arriba del recuadro de
+  // la selección, unido a él por un trazo; si no entra arriba de la
+  // ventana, debajo. Sólo si algo de la selección admite rotar. (bx, by) es
+  // dónde toca el recuadro.
+  function tiradorGiroDe(sel, f) {
+    if (!admiten(sel, "rotar").length) return null;
+    const b = recuadroEnPantalla(cajaDeGrupo(sel), f);
+    const x = (b.x0 + b.x1) / 2;
+    if (b.y0 - DIST_GIRO_PX - RADIO_GIRO_PX >= 0) return { x: x, y: b.y0 - DIST_GIRO_PX, bx: x, by: b.y0 };
+    return { x: x, y: b.y1 + DIST_GIRO_PX, bx: x, by: b.y1 };
+  }
+
+  // Qué tirador hay bajo el puntero: "escalar", "rotar" o null.
+  function tiradorBajo(clientX, clientY) {
+    const sel = seleccionados(), f = encajeVentana();
+    const t = tiradorDe(sel, f);
+    if (t && Math.abs(clientX - t.x) <= TOL_TIRADOR_PX && Math.abs(clientY - t.y) <= TOL_TIRADOR_PX) return "escalar";
+    const r = tiradorGiroDe(sel, f);
+    if (r && Math.hypot(clientX - r.x, clientY - r.y) <= TOL_TIRADOR_PX) return "rotar";
+    return null;
   }
 
   // Blanco por debajo y negro encima: se lee sobre cualquier color.
@@ -1319,18 +1431,51 @@ Es definitivo: después ya no se puede seguir editando.</div>
     const sel = seleccionados();
     if (!sel.length) return;
     for (const el of sel) trazarRecuadro(c, recuadroEnPantalla(cajaDe(el), f), true);
-    const t = tiradorDe(sel, f);
-    if (!t) return;
-    // Con varios elementos, el recuadro conjunto muestra a qué pertenece el
-    // tirador y respecto de qué centro se escala.
+    const t = tiradorDe(sel, f), r = tiradorGiroDe(sel, f);
+    if (!t && !r) return;
+    // Con varios elementos, el recuadro conjunto muestra a qué pertenecen los
+    // tiradores y respecto de qué centro se escala y se gira.
     if (sel.length > 1) trazarRecuadro(c, recuadroEnPantalla(cajaDeGrupo(sel), f), false);
-    const l = LADO_TIRADOR_PX;
     c.setLineDash([]);
-    c.fillStyle = "#fff";
-    c.fillRect(t.x - l / 2, t.y - l / 2, l, l);
+    if (r) {
+      c.beginPath();
+      c.moveTo(r.bx, r.by);
+      c.lineTo(r.x, r.y);
+      c.lineWidth = 3;
+      c.strokeStyle = "rgba(255,255,255,0.85)";
+      c.stroke();
+      c.lineWidth = 1;
+      c.strokeStyle = "#111";
+      c.stroke();
+      c.beginPath();
+      c.arc(r.x, r.y, RADIO_GIRO_PX, 0, TAU);
+      c.fillStyle = "#fff";
+      c.fill();
+      c.stroke();
+    }
+    if (t) {
+      const l = LADO_TIRADOR_PX;
+      c.fillStyle = "#fff";
+      c.fillRect(t.x - l / 2, t.y - l / 2, l, l);
+      c.lineWidth = 1;
+      c.strokeStyle = "#111";
+      c.strokeRect(t.x - l / 2, t.y - l / 2, l, l);
+    }
+  }
+
+  // Durante un giro, una cruz en el pivote: alrededor de qué gira.
+  function pintarPivote(c, p, f) {
+    const x = f.ox + p.x * f.k, y = f.oy + p.y * f.k, l = 5;
+    c.setLineDash([]);
+    c.beginPath();
+    c.moveTo(x - l, y); c.lineTo(x + l, y);
+    c.moveTo(x, y - l); c.lineTo(x, y + l);
+    c.lineWidth = 3;
+    c.strokeStyle = "rgba(255,255,255,0.85)";
+    c.stroke();
     c.lineWidth = 1;
     c.strokeStyle = "#111";
-    c.strokeRect(t.x - l / 2, t.y - l / 2, l, l);
+    c.stroke();
   }
 
   function pintarMarcoDeSeleccion(c, r, f) {
@@ -1888,8 +2033,7 @@ Es definitivo: después ya no se puede seguir editando.</div>
   //   mover(m)         el puntero se movió (m en coordenadas del marco)
   //   terminar(movio)  se soltó; movio dice si pasó el umbral de arrastre
   //   pintar(c, f)     opcional: lo que dibuja encima de la escena
-  // Agregar un gesto nuevo (rotar, por ejemplo) es una función más y una
-  // línea en iniciarGesto.
+  // Agregar un gesto nuevo es una función más y una línea en iniciarGesto.
   // ===============================================================
 
   // Arrastrar la selección.
@@ -1918,6 +2062,27 @@ Es definitivo: después ya no se puede seguir editando.</div>
     };
   }
 
+  // Arrastrar el tirador de girar: el ángulo es cuánto giró el puntero
+  // alrededor del pivote desde donde lo agarró, así que tampoco salta. Se
+  // lleva continuo (sin el salto de π a -π) para que una vuelta entera sea
+  // una vuelta entera. Con Mayús, de a GIRO_PASO.
+  function gestoRotar(m0) {
+    const antes = historial.foto();
+    const giro = prepararGiro(seleccionados(), escena);
+    const p = giro && giro.pivote;
+    const a0 = p ? Math.atan2(m0.y - p.y, m0.x - p.x) : 0;
+    let continuo = 0;
+    return {
+      mover: function (m) {
+        if (!p || Math.hypot(m.x - p.x, m.y - p.y) < 1e-6) return;
+        continuo += normalizarAngulo(Math.atan2(m.y - p.y, m.x - p.x) - a0 - continuo);
+        giro.aplicar(m.mayus ? Math.round(continuo / GIRO_PASO) * GIRO_PASO : continuo);
+      },
+      terminar: function (movio) { if (movio && giro) historial.registrar(antes); },
+      pintar: function (c, f) { if (p) pintarPivote(c, p, f); }
+    };
+  }
+
   // Marco de selección: elige todo lo que toca, incluso lo tapado. Con
   // Mayús suma a lo que ya estaba seleccionado. La selección se actualiza
   // mientras se arrastra, para ver qué va a quedar adentro.
@@ -1939,7 +2104,9 @@ Es definitivo: después ya no se puede seguir editando.</div>
   // Elige el gesto y, si el clic era sobre un elemento, actualiza la
   // selección. null si el clic no empieza ningún gesto.
   function iniciarGesto(e, m) {
-    if (tocaTirador(e.clientX, e.clientY)) return gestoEscalar(m);
+    const tirador = tiradorBajo(e.clientX, e.clientY);
+    if (tirador === "escalar") return gestoEscalar(m);
+    if (tirador === "rotar") return gestoRotar(m);
     const el = elementoEn(escena.elementos, m.x, m.y, m.px);
     if (!el) return gestoMarco(m, e.shiftKey);
     if (e.shiftKey) {
@@ -1959,7 +2126,7 @@ Es definitivo: después ya no se puede seguir editando.</div>
 
   function aMarco(e) {
     const f = encajeVentana();
-    return { x: (e.clientX - f.ox) / f.k, y: (e.clientY - f.oy) / f.k, px: 1 / f.k };
+    return { x: (e.clientX - f.ox) / f.k, y: (e.clientY - f.oy) / f.k, px: 1 / f.k, mayus: e.shiftKey };
   }
 
   function editable() {
@@ -1967,7 +2134,9 @@ Es definitivo: después ya no se puede seguir editando.</div>
   }
 
   function cursorEn(e) {
-    if (tocaTirador(e.clientX, e.clientY)) return "nwse-resize";
+    const tirador = tiradorBajo(e.clientX, e.clientY);
+    if (tirador === "escalar") return "nwse-resize";
+    if (tirador === "rotar") return "grab";
     const m = aMarco(e);
     return elementoEn(escena.elementos, m.x, m.y, m.px) ? "move" : "default";
   }
@@ -2007,30 +2176,41 @@ Es definitivo: después ya no se puede seguir editando.</div>
 
   // ===============================================================
   // ENTRADA · Rueda: escala la selección respecto de su centro, con el
-  // mismo escalado que el tirador. Una ráfaga de rueda (eventos separados
-  // por menos de RUEDA_PAUSA_MS) es un solo paso del historial.
+  // mismo escalado que el tirador; con Mayús la gira, con el mismo giro que
+  // el tirador redondo. Una ráfaga de rueda (eventos separados por menos de
+  // RUEDA_PAUSA_MS, sin soltar ni apretar Mayús en el medio) es un solo paso
+  // del historial.
   // ===============================================================
-  let rueda = null;   // { escalado, antes, k, temporizador }
+  let rueda = null;   // { op, t (la transformación preparada), antes, valor, neutro, temporizador }
 
   function terminarRueda() {
     if (!rueda) return;
     clearTimeout(rueda.temporizador);
-    if (rueda.k !== 1) historial.registrar(rueda.antes);
+    if (rueda.valor !== rueda.neutro) historial.registrar(rueda.antes);
     rueda = null;
   }
 
   lienzo.addEventListener("wheel", function (e) {
     // Ctrl+rueda es el zoom del navegador: no se lo quitamos.
     if (!editable() || gesto || e.ctrlKey) return;
+    const op = e.shiftKey ? "rotar" : "escalar";
+    if (rueda && rueda.op !== op) terminarRueda();
     if (!rueda) {
-      const escalado = prepararEscalado(seleccionados(), escena);
-      if (!escalado) return;
+      const t = op === "rotar" ? prepararGiro(seleccionados(), escena)
+                               : prepararEscalado(seleccionados(), escena);
+      if (!t) return;
       cancelarConfirmacion();
-      rueda = { escalado: escalado, antes: historial.foto(), k: 1, temporizador: 0 };
+      const neutro = op === "rotar" ? 0 : 1;
+      rueda = { op: op, t: t, antes: historial.foto(), valor: neutro, neutro: neutro, temporizador: 0 };
     }
     e.preventDefault();
-    const delta = e.deltaY * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 400 : 1);
-    rueda.k = rueda.escalado.aplicar(rueda.k * Math.exp(-delta * RUEDA_K));
+    // Con Mayús, varios navegadores mandan la rueda como desplazamiento
+    // horizontal: deltaX en vez de deltaY.
+    const crudo = op === "rotar" ? (e.deltaY || e.deltaX) : e.deltaY;
+    const delta = crudo * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 400 : 1);
+    rueda.valor = op === "rotar"
+      ? rueda.t.aplicar(rueda.valor + delta * RUEDA_GIRO_K)
+      : rueda.t.aplicar(rueda.valor * Math.exp(-delta * RUEDA_K));
     clearTimeout(rueda.temporizador);
     rueda.temporizador = setTimeout(terminarRueda, RUEDA_PAUSA_MS);
     pedirDibujo();
@@ -2293,9 +2473,13 @@ Es definitivo: después ya no se puede seguir editando.</div>
       if (!(e.ctrlKey || e.metaKey)) return;
     }
     // Cualquier tecla cierra la ráfaga de rueda o de color: deshacer justo
-    // después de escalar con la rueda tiene que deshacer el escalado.
-    terminarRueda();
-    cerrarRafagaColor();
+    // después de escalar con la rueda tiene que deshacer el escalado. Menos
+    // un modificador solo: Mayús mantenida (que en algunos sistemas repite
+    // keydown) es parte de girar con la rueda.
+    if (MODIFICADORES.indexOf(e.key) < 0) {
+      terminarRueda();
+      cerrarRafagaColor();
+    }
     const ctrl = e.ctrlKey || e.metaKey;
     const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
     if (e.key === "ArrowLeft") {
@@ -2441,7 +2625,8 @@ Es definitivo: después ya no se puede seguir editando.</div>
     if (claves.length !== Object.keys(comp.fuentes).length) return null;
     for (const k of claves) if (comp.fuentes[k] !== actuales[k]) return null;
     const elementos = comp.elementos.filter(function (el) {
-      return el && propio(TIPOS, el.tipo) && finito(el.x, el.y, el.escala, el.id) && el.forma && el.estilo;
+      return el && propio(TIPOS, el.tipo) && finito(el.x, el.y, el.escala, el.id) && el.forma && el.estilo &&
+             (el.giro === undefined || finito(el.giro));
     });
     for (const el of elementos) proximoId = Math.max(proximoId, el.id + 1);
     return { ancho: comp.ancho, alto: comp.alto, elementos: elementos };
