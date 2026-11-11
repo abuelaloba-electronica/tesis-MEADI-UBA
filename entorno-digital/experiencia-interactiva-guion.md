@@ -102,7 +102,7 @@ Para finalizar selecciona las zonas de las composiciones que creas que son las m
 
 **Composición: las tres capturas superpuestas, cada una con fondo transparente. De abajo hacia arriba: dispositivo tres (EMG), dispositivo dos (guante) y dispositivo uno (bandada). Sin texto.**
 
-**Dos momentos. Primero la edición, en silencio: se pueden seleccionar, mover, agrandar, copiar, pegar y eliminar los elementos, y deshacer. Después la composición final, que se pide pulsando dos veces la barra espaciadora: queda tal como se dejó, sin marcas de edición, y suena en loop lo que se grabó con el dispositivo dos. Es definitivo: ya no se vuelve a editar.**
+**Dos momentos. Primero la edición, en silencio: se pueden seleccionar, mover, agrandar, cambiar de color y de opacidad, copiar, pegar y eliminar los elementos, y deshacer. Después la composición final, que se pide pulsando dos veces la barra espaciadora: queda tal como se dejó, sin marcas de edición, y suena en loop lo que se grabó con el dispositivo dos. Es definitivo: ya no se vuelve a editar.**
 
 **Al pulsar la barra espaciadora por primera vez, aviso sobre la composición:**
 

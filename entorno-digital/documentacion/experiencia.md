@@ -185,7 +185,7 @@ después se cierra.
 | | Modo edición (al entrar) | Modo final |
 |---|---|---|
 | Qué se ve | todos los elementos, con marcas de selección | la composición tal como quedó, sin marcas |
-| Qué se puede hacer | seleccionar, mover, agrandar, copiar, pegar, eliminar, deshacer | mirar y escuchar |
+| Qué se puede hacer | seleccionar, mover, agrandar, cambiar color y opacidad, copiar, pegar, eliminar, deshacer | mirar y escuchar |
 | Sonido | ninguno | la grabación del guante, en loop |
 | Movimiento | sólo el que hace la persona | el que produce el sonido |
 | Exportar | — | el botón "Descargar obra" (§5.6) |
@@ -249,6 +249,7 @@ ignora en silencio, como las líneas serie que una página no reconoce.
 | arrastrar en el vacío | marco: selecciona todo lo que toca, aunque esté tapado (con Mayús, suma) |
 | clic al vacío, Esc | deselecciona |
 | tirador de la esquina, rueda | agranda o achica la selección |
+| muestra de color (arriba a la izquierda) | abre el panel de color y opacidad de la selección |
 | Ctrl+C / Ctrl+V | copia / pega desplazado, encima de todo |
 | Supr, Retroceso | elimina la selección |
 | Ctrl+Z / Ctrl+Mayús+Z o Ctrl+Y | deshace / rehace |
@@ -260,17 +261,17 @@ pregunta por tipos: pregunta `permite(el, op)`.
 
 ```js
 const PERMITIDAS = {
-  punto:        ["mover", "copiar", "eliminar"],
-  anillo:       ["mover", "escalar", "copiar", "eliminar"],
-  disco:        ["mover", "escalar", "copiar", "eliminar"],
-  cuadrilatero: ["mover", "escalar", "copiar", "eliminar"],
+  punto:        ["mover", "copiar", "eliminar", "color"],
+  anillo:       ["mover", "escalar", "copiar", "eliminar", "color"],
+  disco:        ["mover", "escalar", "copiar", "eliminar", "color"],
+  cuadrilatero: ["mover", "escalar", "copiar", "eliminar", "color"],
   imagen:       []
 };
 ```
 
 Como cada origen tiene sus propios tipos, `escalar` fuera de la fila de
 `punto` es exactamente "el guante y la EMG se agrandan, la bandada no". Una
-operación nueva (rotar, cambiar color) es una entrada en esa tabla, no
+operación nueva (rotar, por ejemplo; así entró `color`) es una entrada en esa tabla, no
 condiciones en el código. `pegar` no es un permiso: actúa sobre el
 portapapeles, que sólo contiene lo que ya se pudo copiar.
 
@@ -321,18 +322,51 @@ Las decisiones que sostienen la interacción:
   al alternar no se mueve nada; sólo cambian el multiply del guante sobre la
   EMG y la nitidez de la bandada.
 
+**Color y opacidad.** Con algo seleccionado que admita `color`, arriba a
+la izquierda aparece una muestra discreta, como la de
+`tools/paleta_colores.html`: sólo el color, sin código ni nombre, para no
+sumar texto a una pantalla que no lo tiene. Muestra el color del
+seleccionado de más arriba, partida en diagonal si la selección mezcla
+colores. Al tocarla se abre un panel con:
+
+- **Color**: el selector nativo del navegador (`<input type="color">`). Pasa
+  a los destinos; la opacidad de cada uno queda como estaba.
+- **Opacidad**: un deslizador de 0 a 100 %, que escribe `estilo.alpha`. Pasa
+  a los destinos; el color de cada uno queda como estaba.
+- **Con más de un elemento seleccionado, una casilla por cada tipo
+  presente**: "Aplicar a todos los anillos", "… los cuadriláteros", "… los
+  círculos" (el disco del FSR), "… los puntos", en ese orden. Los destinos
+  son los seleccionados de los tipos marcados, nunca algo fuera de la
+  selección. Arrancan todas marcadas, para que el panel actúe sobre toda la
+  selección sin un paso previo, y se vuelven a marcar cada vez que cambia la
+  selección (deshacer no la cambia). Marcar o desmarcar no aplica nada en el
+  acto: sólo decide a qué le llega el próximo cambio. Sin ninguna marcada,
+  el color y la opacidad se deshabilitan. Con un solo elemento no hay
+  casillas: el destino es ése.
+
+El panel muestra el color y la opacidad del de más arriba entre los
+destinos. El modo de fusión no cambia: un anillo recoloreado sigue en `multiply`. El
+anillo de impacto del modo final toma el color nuevo, porque lee
+`estilo.color`. Arrastrar en el selector o en el deslizador es una ráfaga,
+como la rueda: un solo paso de deshacer, que se cierra al soltar, con
+cualquier tecla o al cerrar el panel; elegir el mismo color no suma paso. El
+panel se cierra con un clic fuera, con Esc (que entonces no deselecciona) o
+tocando otra vez la muestra. Con el foco en el panel las teclas son de sus
+controles: las flechas mueven el deslizador y no navegan, la barra marca una
+casilla y no cierra la edición, Supr no borra; Ctrl+Z sí deshace.
+
 ### 4.3 · El script en capas
 
 Cada capa usa sólo las de arriba:
 
 | Capa | Contenido |
 |---|---|
-| modelo | geometría, `TIPOS` (cada tipo con `desdeCaptura`, `dibujar`, `caja`, `toca`, `tocaRect`), construcción de la escena, `PERMITIDAS`, `REACCIONES` y operaciones puras sobre listas de elementos (`prepararTraslado`, `prepararEscalado`, `copiar`, `pegar`, `eliminar`) |
+| modelo | geometría, `TIPOS` (cada tipo con `desdeCaptura`, `dibujar`, `caja`, `toca`, `tocaRect`), construcción de la escena, `PERMITIDAS`, `REACCIONES` y operaciones puras sobre listas de elementos (`prepararTraslado`, `prepararEscalado`, `copiar`, `pegar`, `eliminar`, `aplicarEstilo`) |
 | editor | historial, selección, portapapeles y comandos (`aplicarCambio` hace de cada uno un paso de deshacer) |
 | vista | dibujo de la escena y de las marcas de edición |
 | sonido | decodificar o sintetizar la grabación, reproducirla en loop, analizarla, llevar el cuadro de la animación |
 | video | grabar una vuelta de la animación con su sonido en un lienzo propio y descargarla (§5.6) |
-| entrada | gestos (mover, escalar, marco: objetos con `mover`, `terminar`, `pintar`), rueda, teclado, cierre de la edición |
+| entrada | gestos (mover, escalar, marco: objetos con `mover`, `terminar`, `pintar`), rueda, color y opacidad, teclado, cierre de la edición |
 | datos | IndexedDB, demo y arranque |
 
 Un tipo nuevo es una entrada en `TIPOS` y sus filas en `PERMITIDAS` y
@@ -858,3 +892,16 @@ azulado `#151923`. EMG: cinco familias derivadas de cinco colores base. La
 física, el `multiply` y las opacidades no cambian. `#demo` usa los colores
 nuevos. Las capturas guardan el color de cada elemento, así que no hubo que
 migrar IndexedDB: la paleta alcanza a las capturas posteriores.
+
+**2026-11-09 · Color y opacidad en la composición.** Se suma `color` a
+`PERMITIDAS` (los cuatro tipos) y, en el modo edición, una muestra discreta
+arriba a la izquierda con el color de la selección; al tocarla, un panel con
+el selector de color, la opacidad y, con más de un elemento seleccionado,
+una casilla por tipo presente que decide a qué tipos de la selección les
+llega el cambio (§4.2). Una primera versión tenía una sola casilla "aplicar
+a todos los del mismo tipo" que alcanzaba también a lo no seleccionado; se
+reemplazó por las casillas por tipo, que se quedan dentro de la selección.
+Probado en Brave headless con `#demo`: selección, ráfagas de un solo paso,
+casillas con un marco sobre los cuatro tipos (desmarcar círculos y puntos
+los deja intactos), Ctrl+Z, y que ← y Esc con el foco en el panel no navegan
+ni deseleccionan.

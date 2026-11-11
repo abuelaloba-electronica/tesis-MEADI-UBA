@@ -125,6 +125,53 @@
   }
   .boton-video.error svg { display: none; }
   @keyframes latido-rec { 50% { opacity: 0.25; } }
+
+  /* Color y opacidad de la selección, en el modo edición. La muestra imita
+     la de tools/paleta_colores.html: un recuadro con sólo el color, sin
+     código ni nombre. Al tocarla se abre el panel debajo. */
+  .muestra-color {
+    position: fixed;
+    top: 16px; left: 16px;
+    display: none;
+    width: 34px; height: 26px; padding: 0;
+    border: 1px solid #bbb; border-radius: 5px;
+    background: #fff;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.12);
+    cursor: pointer;
+    z-index: 15;
+  }
+  .muestra-color.visible { display: block; }
+  .muestra-color span {
+    position: absolute; inset: 3px;
+    border-radius: 2px;
+  }
+  .panel-color {
+    position: fixed;
+    top: 50px; left: 16px;
+    display: none;
+    width: 232px; box-sizing: border-box;
+    padding: 12px 14px;
+    border: 1px solid #e3e3e3; border-radius: 8px;
+    background: #fff; color: #333;
+    box-shadow: 0 6px 16px rgba(0,0,0,0.08), 0 3px 6px -4px rgba(0,0,0,0.12);
+    font-size: 12px; line-height: 1.4;
+    z-index: 15;
+  }
+  .panel-color.visible { display: block; }
+  .panel-color .fila { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+  .panel-color .rotulo { width: 56px; flex-shrink: 0; color: #666; }
+  .panel-color input[type=color] {
+    width: 44px; height: 28px; padding: 0;
+    border: 1px solid #bbb; border-radius: 5px; background: none; cursor: pointer;
+  }
+  .panel-color input[type=range] { flex: 1; min-width: 0; margin: 0; accent-color: #111; cursor: pointer; }
+  .panel-color .valor { width: 36px; text-align: right; color: #666; font-variant-numeric: tabular-nums; }
+  /* Las casillas por tipo, sólo con más de un elemento seleccionado. */
+  .panel-color .tipos { display: flex; flex-direction: column; gap: 6px; padding-top: 10px; border-top: 1px solid #eee; }
+  .panel-color .tipos:empty { display: none; }
+  .panel-color input:disabled { opacity: 0.4; cursor: default; }
+  .panel-color .todos { display: flex; align-items: flex-start; gap: 6px; color: #555; cursor: pointer; }
+  .panel-color .todos input { margin: 2px 0 0; cursor: pointer; }
 </style>
 </head>
 <body>
@@ -145,6 +192,22 @@ Es definitivo: después ya no se puede seguir editando.</div>
   <span class="punto-rec" aria-hidden="true"></span>
   <span id="botonVideoTexto">Descargar obra</span>
 </button>
+<button id="muestraColor" class="muestra-color" type="button"
+        aria-label="Color y opacidad de la selección" aria-expanded="false" aria-controls="panelColor">
+  <span id="muestraColorTinta"></span>
+</button>
+<div id="panelColor" class="panel-color" role="dialog" aria-label="Color y opacidad">
+  <div class="fila">
+    <span class="rotulo">Color</span>
+    <input id="colorElegido" type="color" value="#000000">
+  </div>
+  <div class="fila">
+    <span class="rotulo">Opacidad</span>
+    <input id="opacidadElegida" type="range" min="0" max="100" step="1" value="100">
+    <span id="opacidadValor" class="valor">100 %</span>
+  </div>
+  <div id="colorTipos" class="tipos"></div>
+</div>
 
 <script>
 (function () {
@@ -190,6 +253,10 @@ Es definitivo: después ya no se puede seguir editando.</div>
   //                         agranda o achica la selección. Los anillos, discos y
   //                         cuadriláteros cambian de tamaño; los puntos de la
   //                         bandada no: sólo se separan o se juntan.
+  //   muestra de color      arriba a la izquierda, con algo seleccionado: al
+  //                         tocarla, color, opacidad y, con varios
+  //                         seleccionados, una casilla por tipo (ver
+  //                         ENTRADA · Color)
   // Teclas:
   //   Ctrl+C / Ctrl+V       copia la selección / la pega desplazada, encima
   //   Supr, Retroceso       elimina la selección
@@ -616,13 +683,14 @@ Es definitivo: después ya no se puede seguir editando.</div>
   // discos) y de la EMG (cuadriláteros), no para los puntos de la bandada:
   // en una selección mixta los puntos se separan o se juntan con el resto,
   // pero conservan su radio. Un tipo sin operaciones (la `imagen` de
-  // respaldo) no se puede ni seleccionar.
+  // respaldo) no se puede ni seleccionar. `color` es cambiar el color y la
+  // opacidad (estilo.color y estilo.alpha; el modo de fusión no se toca).
   // ===============================================================
   const PERMITIDAS = {
-    punto:        ["mover", "copiar", "eliminar"],
-    anillo:       ["mover", "escalar", "copiar", "eliminar"],
-    disco:        ["mover", "escalar", "copiar", "eliminar"],
-    cuadrilatero: ["mover", "escalar", "copiar", "eliminar"],
+    punto:        ["mover", "copiar", "eliminar", "color"],
+    anillo:       ["mover", "escalar", "copiar", "eliminar", "color"],
+    disco:        ["mover", "escalar", "copiar", "eliminar", "color"],
+    cuadrilatero: ["mover", "escalar", "copiar", "eliminar", "color"],
     imagen:       []
   };
 
@@ -939,6 +1007,17 @@ Es definitivo: después ya no se puede seguir editando.</div>
     return elementos.filter(function (el) { return !ids.has(el.id); });
   }
 
+  // Cambia en el lugar el color y/o la opacidad (los campos presentes en
+  // `cambio`: { color, alpha }) de los de `els` que admiten `color`. Como un
+  // gesto, escribe en los elementos: el paso del historial lo arma quien
+  // llama. El anillo de impacto del modo final toma el color nuevo solo.
+  function aplicarEstilo(els, cambio) {
+    for (const el of admiten(els, "color")) {
+      if (cambio.color !== undefined) el.estilo.color = cambio.color;
+      if (cambio.alpha !== undefined) el.estilo.alpha = acotar(cambio.alpha, 0, 1);
+    }
+  }
+
   // ===============================================================
   // EDITOR · Historial: instantáneas de la lista de elementos. Con unos
   // cientos de elementos copiar la lista entera por paso es barato, y mucho
@@ -1177,6 +1256,7 @@ Es definitivo: después ya no se puede seguir editando.</div>
     partes.push(pieBase);
     pieEl.textContent = partes.join("   ·   ");
     actualizarBotonVideo();
+    actualizarColor();
   }
 
   // ===============================================================
@@ -1957,6 +2037,197 @@ Es definitivo: después ya no se puede seguir editando.</div>
   }, { passive: false });
 
   // ===============================================================
+  // ENTRADA · Color y opacidad de la selección. Con algo seleccionado que
+  // admita `color`, arriba a la izquierda aparece una muestra discreta: sólo
+  // el color del seleccionado de más arriba (partida en diagonal si la
+  // selección mezcla colores), sin código ni nombre. Al tocarla se abre el
+  // panel: el selector de color y la opacidad.
+  //
+  // El color o la opacidad que se mueve pasa a los destinos (lo otro queda
+  // como estaba en cada elemento). Con un solo elemento seleccionado, el
+  // destino es ése. Con más de uno, el panel suma una casilla por cada tipo
+  // presente en la selección ("Aplicar a todos los anillos", "… los
+  // cuadriláteros", "… los círculos", "… los puntos"), y los destinos son
+  // los seleccionados de los tipos marcados. Arrancan marcadas, y se vuelven
+  // a marcar todas cada vez que cambia la selección. Marcar o desmarcar no
+  // cambia nada en el acto: decide a qué le llega el próximo cambio. Sin
+  // ninguna marcada, el color y la opacidad quedan deshabilitados.
+  //
+  // Arrastrar en el selector o en el deslizador es una ráfaga, como la de la
+  // rueda: un solo paso del historial, que se cierra al soltar (`change`),
+  // con cualquier tecla, o al cerrar el panel (un clic fuera, Esc, o tocar
+  // otra vez la muestra).
+  // ===============================================================
+  const muestraEl = document.getElementById("muestraColor");
+  const muestraTintaEl = document.getElementById("muestraColorTinta");
+  const panelColorEl = document.getElementById("panelColor");
+  const colorEl = document.getElementById("colorElegido");
+  const opacidadEl = document.getElementById("opacidadElegida");
+  const opacidadValorEl = document.getElementById("opacidadValor");
+  const tiposColorEl = document.getElementById("colorTipos");
+  // Orden y nombre de las casillas. El disco del FSR, para quien edita, es
+  // un círculo.
+  const PLURALES = { anillo: "anillos", cuadrilatero: "cuadriláteros", disco: "círculos", punto: "puntos" };
+
+  let rafagaColor = null;           // foto del historial antes de la ráfaga en curso
+  let firmaSeleccionColor = "";     // para rearmar las casillas si cambia la selección
+  let tiposExcluidos = new Set();   // los tipos desmarcados
+  let fondoMuestra = "";
+
+  // El <input type="color"> sólo acepta #rrggbb, y las capturas guardan lo
+  // que devolvió el canvas (#rrggbb o rgba(...)) o "#000". El propio canvas
+  // lo normaliza.
+  const normalizador = document.createElement("canvas").getContext("2d");
+  function hexDe(color) {
+    normalizador.fillStyle = "#000000";
+    normalizador.fillStyle = String(color);
+    const v = normalizador.fillStyle;
+    if (/^#[0-9a-f]{6}$/i.test(v)) return v.toLowerCase();
+    const m = /rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/.exec(v);
+    if (!m) return "#000000";
+    return "#" + [m[1], m[2], m[3]].map(function (n) {
+      return (+n).toString(16).padStart(2, "0");
+    }).join("");
+  }
+
+  function coloreables() { return admiten(seleccionados(), "color"); }
+
+  function destinosDeColor() {
+    const sel = coloreables();
+    if (sel.length < 2) return sel;
+    return sel.filter(function (el) { return !tiposExcluidos.has(el.tipo); });
+  }
+
+  function cambiarEstilo(cambio) {
+    if (!editable()) return;
+    const destinos = destinosDeColor();
+    if (!destinos.length) return;
+    if (!rafagaColor) { cancelarConfirmacion(); rafagaColor = historial.foto(); }
+    aplicarEstilo(destinos, cambio);
+    pedirDibujo();
+  }
+
+  // Elegir el mismo color que ya tenía no es un paso del historial.
+  function cerrarRafagaColor() {
+    if (!rafagaColor) return;
+    const antes = rafagaColor;
+    rafagaColor = null;
+    if (JSON.stringify(antes) !== JSON.stringify(escena.elementos)) historial.registrar(antes);
+  }
+
+  function panelColorAbierto() { return panelColorEl.classList.contains("visible"); }
+
+  function abrirPanelColor() {
+    panelColorEl.classList.add("visible");
+    muestraEl.setAttribute("aria-expanded", "true");
+    actualizarColor();
+  }
+
+  function cerrarPanelColor() {
+    if (!panelColorAbierto()) return;
+    cerrarRafagaColor();
+    if (panelColorEl.contains(document.activeElement)) document.activeElement.blur();
+    panelColorEl.classList.remove("visible");
+    muestraEl.setAttribute("aria-expanded", "false");
+  }
+
+  // Una casilla por tipo presente, todas marcadas; ninguna con un solo
+  // elemento.
+  function armarCasillas(sel) {
+    tiposExcluidos = new Set();
+    tiposColorEl.textContent = "";
+    if (sel.length < 2) return;
+    const presentes = new Set(sel.map(function (el) { return el.tipo; }));
+    const tipos = Object.keys(PLURALES).filter(function (t) { return presentes.has(t); });
+    presentes.forEach(function (t) { if (tipos.indexOf(t) < 0) tipos.push(t); });
+    for (const tipo of tipos) {
+      const fila = document.createElement("label");
+      fila.className = "todos";
+      const caja = document.createElement("input");
+      caja.type = "checkbox";
+      caja.checked = true;
+      caja.addEventListener("change", function () {
+        cerrarRafagaColor();
+        if (caja.checked) tiposExcluidos.delete(tipo); else tiposExcluidos.add(tipo);
+        actualizarColor();
+      });
+      const texto = document.createElement("span");
+      texto.textContent = "Aplicar a todos los " + (PLURALES[tipo] || tipo);
+      fila.appendChild(caja);
+      fila.appendChild(texto);
+      tiposColorEl.appendChild(fila);
+    }
+  }
+
+  // Lo llama actualizarPie en cada repintado: muestra u oculta la muestra,
+  // la pinta, rearma las casillas si cambió la selección y, con el panel
+  // abierto y sin una ráfaga en curso (mientras se arrastra manda el
+  // control, no la escena), pone el panel al día con el de más arriba de
+  // los destinos, por ejemplo después de deshacer.
+  function actualizarColor() {
+    const sel = editable() ? coloreables() : [];
+    if (!sel.length) {
+      cerrarPanelColor();
+      muestraEl.classList.remove("visible");
+      firmaSeleccionColor = "";
+      return;
+    }
+    muestraEl.classList.add("visible");
+
+    const colores = [];
+    for (let i = sel.length - 1; i >= 0 && colores.length < 2; i--) {
+      const c = hexDe(sel[i].estilo.color);
+      if (colores.indexOf(c) < 0) colores.push(c);
+    }
+    const fondo = colores.length > 1
+      ? "linear-gradient(135deg, " + colores[0] + " 50%, " + colores[1] + " 50%)"
+      : colores[0];
+    if (fondo !== fondoMuestra) { fondoMuestra = fondo; muestraTintaEl.style.background = fondo; }
+
+    const firma = sel.map(function (el) { return el.id; }).join(",");
+    if (firma !== firmaSeleccionColor) {
+      firmaSeleccionColor = firma;
+      armarCasillas(sel);
+    }
+
+    if (panelColorAbierto() && !rafagaColor) {
+      const destinos = destinosDeColor();
+      const sinDestino = !destinos.length;
+      colorEl.disabled = opacidadEl.disabled = sinDestino;
+      const arriba = sinDestino ? sel[sel.length - 1] : destinos[destinos.length - 1];
+      const hex = hexDe(arriba.estilo.color);
+      const pct = String(Math.round(arriba.estilo.alpha * 100));
+      if (colorEl.value !== hex) colorEl.value = hex;
+      if (opacidadEl.value !== pct) opacidadEl.value = pct;
+      opacidadValorEl.textContent = pct + " %";
+    }
+  }
+
+  muestraEl.addEventListener("click", function () {
+    // Sin foco: la barra espaciadora no la vuelve a apretar.
+    muestraEl.blur();
+    if (panelColorAbierto()) cerrarPanelColor(); else abrirPanelColor();
+  });
+
+  // Un clic fuera de la muestra y del panel lo cierra (y, si fue en el
+  // lienzo, además hace lo suyo: seleccionar otra cosa, por ejemplo).
+  document.addEventListener("pointerdown", function (e) {
+    if (!panelColorAbierto() || muestraEl.contains(e.target) || panelColorEl.contains(e.target)) return;
+    cerrarPanelColor();
+  }, true);
+
+  colorEl.addEventListener("input", function () { cambiarEstilo({ color: colorEl.value }); });
+  colorEl.addEventListener("change", function () {
+    cambiarEstilo({ color: colorEl.value });
+    cerrarRafagaColor();
+  });
+  opacidadEl.addEventListener("input", function () {
+    opacidadValorEl.textContent = opacidadEl.value + " %";
+    cambiarEstilo({ alpha: opacidadEl.value / 100 });
+  });
+  opacidadEl.addEventListener("change", cerrarRafagaColor);
+
+  // ===============================================================
   // ENTRADA · Cierre de la edición: la barra espaciadora pulsada dos veces,
   // como en las pantallas 5, 7 y 9. La primera sólo muestra el aviso; la
   // segunda, antes de CONFIRMAR_MS, pasa al modo final. Mientras el aviso
@@ -1988,6 +2259,7 @@ Es definitivo: después ya no se puede seguir editando.</div>
   // crea primero, mientras dura el gesto.
   function finalizar() {
     clearTimeout(temporizadorConfirmar);
+    cerrarPanelColor();
     etapa = "final";
     iniciarSonido();
     avisoEl.classList.remove("visible");
@@ -2012,9 +2284,18 @@ Es definitivo: después ya no se puede seguir editando.</div>
   const MODIFICADORES = ["Shift", "Control", "Alt", "Meta", "AltGraph", "CapsLock"];
 
   window.addEventListener("keydown", function (e) {
-    // Cualquier tecla cierra la ráfaga de rueda: deshacer justo después de
-    // escalar con la rueda tiene que deshacer el escalado.
+    // Con el foco en el panel de color, las teclas son de sus controles (las
+    // flechas mueven el deslizador, la barra marca la casilla): no navegan,
+    // no borran ni cierran la edición. Esc cierra el panel; Ctrl+algo
+    // (deshacer, copiar) sigue de largo.
+    if (panelColorEl.contains(e.target)) {
+      if (e.key === "Escape") { e.preventDefault(); cerrarPanelColor(); return; }
+      if (!(e.ctrlKey || e.metaKey)) return;
+    }
+    // Cualquier tecla cierra la ráfaga de rueda o de color: deshacer justo
+    // después de escalar con la rueda tiene que deshacer el escalado.
     terminarRueda();
+    cerrarRafagaColor();
     const ctrl = e.ctrlKey || e.metaKey;
     const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
     if (e.key === "ArrowLeft") {
@@ -2060,7 +2341,8 @@ Es definitivo: después ya no se puede seguir editando.</div>
       e.preventDefault();
       if (!e.repeat) eliminarSeleccion();
     } else if (e.key === "Escape") {
-      seleccion.clear();
+      // Con el panel de color abierto, Esc sólo lo cierra.
+      if (panelColorAbierto()) cerrarPanelColor(); else seleccion.clear();
       pedirDibujo();
     } else if (ctrl && k === "c") {
       e.preventDefault();

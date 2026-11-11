@@ -45,7 +45,8 @@ lo guarda con la captura (`version: 2`, campo `sonido`).
 La pantalla 11, `composicion.html`, vuelca los `elementos` de las tres capturas
 en una sola escena y los redibuja en vector (EMG abajo, guante, bandada
 arriba), y permite seleccionar (con clic o con un marco), mover,
-agrandar (no los puntos de la bandada), copiar y pegar, eliminar y deshacer.
+agrandar (no los puntos de la bandada), cambiar color y opacidad (con una
+muestra arriba a la izquierda), copiar y pegar, eliminar y deshacer.
 La barra espaciadora dos veces cierra la edición (definitivo): la escena se guarda en
 la clave `composicion` y suena en loop la grabación del guante, que mueve la
 escena: anillos y discos vuelven a sonar en su momento, la bandada y la EMG

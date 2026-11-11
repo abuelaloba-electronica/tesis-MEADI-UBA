@@ -49,8 +49,8 @@ Helm) y recién entonces → pasa a la siguiente.
 Desde la 10, → lleva a la 11,
 [`experiencia/composicion.html`](experiencia/composicion.html): los elementos
 de las tres capturas en una sola escena en vector (EMG abajo, guante, bandada
-arriba), donde se pueden seleccionar, mover, agrandar, copiar, pegar y
-eliminar, con deshacer. La barra espaciadora dos veces cierra la edición: la
+arriba), donde se pueden seleccionar, mover, agrandar, cambiar de color y de
+opacidad, copiar, pegar y eliminar, con deshacer. La barra espaciadora dos veces cierra la edición: la
 composición se guarda y suena en loop la grabación del guante, que la mueve;
 un botón flotante descarga un video de una vuelta, con su sonido.
 Inicio borra todo y vuelve a la 0; `composicion.html#demo` arma una escena
