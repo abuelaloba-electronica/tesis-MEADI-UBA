@@ -172,6 +172,76 @@
   .panel-color input:disabled { opacity: 0.4; cursor: default; }
   .panel-color .todos { display: flex; align-items: flex-start; gap: 6px; color: #555; cursor: pointer; }
   .panel-color .todos input { margin: 2px 0 0; cursor: pointer; }
+
+  /* Ayuda del modo edición: un "?" casi transparente arriba a la derecha
+     abre un panel con las operaciones, que se arrastra desde el título. */
+  .boton-ayuda {
+    position: fixed;
+    top: 16px; right: 16px;
+    display: none;
+    width: 26px; height: 26px; padding: 0;
+    border: 1px solid #ccc; border-radius: 50%;
+    background: rgba(255,255,255,0.8); color: #888;
+    font: 300 14px/24px "Roboto", -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+    text-align: center;
+    opacity: 0.55;
+    cursor: pointer;
+    z-index: 15;
+    transition: opacity 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+  }
+  .boton-ayuda.visible { display: block; }
+  .boton-ayuda:hover, .boton-ayuda[aria-expanded="true"] { opacity: 1; color: #333; border-color: #999; }
+  .panel-ayuda {
+    position: fixed;
+    top: 50px; right: 16px;
+    display: none;
+    width: 340px; max-width: calc(100vw - 32px);
+    max-height: calc(100vh - 32px); overflow-y: auto;
+    box-sizing: border-box;
+    border: 1px solid #e3e3e3; border-radius: 8px;
+    background: #fff; color: #333;
+    box-shadow: 0 6px 16px rgba(0,0,0,0.08), 0 3px 6px -4px rgba(0,0,0,0.12);
+    font-size: 12px; line-height: 1.4;
+    z-index: 15;
+    user-select: none; -webkit-user-select: none;
+  }
+  .panel-ayuda.visible { display: block; }
+  .panel-ayuda .titulo {
+    position: sticky; top: 0;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 10px 8px 14px;
+    background: #fff;
+    border-bottom: 1px solid #eee;
+    font-size: 13px; color: #111;
+    cursor: grab;
+    touch-action: none;
+  }
+  .panel-ayuda.arrastrando .titulo { cursor: grabbing; }
+  .panel-ayuda .cerrar {
+    border: none; background: transparent; cursor: pointer;
+    font-size: 18px; line-height: 1; padding: 0 4px;
+    color: rgba(0,0,0,0.45);
+  }
+  .panel-ayuda .cerrar:hover { color: rgba(0,0,0,0.88); }
+  .panel-ayuda .cuerpo { padding: 4px 14px 12px; }
+  .panel-ayuda h3 {
+    margin: 10px 0 4px;
+    font-size: 11px; font-weight: 300; font-style: italic; color: #888;
+  }
+  .panel-ayuda dl {
+    display: grid; grid-template-columns: 46% 1fr; gap: 4px 10px;
+    margin: 0;
+  }
+  .panel-ayuda dt { color: #111; }
+  .panel-ayuda dd { margin: 0; color: #555; }
+  .panel-ayuda kbd {
+    display: inline-block;
+    padding: 0 4px;
+    border: 1px solid #ccc; border-radius: 3px;
+    background: #fafafa;
+    font: inherit; font-size: 11px; line-height: 15px;
+  }
+  .panel-ayuda .nota { margin: 12px 0 0; padding-top: 8px; border-top: 1px solid #eee; color: #777; }
 </style>
 </head>
 <body>
@@ -207,6 +277,44 @@ Es definitivo: después ya no se puede seguir editando.</div>
     <span id="opacidadValor" class="valor">100 %</span>
   </div>
   <div id="colorTipos" class="tipos"></div>
+</div>
+<!-- El texto de la ayuda sale del guion (pantalla 11): un cambio acá se
+     refleja allá, y al revés. -->
+<button id="botonAyuda" class="boton-ayuda" type="button"
+        aria-label="Ayuda: cómo editar" title="Ayuda" aria-expanded="false" aria-controls="panelAyuda">?</button>
+<div id="panelAyuda" class="panel-ayuda" role="dialog" aria-labelledby="ayudaTitulo">
+  <div id="ayudaAsa" class="titulo">
+    <span id="ayudaTitulo">Cómo editar</span>
+    <button id="ayudaCerrar" class="cerrar" type="button" title="Cerrar" aria-label="Cerrar">×</button>
+  </div>
+  <div class="cuerpo">
+    <h3>Seleccionar</h3>
+    <dl>
+      <dt>clic</dt><dd>selecciona un elemento</dd>
+      <dt><kbd>Mayús</kbd> + clic</dt><dd>lo suma a la selección o lo quita</dd>
+      <dt>arrastrar en el vacío</dt><dd>selecciona todo lo que toca el recuadro (con <kbd>Mayús</kbd>, lo suma)</dd>
+      <dt>clic en el vacío o <kbd>Esc</kbd></dt><dd>deselecciona</dd>
+    </dl>
+    <h3>Transformar</h3>
+    <dl>
+      <dt>arrastrar lo seleccionado</dt><dd>lo mueve</dd>
+      <dt>tirador de la esquina o rueda</dt><dd>agranda o achica</dd>
+      <dt>tirador redondo o <kbd>Mayús</kbd> + rueda</dt><dd>gira los cuadriláteros (con <kbd>Mayús</kbd>, de a 15°)</dd>
+      <dt>muestra de color, arriba a la izquierda</dt><dd>cambia el color y la opacidad</dd>
+    </dl>
+    <h3>Editar</h3>
+    <dl>
+      <dt><kbd>Ctrl</kbd> + <kbd>C</kbd> / <kbd>Ctrl</kbd> + <kbd>V</kbd></dt><dd>copia / pega</dd>
+      <dt><kbd>Retroceso</kbd></dt><dd>elimina la selección</dd>
+      <dt><kbd>Ctrl</kbd> + <kbd>Z</kbd></dt><dd>deshace</dd>
+      <dt><kbd>Ctrl</kbd> + <kbd>Mayús</kbd> + <kbd>Z</kbd></dt><dd>rehace</dd>
+    </dl>
+    <h3>Terminar</h3>
+    <dl>
+      <dt>barra espaciadora dos veces</dt><dd>finaliza la composición</dd>
+    </dl>
+    <p class="nota">Los puntos se mueven pero no se agrandan. Sólo los cuadriláteros giran.</p>
+  </div>
 </div>
 
 <script>
@@ -262,6 +370,8 @@ Es definitivo: después ya no se puede seguir editando.</div>
   //                         tocarla, color, opacidad y, con varios
   //                         seleccionados, una casilla por tipo (ver
   //                         ENTRADA · Color)
+  //   ?                     arriba a la derecha: abre o cierra la ayuda, que se
+  //                         arrastra desde su título (ver ENTRADA · Ayuda)
   // Teclas:
   //   Ctrl+C / Ctrl+V       copia la selección / la pega desplazada, encima
   //   Supr, Retroceso       elimina la selección
@@ -1349,6 +1459,7 @@ Es definitivo: después ya no se puede seguir editando.</div>
     pieEl.textContent = partes.join("   ·   ");
     actualizarBotonVideo();
     actualizarColor();
+    actualizarAyuda();
   }
 
   // ===============================================================
@@ -2406,6 +2517,91 @@ Es definitivo: después ya no se puede seguir editando.</div>
     cambiarEstilo({ alpha: opacidadEl.value / 100 });
   });
   opacidadEl.addEventListener("change", cerrarRafagaColor);
+
+  // ===============================================================
+  // ENTRADA · Ayuda. Durante la edición, un "?" casi transparente arriba a
+  // la derecha abre un panel con las operaciones (el texto sale del guion).
+  // Arranca cerrada; se cierra con su X o tocando otra vez el "?". Se
+  // arrastra desde el título para que no tape lo que se quiere editar, y al
+  // volver a abrirla aparece donde se dejó, siempre entera dentro de la
+  // ventana. No es parte de la escena: no recibe rueda ni gestos, y ni el
+  // "?" ni la X se quedan con el foco (la barra espaciadora no los vuelve a
+  // apretar). En el modo final no está.
+  // ===============================================================
+  const botonAyudaEl = document.getElementById("botonAyuda");
+  const panelAyudaEl = document.getElementById("panelAyuda");
+  const asaAyudaEl = document.getElementById("ayudaAsa");
+  const cerrarAyudaEl = document.getElementById("ayudaCerrar");
+  let posAyuda = null;              // { x, y } en px, después del primer arrastre
+  let arrastreAyuda = null;         // { id, x0, y0, x, y } mientras se arrastra
+
+  function ayudaAbierta() { return panelAyudaEl.classList.contains("visible"); }
+
+  // Hasta el primer arrastre manda el CSS (debajo del "?"); después, la
+  // posición elegida, corrida lo justo para que el panel entre en la ventana.
+  function colocarAyuda() {
+    if (!posAyuda || !ayudaAbierta()) return;
+    const maxX = Math.max(0, window.innerWidth - panelAyudaEl.offsetWidth);
+    const maxY = Math.max(0, window.innerHeight - panelAyudaEl.offsetHeight);
+    posAyuda.x = Math.min(Math.max(0, posAyuda.x), maxX);
+    posAyuda.y = Math.min(Math.max(0, posAyuda.y), maxY);
+    panelAyudaEl.style.left = posAyuda.x + "px";
+    panelAyudaEl.style.top = posAyuda.y + "px";
+    panelAyudaEl.style.right = "auto";
+  }
+
+  function abrirAyuda() {
+    panelAyudaEl.classList.add("visible");
+    botonAyudaEl.setAttribute("aria-expanded", "true");
+    colocarAyuda();
+  }
+
+  function cerrarAyuda() {
+    if (!ayudaAbierta()) return;
+    arrastreAyuda = null;
+    panelAyudaEl.classList.remove("visible", "arrastrando");
+    botonAyudaEl.setAttribute("aria-expanded", "false");
+  }
+
+  // Lo llama actualizarPie: el "?" sólo existe en la edición con algo que
+  // editar.
+  function actualizarAyuda() {
+    const hay = etapa !== "final" && hayCapturas && !!escena;
+    botonAyudaEl.classList.toggle("visible", hay);
+    if (!hay) cerrarAyuda();
+  }
+
+  botonAyudaEl.addEventListener("click", function () {
+    botonAyudaEl.blur();
+    if (ayudaAbierta()) cerrarAyuda(); else abrirAyuda();
+  });
+  cerrarAyudaEl.addEventListener("click", function () {
+    cerrarAyudaEl.blur();
+    cerrarAyuda();
+  });
+
+  asaAyudaEl.addEventListener("pointerdown", function (e) {
+    if (e.button !== 0 || cerrarAyudaEl.contains(e.target)) return;
+    e.preventDefault();
+    const caja = panelAyudaEl.getBoundingClientRect();
+    arrastreAyuda = { id: e.pointerId, x0: e.clientX, y0: e.clientY, x: caja.left, y: caja.top };
+    panelAyudaEl.classList.add("arrastrando");
+    if (asaAyudaEl.setPointerCapture) asaAyudaEl.setPointerCapture(e.pointerId);
+  });
+  asaAyudaEl.addEventListener("pointermove", function (e) {
+    if (!arrastreAyuda || e.pointerId !== arrastreAyuda.id) return;
+    posAyuda = { x: arrastreAyuda.x + e.clientX - arrastreAyuda.x0,
+                 y: arrastreAyuda.y + e.clientY - arrastreAyuda.y0 };
+    colocarAyuda();
+  });
+  function soltarAyuda(e) {
+    if (!arrastreAyuda || e.pointerId !== arrastreAyuda.id) return;
+    arrastreAyuda = null;
+    panelAyudaEl.classList.remove("arrastrando");
+  }
+  asaAyudaEl.addEventListener("pointerup", soltarAyuda);
+  asaAyudaEl.addEventListener("pointercancel", soltarAyuda);
+  window.addEventListener("resize", colocarAyuda);
 
   // ===============================================================
   // ENTRADA · Cierre de la edición: la barra espaciadora pulsada dos veces,

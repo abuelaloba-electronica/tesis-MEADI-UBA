@@ -269,6 +269,7 @@ ignora en silencio, como las líneas serie que una página no reconoce.
 | tirador de la esquina, rueda | agranda o achica la selección |
 | tirador redondo, Mayús+rueda | gira la selección, si tiene algún cuadrilátero (con Mayús, el tirador va de a 15°) |
 | muestra de color (arriba a la izquierda) | abre el panel de color y opacidad de la selección |
+| `?` (arriba a la derecha) | abre o cierra la ayuda |
 | Ctrl+C / Ctrl+V | copia / pega desplazado, encima de todo |
 | Supr, Retroceso | elimina la selección |
 | Ctrl+Z / Ctrl+Mayús+Z o Ctrl+Y | deshace / rehace |
@@ -418,6 +419,29 @@ tocando otra vez la muestra. Con el foco en el panel las teclas son de sus
 controles: las flechas mueven el deslizador y no navegan, la barra marca una
 casilla y no cierra la edición, Supr no borra; Ctrl+Z sí deshace.
 
+**La ayuda.** Arriba a la derecha, un `?` en un círculo de 26 px, gris y
+casi transparente, que se aclara al pasar el puntero: discreto como la
+muestra de color, para no sumar texto a una pantalla que no lo tiene. Abre
+un panel "Cómo editar" con las operaciones de esta sección, agrupadas en
+Seleccionar, Transformar, Editar y Terminar, y una nota (los puntos no se
+agrandan, sólo los cuadriláteros giran). Su texto sale del guion. Las
+decisiones:
+
+- **Arranca cerrada** y se cierra con su X o tocando otra vez el `?`.
+- **Se arrastra desde el título** a cualquier lugar, para que no tape lo
+  que se quiere editar. Siempre queda entera dentro de la ventana (también
+  al cambiar su tamaño), y al volver a abrirla aparece donde se dejó, hasta
+  recargar.
+- **No es parte de la escena**: un clic, un arrastre o la rueda sobre el
+  panel no seleccionan ni transforman nada, y no cuentan como edición (no
+  cancelan el aviso de cierre). Ni el `?` ni la X se quedan con el foco, así
+  que la barra espaciadora no los vuelve a apretar.
+- **Deja afuera V**, que es diagnóstico del operador, y Ctrl+Y, que hace lo
+  mismo que Ctrl+Mayús+Z. Las teclas se nombran como en las instrucciones de
+  las pantallas 4, 6 y 8 (Retroceso).
+- **Sólo en la edición**: en el modo final el `?` desaparece y el panel se
+  cierra. Tampoco aparece sin capturas.
+
 ### 4.3 · El script en capas
 
 Cada capa usa sólo las de arriba:
@@ -429,7 +453,7 @@ Cada capa usa sólo las de arriba:
 | vista | dibujo de la escena y de las marcas de edición |
 | sonido | decodificar o sintetizar la grabación, reproducirla en loop, analizarla, llevar el cuadro de la animación |
 | video | grabar una vuelta de la animación con su sonido en un lienzo propio y descargarla (§5.6) |
-| entrada | gestos (mover, escalar, rotar, marco: objetos con `mover`, `terminar`, `pintar`), rueda, color y opacidad, teclado, cierre de la edición |
+| entrada | gestos (mover, escalar, rotar, marco: objetos con `mover`, `terminar`, `pintar`), rueda, color y opacidad, ayuda, teclado, cierre de la edición |
 | datos | IndexedDB, demo y arranque |
 
 Un tipo nuevo es una entrada en `TIPOS` y sus filas en `PERMITIDAS` y
@@ -801,8 +825,7 @@ node entorno-digital/tools/harness_midi.js entorno-digital/experiencia/guante_pe
 - **Del editor, sin hacer**: girar otros tipos (hoy no hace falta: son
   redondos), duplicar (Ctrl+D), orden (`[` `]`), clic
   repetido que baja por la pila, bloquear u ocultar por origen (`1` `2` `3`),
-  exportar PNG (`P`) y el panel de instrucciones (cuyo texto tiene que entrar
-  primero al guion).
+  y exportar PNG (`P`).
 
 ---
 
@@ -989,3 +1012,12 @@ un solo paso de deshacer, Mayús en el tirador redondea a 30°, un marco
 sobre toda la escena gira entero (14 cuadriláteros giran, los 69 elementos
 se mueven, ningún otro tipo cambia su `giro`), y el modo final anima sin
 errores.
+
+**2026-11-10 · Ayuda en la composición.** En el modo edición, un `?`
+discreto arriba a la derecha abre un panel con las operaciones de §4.2, que
+se cierra con su X o con el mismo `?` y se arrastra desde el título para no
+tapar la escena. El texto entra primero al guion (pantalla 11), que además
+suma "girar" a la descripción de la edición. Probado en Brave headless con
+`#demo`: abrir, arrastrar (el panel no sale de la ventana y el arrastre no
+selecciona nada de la escena), cerrar, reabrir donde quedó, y que en el modo
+final no aparece.

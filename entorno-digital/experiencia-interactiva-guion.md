@@ -110,7 +110,47 @@ Tu obra será una composición gráfica, audible y en movimiento.
 
 **Composición: las tres capturas superpuestas, cada una con fondo transparente. De abajo hacia arriba: dispositivo tres (EMG), dispositivo dos (guante) y dispositivo uno (bandada). Sin texto.**
 
-**Dos momentos. Primero la edición, en silencio: se pueden seleccionar, mover, agrandar, cambiar de color y de opacidad, copiar, pegar y eliminar los elementos, y deshacer. Después la composición final, que se pide pulsando dos veces la barra espaciadora: queda tal como se dejó, sin marcas de edición, y suena en loop lo que se grabó con el dispositivo dos. Es definitivo: ya no se vuelve a editar.**
+**Dos momentos. Primero la edición, en silencio: se pueden seleccionar, mover, agrandar, girar, cambiar de color y de opacidad, copiar, pegar y eliminar los elementos, y deshacer. Después la composición final, que se pide pulsando dos veces la barra espaciadora: queda tal como se dejó, sin marcas de edición, y suena en loop lo que se grabó con el dispositivo dos. Es definitivo: ya no se vuelve a editar.**
+
+**Durante la edición, arriba a la derecha, un botón flotante muy discreto “?” abre la ayuda. Arranca cerrada. Es un panel que se cierra con su X o tocando otra vez el botón, y que se puede arrastrar desde el título a cualquier lugar de la pantalla para que no tape lo que se quiere editar; al volver a abrirlo aparece donde se dejó. En la composición final no está. Cada línea: a la izquierda, lo que se hace; a la derecha, lo que pasa.**
+
+Cómo editar
+
+*Seleccionar*
+
+clic — selecciona un elemento
+
+Mayús + clic — lo suma a la selección o lo quita
+
+arrastrar en el vacío — selecciona todo lo que toca el recuadro (con Mayús, lo suma)
+
+clic en el vacío o Esc — deselecciona
+
+*Transformar*
+
+arrastrar lo seleccionado — lo mueve
+
+tirador de la esquina o rueda — agranda o achica
+
+tirador redondo o Mayús + rueda — gira los cuadriláteros (con Mayús, de a 15°)
+
+muestra de color, arriba a la izquierda — cambia el color y la opacidad
+
+*Editar*
+
+Ctrl + C / Ctrl + V — copia / pega
+
+Retroceso — elimina la selección
+
+Ctrl + Z — deshace
+
+Ctrl + Mayús + Z — rehace
+
+*Terminar*
+
+barra espaciadora dos veces — finaliza la composición
+
+Los puntos se mueven pero no se agrandan. Sólo los cuadriláteros giran.
 
 **Al pulsar la barra espaciadora por primera vez, aviso sobre la composición:**
 
