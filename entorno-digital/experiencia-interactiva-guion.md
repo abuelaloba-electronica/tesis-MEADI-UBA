@@ -98,7 +98,7 @@ Para borrar todo e iniciar nuevamente pulsa la tecla Retroceso.
 
 **Pantalla 10\.**
 
-Llegaste casi al final de la experiencia. Los datos que generaste ahora pueden volverse una obra gráfica y sonora: la huella de tu cuerpo en el espacio digital.
+Llegaste casi al final de la experiencia. Los datos que generaste pueden volverse una obra gráfica y sonora, la huella de tu cuerpo en el espacio digital.
 
 Selecciona lo que creas más interesante para componerla y la máquina te ayudará. Puedes borrar elementos, disminuir o aumentar su tamaño, cambiar el color, rotar, copiar y pegar.
 
