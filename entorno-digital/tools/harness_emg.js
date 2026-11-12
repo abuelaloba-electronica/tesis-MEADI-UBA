@@ -128,6 +128,9 @@ const puertoFalso = {
 };
 const serialFalso = {
   requestPort: async function () { return puertoFalso; },
+  // Ningun puerto autorizado de antemano: la conexion automatica de la copia
+  // de la experiencia no encuentra nada y el harness conecta por requestPort.
+  getPorts: async function () { return []; },
   addEventListener: function () {}
 };
 

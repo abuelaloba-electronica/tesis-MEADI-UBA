@@ -56,6 +56,13 @@ visualización sólo deja seguir con → **después de capturar**, y vuelve a
 atrás: ← en la 6 o en la 8 no hace nada, porque la captura es definitiva. En
 la 11, ← vuelve a la 10.
 
+**Conectar cada dispositivo.** La persona enchufa cada placa recién en la
+pantalla de su paso (4, 6, 8) y la cambia por la siguiente en la otra. En
+esas tres pantallas, el botón "Conectar dispositivo" la autoriza y la
+reconoce, y la visualización que sigue se conecta sola, sin abrir el panel
+(§2 y §3). Sin conectar, se avanza igual y la visualización arranca
+simulada.
+
 **El número de pantalla vive en el hash** (`experiencia.html#6`): recargar no
 pierde el lugar, y es la forma en que las otras páginas vuelven al recorrido.
 
@@ -108,6 +115,37 @@ rótulo, y las flechas forman una T invertida, con ← y → enteras. El
 texto de las instrucciones sigue diciendo "Retroceso". Se eligió entre seis
 variantes (tecla dibujada en línea, símbolo como viñeta, leyenda en el pie,
 la tecla que se pulsa, la tecla con el resaltador y este esquema).
+
+**El botón "Conectar dispositivo"** (pantallas 4, 6 y 8), flotante arriba a
+la derecha; arriba a la izquierda, en las visualizaciones, está la pestaña
+del panel. Se pulsa después de colocarse el dispositivo y enchufarlo, antes
+de →. Abre el selector de puertos de Chrome, filtrado a Adafruit (`0x239A`,
+la Flora) y SparkFun (`0x1B4F`, las LilyPad USB). Con el puerto elegido, la
+página lo abre, escucha hasta 2 s, decide por el prefijo de tres líneas
+(`A:` bandada; `F:`/`G:` guante; `E:`/`L:`/`S:` EMG) y lo cierra para que lo
+abra la visualización. El botón dice "Reconociendo…" y después "Dispositivo
+listo ✓", en el amarillo del resaltador. Si no, una nota debajo dice qué
+pasó: "Ese es el dispositivo dos. Conecta el dispositivo uno.", que no llegan
+datos, o que otro programa tiene el puerto. El texto está en el guion.
+Al llegar a la pantalla también se revisan los puertos ya autorizados: si
+la placa ya lo estaba, el botón aparece listo sin tocarlo. Al desenchufarla,
+vuelve a "Conectar dispositivo". Sin Web Serial (Firefox, Safari) el botón no
+aparece. Pulsarlo no es obligatorio para avanzar.
+
+**Por qué hace falta un clic con cada placa.** Web Serial sólo abre un puerto
+que la persona eligió en el selector, y el selector exige un gesto. Después
+`getPorts()` devuelve los autorizados sin gesto, y como todas las páginas
+`file://` comparten origen, la autorización dada en `experiencia.html` vale
+en la visualización. Pero las tres placas (32u4 con el core de Arduino)
+informan un número de serie USB vacío —medido en la Flora: `iSerial 3` sin
+texto, `/dev/serial/by-id/usb-Adafruit_Flora-if00`—, y sin número de serie
+Chrome da un permiso efímero que **se pierde al desenchufar**. Como cada placa
+se enchufa justo antes de su paso, hay que autorizarla ahí. Se eligió el
+botón y no un cambio en las instrucciones ni una tecla (Enter).
+
+**Por qué reconocer la placa y no fiarse del USB.** `port.getInfo()` sólo da
+VID y PID, y las dos LilyPad son iguales: lo único que las distingue es lo
+que emiten.
 
 ---
 
@@ -182,6 +220,18 @@ cosa. Por eso cada copia anota sus `elementos`:
 **IndexedDB y no `localStorage`**: tres PNG de pantalla completa pasan los
 ~5 MB de `localStorage`. En Chrome y Brave todas las páginas `file://`
 comparten origen, así que la 11 lee lo que escribieron las otras.
+
+**Conexión automática.** Al cargar, cada copia busca entre los puertos ya
+autorizados (`getPorts()`) uno que emita lo suyo, con la misma
+`identificarPuerto()` de `experiencia.html` (`MI_DISPOSITIVO`), y si lo
+encuentra lo pasa a `usarPuerto()`, lo mismo que hace el botón del panel
+después del selector. El estado dice "Conectado (automático)". Los otros
+puertos se cierran sin tocar. El evento `connect` repite la búsqueda si se
+enchufa una placa con la página abierta (sólo llega si la autorización
+sigue en pie). Si no encuentra nada, todo queda como antes: simulación y el
+botón del panel. Si se pulsa el botón del panel durante la búsqueda, espera
+a que termine (abrir dos veces el mismo puerto falla). Las páginas activas
+de `entorno-digital/` no tienen esto.
 
 **Particularidades por copia.** La bandada no dibuja los puntos hasta que
 llega el primer dato (del dispositivo, de los sliders o del demo), para que
@@ -794,7 +844,12 @@ sonido en pausa, al recargar en el modo final antes de la primera tecla.
   fuente por `deviceId` exacto, nunca `default` ni un micrófono, nada antes
   del primer golpe, Retroceso descarta, la cola, `t` de cada anillo igual al
   de su nota, `t0`/`t1` del disco con sus CC, el tope). `tools/harness.js` y
-  `tools/harness_emg.js` corren también sobre las copias. Para
+  `tools/harness_emg.js` corren también sobre las copias (el Web Serial
+  falso de `harness_emg.js` devuelve `getPorts()` vacío, así que conecta por
+  el botón como antes). El botón de conexión y la conexión automática se
+  probaron con pruebas descartables en Node con puertos falsos que emiten
+  las líneas de cada placa (la equivocada, una muda, el clic durante la
+  revisión automática, el cambio de pantalla a mitad). Para
   `composicion.html` no hay harness en `tools/`: se probó con pruebas
   descartables en Node (DOM, canvas, IndexedDB, eventos y Web Audio falsos).
   El video se probó con Brave headless manejado por el protocolo de
@@ -810,6 +865,12 @@ node entorno-digital/tools/harness_midi.js entorno-digital/experiencia/guante_pe
 
 ## 7 · Pendiente
 
+- **Probar la conexión con las tres placas reales** en Chrome o Brave:
+  el selector, el reconocimiento, y que la visualización se conecte sola.
+  Si algún día se le da número de serie USB a las placas (un módulo
+  `PluggableUSB` mínimo en cada sketch) o se usa la política de Chrome
+  `SerialAllowUsbDevicesForUrls`, el botón aparece listo solo y el clic
+  deja de hacer falta, sin cambiar las páginas.
 - **Verlo y oírlo en la sala** con una captura real del guante, y ajustar a
   ojo las ganancias de `REACCIONES` y las bandas de `SENALES` con el patch de
   Helm.
@@ -1021,3 +1082,14 @@ suma "girar" a la descripción de la edición. Probado en Brave headless con
 `#demo`: abrir, arrastrar (el panel no sale de la ventana y el arrastre no
 selecciona nada de la escena), cerrar, reabrir donde quedó, y que en el modo
 final no aparece.
+
+**2026-11-12 · Conectar el dispositivo desde las instrucciones.** Las
+pantallas 4, 6 y 8 suman arriba a la derecha el botón "Conectar
+dispositivo", que autoriza la placa en el selector de Chrome, la reconoce
+por el prefijo de sus líneas y dice "Dispositivo listo ✓" (§2). Las tres
+copias se conectan solas al cargar con el puerto autorizado que emita lo
+suyo (§3): ya no hace falta abrir el panel. El clic por placa no se puede
+evitar porque las placas no informan número de serie USB y Chrome olvida
+la autorización al desenchufarlas. El texto del botón entra al guion; las
+instrucciones no cambian. `harness_emg.js` suma `getPorts()` a su Web Serial
+falso.

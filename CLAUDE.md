@@ -39,6 +39,11 @@ sin romper nada.
 `guante_percusion.html`, `emg_acumulacion.html`; sus
 instrucciones están en la pantalla de texto anterior: 4, 6 y 8), con Retroceso para borrar, barra espaciadora dos veces para capturar
 (la primera pide confirmación; definitiva: PNG transparente + lista de `elementos` en IndexedDB) y → para seguir.
+En las pantallas 4, 6 y 8 un botón "Conectar dispositivo" autoriza la placa en
+el selector de Chrome y la reconoce por el prefijo de sus líneas; la copia que
+sigue la encuentra con `getPorts()` y se conecta sola (las placas no informan
+número de serie USB, así que la autorización se pierde al desenchufarlas y
+hay que darla con cada una).
 La copia del guante además graba lo que suena en Helm (sólo la fuente
 `MAEDI-Helm-grabacion` que arma `tools/audio_helm.sh`, nunca un micrófono) y
 lo guarda con la captura (`version: 2`, campo `sonido`).

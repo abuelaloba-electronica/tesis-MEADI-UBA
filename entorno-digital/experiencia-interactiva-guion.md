@@ -46,6 +46,32 @@ Para borrar todo e iniciar nuevamente pulsa la tecla Retroceso.
 
 **Debajo de la lista, un esquema del teclado de la MacBook Pro con la barra espaciadora y la tecla delete resaltadas en amarillo y la flecha → apenas marcada**
 
+**Arriba a la derecha, un botón flotante para conectar el dispositivo, que se pulsa después de colocarse el dispositivo y enchufarlo a la computadora, antes de avanzar. Abre el selector de puertos del navegador; al elegir la placa, la reconoce:**
+
+Conectar dispositivo
+
+**Mientras la reconoce:**
+
+Reconociendo…
+
+**Si es la correcta:**
+
+Dispositivo listo ✓
+
+**Si es otra, debajo del botón (con el número de la que se enchufó y de la que corresponde):**
+
+Ese es el dispositivo dos. Conecta el dispositivo uno.
+
+**Si la placa no manda datos:**
+
+No llegan datos del dispositivo. Desconéctalo, vuelve a conectarlo y pulsa otra vez el botón.
+
+**Si otro programa la tiene abierta:**
+
+El dispositivo está en uso por otro programa. Ciérralo y vuelve a pulsar el botón.
+
+**Sin conectar, se avanza igual y la visualización arranca simulada.**
+
 **Pantalla 5\.**
 
 **Visualización del dispositivo uno, sin instrucciones en pantalla**
@@ -70,6 +96,8 @@ Para borrar todo e iniciar nuevamente pulsa la tecla Retroceso.
 
 **Debajo de la lista, un esquema del teclado de la MacBook Pro con la barra espaciadora y la tecla delete resaltadas en amarillo y la flecha → apenas marcada**
 
+**Arriba a la derecha, el mismo botón “Conectar dispositivo” de la pantalla 4, ahora para el dispositivo dos.**
+
 **Pantalla 7\.**
 
 **Visualización del dispositivo dos, sin instrucciones en pantalla**
@@ -91,6 +119,8 @@ Captura la composición gráfica pulsando dos veces la barra espaciadora.
 Para borrar todo e iniciar nuevamente pulsa la tecla Retroceso.
 
 **Debajo de la lista, un esquema del teclado de la MacBook Pro con la barra espaciadora y la tecla delete resaltadas en amarillo y la flecha → apenas marcada**
+
+**Arriba a la derecha, el mismo botón “Conectar dispositivo” de la pantalla 4, ahora para el dispositivo tres.**
 
 **Pantalla 9\.**
 
